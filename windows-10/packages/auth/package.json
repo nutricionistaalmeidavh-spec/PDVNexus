@@ -1,0 +1,11 @@
+{
+  "name": "@nexus-core/auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autenticacao local, sessao e permissoes.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,0 +1,1343 @@
+import { getDesktopPdvBackupBridge, getDesktopPdvStoreBridge, getDesktopPdvSyncBridge, getDesktopPrintingBridge, getDesktopSerialBridge, type DesktopPdvBackupFile, type DesktopPdvSyncServerStatus, type SerialPortInfo } from "@nexus-core/desktop-runtime";
+import {
+  applyPdvInventoryCount,
+  applyPdvStockMovement,
+  authorizePdvAction,
+  cancelPdvSale,
+  closePdvCashSession,
+  completePdvSale,
+  configurePdvTerminal,
+  createDefaultPdvLocalStore,
+  createPdvAutoBackup,
+  exportPdvReportCsv,
+  filterPdvSalesForCashSession,
+  filterPdvSalesHistory,
+  generatePdvDashboardReport,
+  getPdvLowStockAlerts,
+  renderPdvReceipt,
+  resolvePdvTefTransaction,
+  upsertPdvPaymentOption,
+  upsertPdvUser,
+  verifyPdvUserPassword,
+  resolvePdvPayment,
+  type PdvCashClosingSummary,
+  type PdvLocalStoreDefaults,
+  type PdvPaymentSummary,
+  type PdvStockMovement,
+  type PdvStockMovementType,
+  type PdvAuditLog,
+  type PdvTerminalConfig,
+  type PdvTefTransaction,
+  type PdvUser
+} from "@nexus-core/database";
+import {
+  calculateTotalPrice,
+  defaultBrazilianScaleProfile,
+  encodeScaleBarcode,
+  exportToledoItemsFile,
+  exportUranoProductsFile,
+  genericUsbScaleProfile,
+  keyboardWedgeScannerProfile,
+  parseScaleSerialReadingByBrand,
+  resolvePosInputFromBarcode,
+  resolvePosInputFromScaleBarcodeProfile,
+  SCALE_BARCODE_PROFILES,
+  SCALE_REQUEST_COMMANDS,
+  type BarcodeProfileMode,
+  type ScaleBarcodeProfileKey,
+  type ScaleProductRecord,
+  type ScaleSerialBrand
+} from "@nexus-core/module-balanca";
+import { AppShell, Pill, SectionCard } from "@nexus-core/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useHashRoute } from "../../meu-engenheiro/src/lib/useHashRoute";
+
+type PaymentMethod = string;
+type PaymentOption = { name: string; feePercent: number; showsInCashflow: boolean; active?: boolean; kind?: "cash" | "pix" | "credit" | "debit" | "store-credit" | "check" | "other"; };
+type PaymentDraft = { method: PaymentMethod; amount: number };
+type CatalogProduct = ScaleProductRecord & { barcode: string; unitLabel: string; stock: number; minStock: number; category: string; active?: boolean; };
+type Customer = { id: string; name: string; document: string; city: string; creditLimit: number; creditUsed: number; };
+type SaleItem = { id: string; productCode: string; productName: string; unitLabel: string; quantity: number; unitPrice: number; totalPrice: number; source: "catalog" | "scale"; };
+type SaleState = { number: string; openedAt: string; customerId: string; seller: string; discountPercent: number; items: SaleItem[]; payments: PaymentDraft[]; terminalId?: string; operatorId?: string; };
+type CompletedSale = SaleState & { finalizedAt: string; netTotal: number; paymentSummary: PdvPaymentSummary; status?: "completed" | "cancelled"; cancelledAt?: string; cancelReason?: string; cancelledById?: string; authorizedById?: string; };
+type CashSession = { openedAt: string; initialAmount: number; closedAt?: string; withdrawals: Array<{ amount: number; note: string; createdAt: string }>; };
+type ReceiptPrinterConfig = { paperWidth: number; autoPrint: boolean; printerName: string; };
+type TefConfig = { enabled: boolean; simulationMode: boolean; provider: string; merchantCode: string; endpointUrl: string; integrationMode: "simulated" | "http-bridge"; };
+type AutoBackupConfig = { enabled: boolean; retention: number; trigger: "sale-finalized" | "manual"; };
+type StoreSettings = { storeName: string; document: string; phone: string; address: string; };
+type PdvExtensions = { inventoryMovements: PdvStockMovement[]; cashClosings: PdvCashClosingSummary[]; receiptPrinterConfig: ReceiptPrinterConfig; lastReceiptText: string; users: PdvUser[]; currentOperatorId: string; auditLogs: PdvAuditLog[]; cancelledSales: CompletedSale[]; terminalConfig: PdvTerminalConfig; tefConfig: TefConfig; tefTransactions: PdvTefTransaction[]; autoBackupConfig: AutoBackupConfig; autoBackups: Array<{ id: string; createdAt: string; reason: string; snapshotJson: string }>; storeSettings: StoreSettings; };
+type PdvDeviceConfig = { scaleBrand: ScaleSerialBrand; barcodeMode: BarcodeProfileMode; requestCommand: string; selectedPort: string; baudRate: string; manualProductCode: string; };
+type PdvStoreDefaults = PdvLocalStoreDefaults<CatalogProduct, Customer, CompletedSale, CashSession, PaymentOption, PdvDeviceConfig>;
+
+const seedProducts: CatalogProduct[] = [
+  { productCode: "00021", barcode: "7891000000212", productName: "Picanha Bovina", unitPrice: 79.9, itemType: "weight", shelfLifeDays: 3, unitLabel: "KG", stock: 12.2, minStock: 3, category: "Acougue" },
+  { productCode: "00034", barcode: "7891000000342", productName: "Tomate Italiano", unitPrice: 8.99, itemType: "weight", shelfLifeDays: 4, unitLabel: "KG", stock: 25.8, minStock: 6, category: "Hortifruti" },
+  { productCode: "00101", barcode: "7895555441971", productName: "Teclado com fio", unitPrice: 100, itemType: "unit", shelfLifeDays: 0, unitLabel: "UN", stock: 8, minStock: 2, category: "Informatica" },
+  { productCode: "00102", barcode: "7894123412341", productName: "Mouse sem fio", unitPrice: 49.9, itemType: "unit", shelfLifeDays: 0, unitLabel: "UN", stock: 14, minStock: 4, category: "Informatica" },
+  { productCode: "00103", barcode: "7894900011110", productName: "Coca-Cola 2,5L", unitPrice: 12, itemType: "unit", shelfLifeDays: 90, unitLabel: "UN", stock: 22, minStock: 6, category: "Bebidas" }
+];
+
+const seedCustomers: Customer[] = [
+  { id: "CLI-001", name: "Cliente Balcao", document: "Consumidor final", city: "Sao Paulo", creditLimit: 0, creditUsed: 0 },
+  { id: "CLI-002", name: "Joao Santos", document: "123.456.789-00", city: "Cubatao", creditLimit: 5000, creditUsed: 284.99 },
+  { id: "CLI-003", name: "Maria Oliveira", document: "987.654.321-00", city: "Sao Paulo", creditLimit: 2500, creditUsed: 420 }
+];
+const fallbackCustomer: Customer = seedCustomers[0];
+
+const nav = [
+  { key: "caixa", label: "Caixa Rápido", path: "/caixa", icon: "CX" },
+  { key: "produtos", label: "Produtos", path: "/produtos", icon: "PR" },
+  { key: "clientes", label: "Clientes", path: "/clientes", icon: "CL" },
+  { key: "financeiro", label: "Financeiro", path: "/financeiro", icon: "FX" },
+  { key: "administracao", label: "Administração", path: "/administracao", icon: "AD" },
+  { key: "balanca", label: "Balança", path: "/balanca", icon: "KG" }
+];
+
+const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
+const defaultPaymentOptions: PaymentOption[] = [{ name: "A VISTA", feePercent: 0, showsInCashflow: true }, { name: "PIX", feePercent: 0, showsInCashflow: true }, { name: "CREDITO", feePercent: 3, showsInCashflow: true }, { name: "DEBITO", feePercent: 2.5, showsInCashflow: true }, { name: "A PRAZO", feePercent: 0, showsInCashflow: false }, { name: "CHEQUE", feePercent: 0, showsInCashflow: true }, { name: "OUTROS", feePercent: 0, showsInCashflow: true }];
+const paymentQuickMethods = ["A VISTA", "PIX", "DEBITO", "CREDITO", "A PRAZO"];
+const defaultRoute = "/caixa";
+const defaultConfig: PdvDeviceConfig = { scaleBrand: "toledo", barcodeMode: "DEFAULT_PRICE", requestCommand: SCALE_REQUEST_COMMANDS.toledo, selectedPort: "", baudRate: "9600", manualProductCode: "00034" };
+const defaultPrinterConfig: ReceiptPrinterConfig = { paperWidth: 32, autoPrint: false, printerName: "Impressora termica 58/80mm" };
+const defaultUsers: PdvUser[] = [{ id: "OP-001", name: "Operador Caixa", role: "cashier", active: true }, { id: "GER-001", name: "Gerente", role: "manager", active: true }];
+const defaultTerminalConfig: PdvTerminalConfig = { terminalId: "CAIXA-01", terminalName: "Caixa principal", mode: "single", active: true };
+const defaultTefConfig: TefConfig = { enabled: false, simulationMode: false, provider: "Captura manual", merchantCode: "", endpointUrl: "", integrationMode: "simulated" };
+const defaultAutoBackupConfig: AutoBackupConfig = { enabled: true, retention: 7, trigger: "sale-finalized" };
+const defaultStoreSettings: StoreSettings = { storeName: "PDV Nexus", document: "Nao informado", phone: "", address: "" };
+const defaultExtensions: PdvExtensions = { inventoryMovements: [], cashClosings: [], receiptPrinterConfig: defaultPrinterConfig, lastReceiptText: "", users: defaultUsers, currentOperatorId: "OP-001", auditLogs: [], cancelledSales: [], terminalConfig: defaultTerminalConfig, tefConfig: defaultTefConfig, tefTransactions: [], autoBackupConfig: defaultAutoBackupConfig, autoBackups: [], storeSettings: defaultStoreSettings };
+const defaultPdvStore: PdvStoreDefaults = { catalogProducts: seedProducts, registeredCustomers: seedCustomers, completedSales: [], cashSession: null, paymentOptions: defaultPaymentOptions, deviceConfig: defaultConfig, extensions: defaultExtensions };
+
+export function PdvDemoApp() {
+  const route = useHashRoute(defaultRoute);
+  const [initialStore] = useState(loadInitialPdvStore);
+  // Do not overwrite the desktop database with the renderer's bootstrap state.
+  const [persistenceState, setPersistenceState] = useState<"booting" | "ready" | "error">(
+    () => getDesktopPdvStoreBridge() ? "booting" : "error"
+  );
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const checkoutSearchRef = useRef<HTMLInputElement>(null);
+  const savedConfig = initialStore.deviceConfig;
+  const savedExtensions = normalizePdvExtensions(initialStore.extensions);
+  const [sale, setSale] = useState<SaleState | null>(null);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>(initialStore.catalogProducts);
+  const [registeredCustomers, setRegisteredCustomers] = useState<Customer[]>(initialStore.registeredCustomers);
+  const [completedSales, setCompletedSales] = useState<CompletedSale[]>(initialStore.completedSales);
+  const [cashSession, setCashSession] = useState<CashSession | null>(initialStore.cashSession);
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>(initialStore.paymentOptions);
+  const [inventoryMovements, setInventoryMovements] = useState<PdvStockMovement[]>(savedExtensions.inventoryMovements);
+  const [cashClosings, setCashClosings] = useState<PdvCashClosingSummary[]>(savedExtensions.cashClosings);
+  const [receiptPrinterConfig, setReceiptPrinterConfig] = useState<ReceiptPrinterConfig>(savedExtensions.receiptPrinterConfig);
+  const [lastReceiptText, setLastReceiptText] = useState(savedExtensions.lastReceiptText);
+  const [users, setUsers] = useState<PdvUser[]>(savedExtensions.users);
+  const [currentOperatorId, setCurrentOperatorId] = useState(savedExtensions.currentOperatorId);
+  const [auditLogs, setAuditLogs] = useState<PdvAuditLog[]>(savedExtensions.auditLogs);
+  const [cancelledSales, setCancelledSales] = useState<CompletedSale[]>(savedExtensions.cancelledSales);
+  const [terminalConfig, setTerminalConfig] = useState<PdvTerminalConfig>(savedExtensions.terminalConfig);
+  const [tefConfig, setTefConfig] = useState<TefConfig>(savedExtensions.tefConfig);
+  const [tefTransactions, setTefTransactions] = useState<PdvTefTransaction[]>(savedExtensions.tefTransactions);
+  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(savedExtensions.autoBackupConfig);
+  const [autoBackups, setAutoBackups] = useState(savedExtensions.autoBackups);
+  const [desktopBackupFiles, setDesktopBackupFiles] = useState<DesktopPdvBackupFile[]>([]);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(savedExtensions.storeSettings);
+  const [loginPasswordDraft, setLoginPasswordDraft] = useState("");
+  const [terminalDraft, setTerminalDraft] = useState({ terminalId: savedExtensions.terminalConfig.terminalId, terminalName: savedExtensions.terminalConfig.terminalName, mode: savedExtensions.terminalConfig.mode, serverUrl: savedExtensions.terminalConfig.serverUrl ?? "" });
+  const [syncServerDraft, setSyncServerDraft] = useState({ port: "4174", token: "", remoteUrl: savedExtensions.terminalConfig.serverUrl ?? "" });
+  const [syncServerStatus, setSyncServerStatus] = useState<DesktopPdvSyncServerStatus>({ running: false });
+  const [paymentOptionDraft, setPaymentOptionDraft] = useState({ name: "", feePercent: "", showsInCashflow: true, kind: "other" as PaymentOption["kind"] });
+  const [editingPaymentName, setEditingPaymentName] = useState("");
+  const [userDraft, setUserDraft] = useState({ id: "", name: "", role: "cashier" as PdvUser["role"], managerPassword: "", active: true });
+  const [editingUserId, setEditingUserId] = useState("");
+  const [historyFilters, setHistoryFilters] = useState({ query: "", status: "all" as "all" | "completed" | "cancelled", customerId: "", paymentMethod: "" });
+  const [managerPasswordDraft, setManagerPasswordDraft] = useState("");
+  const [cancelReasonDraft, setCancelReasonDraft] = useState("Cancelamento autorizado");
+  const [cancelSaleNumber, setCancelSaleNumber] = useState("");
+  const [desktopStoreStatus, setDesktopStoreStatus] = useState("Persistencia local do navegador");
+  const [cashInitialDraft, setCashInitialDraft] = useState("");
+  const [withdrawalDraft, setWithdrawalDraft] = useState("");
+  const [withdrawalNote, setWithdrawalNote] = useState("");
+  const [countedCashDraft, setCountedCashDraft] = useState("");
+  const [countedPixDraft, setCountedPixDraft] = useState("");
+  const [countedCardDraft, setCountedCardDraft] = useState("");
+  const [entryValue, setEntryValue] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("CLI-001");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [stockProductCode, setStockProductCode] = useState(seedProducts[0].productCode);
+  const [stockMovementType, setStockMovementType] = useState<PdvStockMovementType>("entry");
+  const [stockQuantityDraft, setStockQuantityDraft] = useState("1");
+  const [stockReasonDraft, setStockReasonDraft] = useState("Entrada manual");
+  const [editingProductCode, setEditingProductCode] = useState("");
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState("");
+  const [productDraft, setProductDraft] = useState({ code: "", barcode: "", name: "", category: "", type: "unit" as "unit" | "weight", price: "", stock: "", minimumStock: "" });
+  const [customerDraft, setCustomerDraft] = useState({ name: "", document: "", city: "", creditLimit: "" });
+  const [barcode, setBarcode] = useState("2000015001251");
+  const [serialFrame, setSerialFrame] = useState("\u0002300125\u0003");
+  const [manualProductCode, setManualProductCode] = useState(savedConfig.manualProductCode);
+  const [cashierScaleOpen, setCashierScaleOpen] = useState(false);
+  const [cashierScaleProductCode, setCashierScaleProductCode] = useState(savedConfig.manualProductCode);
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
+  const [lastEvent, setLastEvent] = useState("Caixa livre - pressione Nova Venda para iniciar.");
+  const [serialPorts, setSerialPorts] = useState<SerialPortInfo[]>([]);
+  const [selectedPort, setSelectedPort] = useState(savedConfig.selectedPort);
+  const [baudRate, setBaudRate] = useState(savedConfig.baudRate);
+  const [serialConnected, setSerialConnected] = useState(false);
+  const [scaleBrand, setScaleBrand] = useState<ScaleSerialBrand>(savedConfig.scaleBrand);
+  const [barcodeMode, setBarcodeMode] = useState<BarcodeProfileMode>(savedConfig.barcodeMode);
+  const [requestCommand, setRequestCommand] = useState(savedConfig.requestCommand);
+  const serialBridge = getDesktopSerialBridge();
+  const desktopStoreBridge = getDesktopPdvStoreBridge();
+  const desktopPdvSyncBridge = getDesktopPdvSyncBridge();
+  const desktopPdvBackupBridge = getDesktopPdvBackupBridge();
+  const desktopPrintingBridge = getDesktopPrintingBridge();
+
+  const activeCustomer = registeredCustomers.find((customer) => customer.id === (sale?.customerId ?? selectedCustomerId)) ?? registeredCustomers[0] ?? fallbackCustomer;
+  const activeOperator = users.find((user) => user.id === currentOperatorId) ?? users[0] ?? defaultUsers[0];
+  const filteredProducts = useMemo(() => {
+    const search = catalogSearch.trim().toLowerCase();
+    return search ? catalogProducts.filter((product) => [product.productCode, product.barcode, product.productName, product.category].some((value) => value.toLowerCase().includes(search))) : catalogProducts;
+  }, [catalogSearch, catalogProducts]);
+  // Esta é a mesma coleção que alimenta o seletor de Estoque. A busca apenas
+  // restringe a visualização; sem busca, todos os produtos aparecem na mesma ordem.
+  const productList = filteredProducts;
+  const checkoutCategories = useMemo(() => ["Todos", ...Array.from(new Set(catalogProducts.filter((product) => product.active !== false).map((product) => product.category || "Geral")))], [catalogProducts]);
+  const checkoutProducts = useMemo(() => (selectedCategory === "Todos" ? filteredProducts : filteredProducts.filter((product) => (product.category || "Geral") === selectedCategory)).filter((product) => product.active !== false), [filteredProducts, selectedCategory]);
+
+  useEffect(() => {
+    if (!checkoutCategories.includes(selectedCategory)) setSelectedCategory("Todos");
+  }, [checkoutCategories, selectedCategory]);
+
+  const grossTotal = sale?.items.reduce((sum, item) => sum + item.totalPrice, 0) ?? 0;
+  const itemCount = sale?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const discountValue = roundCurrency(grossTotal * ((sale?.discountPercent ?? 0) / 100));
+  const netTotal = roundCurrency(grossTotal - discountValue);
+  const paymentView = resolvePaymentView(netTotal, sale?.payments ?? [], activeCustomer);
+  const paidTotal = paymentView.paidTotal;
+  const remainingTotal = paymentView.remainingTotal;
+  const change = paymentView.changeDue;
+  const cashStatus = cashSession && !cashSession.closedAt ? "CAIXA ABERTO" : "CAIXA FECHADO";
+  const generatedBarcode = barcodeMode === "legacy-brasil" ? "Usando padrao legado de 13 digitos" : safeEncodeScaleBarcode(manualProductCode, barcodeMode as ScaleBarcodeProfileKey);
+  const toledoFile = exportToledoItemsFile(catalogProducts);
+  const uranoFile = exportUranoProductsFile(catalogProducts);
+  const lowStockAlerts = getPdvLowStockAlerts(catalogProducts);
+  const dashboardReport = generatePdvDashboardReport({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    to: new Date().toISOString(),
+    sales: completedSales,
+    products: catalogProducts,
+    cashClosings
+  });
+  const activePaymentOptions = paymentOptions.filter((option) => option.active !== false);
+  const salesHistory = useMemo(() => filterPdvSalesHistory({
+    sales: completedSales,
+    cancelledSales,
+    filters: {
+      status: historyFilters.status,
+      customerId: historyFilters.customerId || undefined,
+      paymentMethod: historyFilters.paymentMethod || undefined,
+      query: historyFilters.query || undefined
+    }
+  }), [completedSales, cancelledSales, historyFilters]);
+  const storageStatusLabel = desktopStoreStatus.includes("SQLite desktop ativo") ? "Banco local SQLite ativo" : "Armazenamento local ativo";
+  const buildPdvSnapshotJson = () => JSON.stringify(createDefaultPdvLocalStore({
+    catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions,
+    deviceConfig: { scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode },
+    extensions: { inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings }
+  }));
+
+  useEffect(() => { setRequestCommand(SCALE_REQUEST_COMMANDS[scaleBrand]); }, [scaleBrand]);
+  useEffect(() => {
+    if (!desktopStoreBridge) return;
+    let cancelled = false;
+    void (async () => {
+      const status = await Promise.race([
+        desktopStoreBridge.status(),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Tempo esgotado ao abrir o banco local.")), 8000))
+      ]);
+      if (!status.available) {
+        setDesktopStoreStatus("SQLite desktop indisponivel nesta versao.");
+        setPersistenceState("error");
+        return;
+      }
+      const row = await desktopStoreBridge.load(PDV_STORE_KEY);
+      if (cancelled) return;
+      setDesktopStoreStatus(`SQLite ativo neste computador (${status.machineName}). Banco: ${status.path}`);
+      if (row?.snapshotJson) {
+        const imported = parsePdvSnapshot(row.snapshotJson);
+        setCatalogProducts(imported.catalogProducts);
+        setRegisteredCustomers(imported.registeredCustomers);
+        setCompletedSales(imported.completedSales);
+        setCashSession(imported.cashSession);
+        setPaymentOptions(imported.paymentOptions);
+        const importedExtensions = normalizePdvExtensions(imported.extensions);
+        setInventoryMovements(importedExtensions.inventoryMovements);
+        setCashClosings(importedExtensions.cashClosings);
+        setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig);
+        setLastReceiptText(importedExtensions.lastReceiptText);
+        setUsers(importedExtensions.users);
+        setCurrentOperatorId(importedExtensions.currentOperatorId);
+        setAuditLogs(importedExtensions.auditLogs);
+        setCancelledSales(importedExtensions.cancelledSales);
+        setTerminalConfig(importedExtensions.terminalConfig);
+        setTefConfig(importedExtensions.tefConfig);
+        setTefTransactions(importedExtensions.tefTransactions);
+        setAutoBackupConfig(importedExtensions.autoBackupConfig);
+        setAutoBackups(importedExtensions.autoBackups);
+        setStoreSettings(importedExtensions.storeSettings);
+        setPersistenceState("ready");
+        return;
+      }
+      await desktopStoreBridge.save(PDV_STORE_KEY, buildPdvSnapshotJson());
+      if (!cancelled) setPersistenceState("ready");
+    })().catch((error) => {
+      setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao abrir SQLite desktop.");
+      setPersistenceState("error");
+    });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (!desktopPdvSyncBridge) return;
+    void desktopPdvSyncBridge.status().then(setSyncServerStatus).catch(() => setSyncServerStatus({ running: false }));
+  }, [desktopPdvSyncBridge]);
+  useEffect(() => {
+    if (!desktopStoreBridge || persistenceState !== "ready") return;
+    const snapshot = buildPdvSnapshotJson();
+    void desktopStoreBridge.save(PDV_STORE_KEY, snapshot).catch((error) => {
+      setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.");
+      setPersistenceState("error");
+    });
+  }, [persistenceState, catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions, scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings]);
+
+  useEffect(() => {
+    if (!serialBridge) return;
+    const offData = serialBridge.onData((event) => {
+      setSerialFrame(event.data);
+      try {
+        const reading = parseScaleSerialReadingByBrand(scaleBrand, event.data);
+        setLastEvent(reading.status === "ok" ? `Balanca ${scaleBrand}: ${reading.weightKg.toFixed(3)} kg recebidos em ${event.path}.` : `Balanca ${scaleBrand}: status ${reading.status} em ${event.path}.`);
+      } catch (error) {
+        setLastEvent(error instanceof Error ? error.message : "Falha ao interpretar resposta serial.");
+      }
+    });
+    const offError = serialBridge.onError((event) => setLastEvent(`Erro serial ${event.path}: ${event.message}`));
+    return () => { offData(); offError(); };
+  }, [scaleBrand, serialBridge]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "F2") { event.preventDefault(); startNewSale(); }
+      if (event.key === "F3") { event.preventDefault(); checkoutSearchRef.current?.focus(); }
+      if (event.key === "F6") { event.preventDefault(); applyQuickPayment("A VISTA"); }
+      if (event.key === "Delete") { event.preventDefault(); removeLastItem(); }
+      if (event.key === "F8") { event.preventDefault(); finalizeSale(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  const openCash = () => { if (cashSession && !cashSession.closedAt) return setLastEvent("O caixa ja esta aberto."); const amount = Number(cashInitialDraft) || 0; setCashSession({ openedAt: new Date().toLocaleString("pt-BR"), initialAmount: amount, withdrawals: [] }); setLastEvent(`Caixa aberto com ${formatCurrency(amount)}.`); };
+  const closeCash = () => {
+    if (!cashSession || cashSession.closedAt) return setLastEvent("Nao existe caixa aberto.");
+    const closedAt = new Date().toLocaleString("pt-BR");
+    const sessionSales = filterPdvSalesForCashSession({ openedAt: cashSession.openedAt, closedAt, sales: completedSales });
+    const closing = closePdvCashSession({
+      ...cashSession,
+      closedAt,
+      sales: sessionSales,
+      countedByMethod: {
+        "A VISTA": Number(countedCashDraft) || 0,
+        PIX: Number(countedPixDraft) || 0,
+        CREDITO: Number(countedCardDraft) || 0,
+        DEBITO: Number(countedCardDraft) || 0
+      }
+    });
+    setCashClosings((current) => [closing, ...current].slice(0, 50));
+    setCashSession((current) => current ? { ...current, closedAt } : current);
+    setLastEvent(`Caixa fechado com status ${closing.status === "balanced" ? "conferido" : "divergente"}. Divergencia em dinheiro: ${formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0)}.`);
+  };
+  const addWithdrawal = () => { if (!cashSession || cashSession.closedAt) return setLastEvent("Abra o caixa antes de registrar uma sangria."); const amount = Number(withdrawalDraft) || 0; if (amount <= 0) return setLastEvent("Informe um valor de sangria valido."); setCashSession((current) => current ? { ...current, withdrawals: [...current.withdrawals, { amount, note: withdrawalNote || "Sangria", createdAt: new Date().toLocaleString("pt-BR") }] } : current); setLastEvent(`Sangria de ${formatCurrency(amount)} registrada.`); };
+  const exportPdvBackup = () => {
+    const snapshot = buildPdvSnapshotJson();
+    const blob = new Blob([snapshot], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `pdv-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setLastEvent("Backup do PDV exportado em JSON.");
+  };
+  const importPdvBackup = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const imported = parsePdvSnapshot(await file.text());
+      setCatalogProducts(imported.catalogProducts);
+      setRegisteredCustomers(imported.registeredCustomers);
+      setCompletedSales(imported.completedSales);
+      setCashSession(imported.cashSession);
+      setPaymentOptions(imported.paymentOptions);
+      const importedExtensions = normalizePdvExtensions(imported.extensions);
+      setInventoryMovements(importedExtensions.inventoryMovements);
+      setCashClosings(importedExtensions.cashClosings);
+      setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig);
+      setLastReceiptText(importedExtensions.lastReceiptText);
+      setUsers(importedExtensions.users);
+      setCurrentOperatorId(importedExtensions.currentOperatorId);
+      setAuditLogs(importedExtensions.auditLogs);
+      setCancelledSales(importedExtensions.cancelledSales);
+      setTerminalConfig(importedExtensions.terminalConfig);
+      setTefConfig(importedExtensions.tefConfig);
+      setTefTransactions(importedExtensions.tefTransactions);
+        setAutoBackupConfig(importedExtensions.autoBackupConfig);
+        setAutoBackups(importedExtensions.autoBackups);
+        setStoreSettings(importedExtensions.storeSettings);
+      setTerminalDraft({ terminalId: importedExtensions.terminalConfig.terminalId, terminalName: importedExtensions.terminalConfig.terminalName, mode: importedExtensions.terminalConfig.mode, serverUrl: importedExtensions.terminalConfig.serverUrl ?? "" });
+      setScaleBrand(imported.deviceConfig.scaleBrand);
+      setBarcodeMode(imported.deviceConfig.barcodeMode);
+      setRequestCommand(imported.deviceConfig.requestCommand);
+      setSelectedPort(imported.deviceConfig.selectedPort);
+      setBaudRate(imported.deviceConfig.baudRate);
+      setManualProductCode(imported.deviceConfig.manualProductCode);
+      setLastEvent(`Backup ${file.name} restaurado com sucesso.`);
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao restaurar backup do PDV.");
+    } finally {
+      if (backupInputRef.current) backupInputRef.current.value = "";
+    }
+  };
+
+  const startNewSale = (initialItems: SaleItem[] = []) => {
+    const now = new Date();
+    const number = allocateNextSaleNumber({ completedSales, cancelledSales, currentSaleNumber: sale?.number });
+    setSale({ number, openedAt: now.toLocaleString("pt-BR"), customerId: selectedCustomerId, seller: activeOperator.name, discountPercent: 0, items: initialItems, payments: [{ method: activePaymentOptions[0]?.name ?? "A VISTA", amount: 0 }], terminalId: terminalConfig.terminalId, operatorId: activeOperator.id });
+    setLastEvent(`Venda ${number} iniciada no ${terminalConfig.terminalName} para ${activeCustomer.name}.`);
+    window.location.hash = "/caixa";
+  };
+
+  const finalizeSale = () => {
+    if (!sale) return;
+    try {
+      const result = completePdvSale<CatalogProduct, Customer, SaleState, CompletedSale>({
+        sale,
+        products: catalogProducts,
+        customer: activeCustomer,
+        completedSales,
+        finalizedAt: new Date().toLocaleString("pt-BR"),
+        maxCompletedSales: 100
+      });
+      setCatalogProducts(result.products);
+      setRegisteredCustomers((current) => current.map((customer) => customer.id === result.customer.id ? result.customer : customer));
+      setCompletedSales(result.completedSales as CompletedSale[]);
+      setInventoryMovements((current) => [...buildSaleStockMovements(sale, catalogProducts, new Date().toLocaleString("pt-BR")), ...current].slice(0, 200));
+      const receipt = renderReceiptForSale(result.completedSale, activeCustomer.name, receiptPrinterConfig.paperWidth);
+      setLastReceiptText(receipt);
+      setReceiptPreviewOpen(true);
+      const manualCapturePayments = sale.payments.filter((payment) => ["PIX", "CREDITO", "DEBITO"].includes(payment.method.toUpperCase()) && payment.amount > 0);
+      if (manualCapturePayments.length) {
+        const now = new Date().toISOString();
+        setTefTransactions((current) => [
+          ...manualCapturePayments.map((payment) => resolvePdvTefTransaction({ enabled: false, simulationMode: false, provider: "Captura manual", saleNumber: sale.number, method: payment.method, amount: payment.amount, createdAt: now })),
+          ...current
+        ].slice(0, 100));
+      }
+      void runAutoBackup("sale-finalized");
+      const changeMessage = result.completedSale.paymentSummary.changeDue > 0 ? ` Troco: ${formatCurrency(result.completedSale.paymentSummary.changeDue)}.` : "";
+      setLastEvent(`Venda ${sale.number} finalizada com total liquido de ${formatCurrency(result.completedSale.netTotal)}.${changeMessage}`);
+      if (receiptPrinterConfig.autoPrint) void requestReceiptPrint(receipt, desktopPrintingBridge, receiptPrinterConfig);
+      setSale(null);
+      setEntryValue("");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao finalizar a venda.");
+    }
+  };
+
+  const addSaleItem = (item: SaleItem) => {
+    if (!sale) {
+      startNewSale([item]);
+      setLastEvent(`Venda iniciada com ${item.productName}.`);
+      return;
+    }
+    setSale((current) => current ? { ...current, items: [...current.items, item] } : current);
+    setLastEvent(`${item.productName} adicionado ao caixa.`);
+  };
+
+  const addCatalogProduct = (product: CatalogProduct, quantity = 1) => {
+    if (product.active === false) return setLastEvent(`${product.productName} está excluído do catálogo de venda.`);
+    if (quantity > product.stock) return setLastEvent(`Estoque insuficiente para ${product.productName}. Disponivel: ${product.stock}.`);
+    addSaleItem({ id: `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, unitLabel: product.unitLabel, quantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * quantity), source: "catalog" });
+  };
+  const addWeightedSaleItem = (item: { productCode: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; }) => addSaleItem({ id: `${item.productCode}-${Date.now()}`, productCode: item.productCode, productName: item.productName, unitLabel: "KG", quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice, source: "scale" });
+
+  const saveProduct = () => {
+    const rawCode = productDraft.code.trim();
+    const code = rawCode.padStart(5, "0");
+    const name = productDraft.name.trim();
+    const price = parsePdvDecimal(productDraft.price);
+    const stock = parsePdvDecimal(productDraft.stock);
+    const minimumStock = parsePdvDecimal(productDraft.minimumStock);
+    if (!rawCode || !name || !productDraft.price.trim()) return setLastEvent("Preencha codigo, descricao e preco do produto.");
+    if (!Number.isFinite(price) || !Number.isFinite(stock) || !Number.isFinite(minimumStock) || price <= 0 || stock < 0 || minimumStock < 0) return setLastEvent("Informe preco maior que zero e estoques validos.");
+    if (catalogProducts.some((product) => (product.productCode === code || (productDraft.barcode && product.barcode === productDraft.barcode.trim())) && product.productCode !== editingProductCode)) return setLastEvent("Codigo ou codigo de barras ja cadastrado.");
+    const existingProduct = catalogProducts.find((item) => item.productCode === editingProductCode);
+    const product: CatalogProduct = { productCode: code, barcode: productDraft.barcode.trim() || createBarcodeFromProductCode(code), productName: name, unitPrice: price, itemType: productDraft.type, shelfLifeDays: 0, unitLabel: productDraft.type === "weight" ? "KG" : "UN", stock, minStock: minimumStock, category: normalizeProductCategory(productDraft.category), active: existingProduct?.active ?? true };
+    setCatalogProducts((current) => editingProductCode ? current.map((item) => item.productCode === editingProductCode ? product : item) : [...current, product]);
+    setProductDraft({ code: "", barcode: "", name: "", category: "", type: "unit", price: "", stock: "", minimumStock: "" });
+    setEditingProductCode("");
+    setProductFormOpen(false);
+    setLastEvent(editingProductCode ? `${name} atualizado no catalogo.` : `${name} cadastrado no catalogo.`);
+  };
+
+  const editProduct = (product: CatalogProduct) => { setEditingProductCode(product.productCode); setProductFormOpen(true); setProductDraft({ code: product.productCode, barcode: product.barcode, name: product.productName, category: product.category, type: product.itemType, price: String(product.unitPrice), stock: String(product.stock), minimumStock: String(product.minStock) }); };
+  const cancelProductEdit = () => { setEditingProductCode(""); setProductFormOpen(false); setProductDraft({ code: "", barcode: "", name: "", category: "", type: "unit", price: "", stock: "", minimumStock: "" }); setLastEvent("Edição de produto cancelada."); };
+  const removeProduct = (product: CatalogProduct) => {
+    if (sale?.items.some((item) => item.productCode === product.productCode)) return setLastEvent(`Remova ${product.productName} da venda em aberto antes de excluir.`);
+    setCatalogProducts((current) => current.filter((item) => item.productCode !== product.productCode));
+    setStockProductCode((current) => current === product.productCode ? "" : current);
+    setLastEvent(`${product.productName} foi excluído do catálogo. As vendas e movimentações já registradas permanecem no histórico.`);
+  };
+  const applyStockAction = () => {
+    const product = catalogProducts.find((item) => item.productCode === stockProductCode);
+    if (!product) return setLastEvent("Selecione um produto para movimentar o estoque.");
+    const quantity = parsePdvDecimal(stockQuantityDraft);
+    if (!Number.isFinite(quantity) || quantity < 0) return setLastEvent("Informe uma quantidade valida.");
+
+    try {
+      const common = { id: `MOV-${Date.now()}`, productCode: product.productCode, productName: product.productName, reason: stockReasonDraft || "Movimento manual", createdAt: new Date().toLocaleString("pt-BR") };
+      const result = stockMovementType === "inventory"
+        ? applyPdvInventoryCount({ products: catalogProducts, count: { ...common, countedQuantity: quantity } })
+        : applyPdvStockMovement({ products: catalogProducts, movement: { ...common, type: stockMovementType, quantityDelta: stockMovementType === "entry" ? quantity : -quantity } });
+      setCatalogProducts(result.products);
+      setInventoryMovements((current) => [result.movement, ...current].slice(0, 200));
+      const alertMessage = result.lowStockAlerts.some((alert) => alert.productCode === product.productCode) ? " Produto abaixo do minimo." : "";
+      setLastEvent(`Estoque de ${product.productName} atualizado para ${result.movement.stockAfter}.${alertMessage}`);
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao movimentar estoque.");
+    }
+  };
+  const cancelSelectedSale = () => {
+    const targetSale = completedSales.find((item) => item.number === cancelSaleNumber);
+    if (!targetSale) return setLastEvent("Selecione uma venda finalizada para cancelar.");
+    const targetCustomer = registeredCustomers.find((customer) => customer.id === targetSale.customerId) ?? fallbackCustomer;
+
+    try {
+      const authorization = authorizePdvAction({
+        action: "cancel-sale",
+        operator: activeOperator,
+        users,
+        managerPassword: managerPasswordDraft,
+        reason: cancelReasonDraft,
+        createdAt: new Date().toLocaleString("pt-BR")
+      });
+      const result = cancelPdvSale({
+        sale: targetSale,
+        products: catalogProducts,
+        customer: targetCustomer,
+        reason: cancelReasonDraft,
+        cancelledAt: new Date().toLocaleString("pt-BR"),
+        operator: activeOperator,
+        authorization
+      });
+      setCatalogProducts(result.products);
+      setRegisteredCustomers((current) => current.map((customer) => customer.id === result.customer.id ? result.customer : customer));
+      setCompletedSales((current) => current.filter((item) => item.number !== targetSale.number));
+      setCancelledSales((current) => [result.cancelledSale as CompletedSale, ...current].slice(0, 100));
+      setInventoryMovements((current) => [...result.stockMovements, ...current].slice(0, 200));
+      setAuditLogs((current) => [result.auditLog, ...current].slice(0, 200));
+      setLastEvent(`Venda ${targetSale.number} cancelada por ${activeOperator.name} com autorizacao de ${authorization.authorizedBy?.name ?? "gerente"}.`);
+      setManagerPasswordDraft("");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao cancelar venda.");
+    }
+  };
+
+  const saveTerminalConfig = () => {
+    try {
+      const next = configurePdvTerminal(terminalDraft);
+      setTerminalConfig(next);
+      setLastEvent(`${next.terminalName} configurado em modo ${next.mode}.`);
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao configurar multi-caixa.");
+    }
+  };
+
+  const runAutoBackup = async (reason: string) => {
+    if (!autoBackupConfig.enabled && reason !== "manual") return;
+    const snapshotJson = buildPdvSnapshotJson();
+    setAutoBackups((current) => createPdvAutoBackup({ backups: current, snapshotJson, reason, createdAt: new Date().toISOString(), retention: autoBackupConfig.retention }));
+    if (desktopPdvBackupBridge) {
+      const result = await desktopPdvBackupBridge.write({ snapshotJson, reason, retention: autoBackupConfig.retention });
+      setDesktopBackupFiles(result.files);
+    }
+  };
+
+  const refreshDesktopBackups = async () => {
+    if (!desktopPdvBackupBridge) return setLastEvent("Backups em arquivo ficam disponiveis no app desktop Electron.");
+    const result = await desktopPdvBackupBridge.list();
+    setDesktopBackupFiles(result.files);
+    setLastEvent(`Pasta de backup: ${result.directory}`);
+  };
+
+  const loginCurrentOperator = () => {
+    const result = verifyPdvUserPassword({ user: activeOperator, password: loginPasswordDraft });
+    setLastEvent(result.ok ? `Operador ${activeOperator.name} autenticado.` : `Login recusado: ${result.reason}.`);
+    if (result.ok) setLoginPasswordDraft("");
+  };
+
+  const savePaymentOption = () => {
+    try {
+      const option: PaymentOption = { name: paymentOptionDraft.name, feePercent: Number(paymentOptionDraft.feePercent) || 0, showsInCashflow: paymentOptionDraft.showsInCashflow, kind: paymentOptionDraft.kind, active: true };
+      setPaymentOptions((current) => upsertPdvPaymentOption({ options: current, option }));
+      setPaymentOptionDraft({ name: "", feePercent: "", showsInCashflow: true, kind: "other" });
+      setEditingPaymentName("");
+      setLastEvent(editingPaymentName ? "Forma de pagamento atualizada." : "Forma de pagamento cadastrada.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao salvar forma de pagamento.");
+    }
+  };
+
+  const editPaymentOption = (option: PaymentOption) => {
+    setEditingPaymentName(option.name);
+    setPaymentOptionDraft({ name: option.name, feePercent: String(option.feePercent), showsInCashflow: option.showsInCashflow, kind: option.kind ?? "other" });
+  };
+
+  const togglePaymentOption = (option: PaymentOption) => {
+    setPaymentOptions((current) => current.map((item) => item.name === option.name ? { ...item, active: item.active === false } : item));
+    setLastEvent(`${option.name} ${option.active === false ? "reativada" : "desativada"}.`);
+  };
+
+  const saveUser = () => {
+    try {
+      const existingUser = users.find((user) => user.id === editingUserId);
+      const password = userDraft.managerPassword.trim();
+      if (["manager", "admin"].includes(userDraft.role) && !password && !existingUser?.managerPassword) throw new Error("Defina uma senha com pelo menos 6 caracteres para gerente ou administrador.");
+      if (password && password.length < 6) throw new Error("A senha deve ter pelo menos 6 caracteres.");
+      const user: PdvUser = { id: userDraft.id || `OP-${String(users.length + 1).padStart(3, "0")}`, name: userDraft.name, role: userDraft.role, active: userDraft.active, managerPassword: password || existingUser?.managerPassword };
+      const result = upsertPdvUser({ users, user, operator: activeOperator, createdAt: new Date().toLocaleString("pt-BR") });
+      setUsers(result.users);
+      setAuditLogs((current) => [result.auditLog, ...current].slice(0, 200));
+      setUserDraft({ id: "", name: "", role: "cashier", managerPassword: "", active: true });
+      setEditingUserId("");
+      setLastEvent(editingUserId ? "Usuário atualizado." : "Usuário cadastrado.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao salvar usuário.");
+    }
+  };
+
+  const editUser = (user: PdvUser) => {
+    setEditingUserId(user.id);
+    setUserDraft({ id: user.id, name: user.name, role: user.role, managerPassword: "", active: user.active });
+  };
+
+  const toggleUser = (user: PdvUser) => {
+    if (user.id === activeOperator.id) return setLastEvent("O operador logado nao pode desativar a propria conta.");
+    try {
+      const result = upsertPdvUser({ users, user: { ...user, active: !user.active }, operator: activeOperator, createdAt: new Date().toLocaleString("pt-BR") });
+      setUsers(result.users);
+      setAuditLogs((current) => [result.auditLog, ...current].slice(0, 200));
+      setLastEvent(`${user.name} ${user.active ? "desativado" : "reativado"}.`);
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao alterar usuario.");
+    }
+  };
+
+  const verifySqliteStorage = async () => {
+    if (!desktopStoreBridge) return setLastEvent("SQLite so fica disponivel dentro do app desktop Electron.");
+    const status = await desktopStoreBridge.status();
+    if (!status.available) throw new Error("SQLite indisponível neste computador.");
+    setDesktopStoreStatus(`SQLite ativo neste computador (${status.machineName}). Banco: ${status.path}`);
+    setLastEvent("Conexão com o SQLite confirmada.");
+  };
+
+  const startPdvSyncServer = async () => {
+    try {
+      if (!desktopPdvSyncBridge) return setLastEvent("Servidor multi-caixa disponivel apenas no app desktop Electron.");
+      if (terminalConfig.mode !== "server") return setLastEvent("Defina este computador como Servidor antes de iniciar o multi-caixa.");
+      const status = await desktopPdvSyncBridge.start({ port: Number(syncServerDraft.port) || 4174, token: syncServerDraft.token, storeKey: PDV_STORE_KEY });
+      setSyncServerStatus(status);
+      setSyncServerDraft((current) => ({ ...current, remoteUrl: status.url ?? current.remoteUrl }));
+      setLastEvent(`Servidor multi-caixa ativo em ${status.url}. Use o IP deste computador nos outros caixas.`);
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao iniciar servidor multi-caixa.");
+    }
+  };
+
+  const stopPdvSyncServer = async () => {
+    try {
+      if (!desktopPdvSyncBridge) return setLastEvent("Servidor multi-caixa disponivel apenas no app desktop Electron.");
+      if (terminalConfig.mode !== "server") return setLastEvent("Somente o computador Servidor pode encerrar o multi-caixa.");
+      const status = await desktopPdvSyncBridge.stop();
+      setSyncServerStatus(status);
+      setLastEvent("Servidor multi-caixa parado.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao parar servidor multi-caixa.");
+    }
+  };
+
+  const pushSnapshotToPdvServer = async () => {
+    try {
+      if (terminalConfig.mode !== "client") return setLastEvent("O envio para a base é exclusivo dos caixas Cliente.");
+      const url = normalizeSyncUrl(syncServerDraft.remoteUrl);
+      if (!url) return setLastEvent("Informe a URL do servidor multi-caixa.");
+      const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...(syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : {}) },
+        body: JSON.stringify({ snapshotJson: buildPdvSnapshotJson() })
+      });
+      if (!response.ok) throw new Error(`Servidor recusou envio: ${response.status}.`);
+      setLastEvent("Snapshot enviado para o servidor multi-caixa.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao enviar snapshot para servidor.");
+    }
+  };
+
+  const pullSnapshotFromPdvServer = async () => {
+    try {
+      if (terminalConfig.mode !== "client") return setLastEvent("O recebimento da base é exclusivo dos caixas Cliente.");
+      const url = normalizeSyncUrl(syncServerDraft.remoteUrl);
+      if (!url) return setLastEvent("Informe a URL do servidor multi-caixa.");
+      const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, {
+        headers: syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : undefined
+      });
+      if (!response.ok) throw new Error(`Servidor recusou leitura: ${response.status}.`);
+      const row = await response.json() as { snapshotJson?: string } | null;
+      if (!row?.snapshotJson) return setLastEvent("Servidor multi-caixa ainda nao tem snapshot salvo.");
+      const imported = parsePdvSnapshot(row.snapshotJson);
+      setCatalogProducts(imported.catalogProducts);
+      setRegisteredCustomers(imported.registeredCustomers);
+      setCompletedSales(imported.completedSales);
+      setCashSession(imported.cashSession);
+      setPaymentOptions(imported.paymentOptions);
+      const importedExtensions = normalizePdvExtensions(imported.extensions);
+      setInventoryMovements(importedExtensions.inventoryMovements);
+      setCashClosings(importedExtensions.cashClosings);
+      setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig);
+      setLastReceiptText(importedExtensions.lastReceiptText);
+      setUsers(importedExtensions.users);
+      setCurrentOperatorId(importedExtensions.currentOperatorId);
+      setAuditLogs(importedExtensions.auditLogs);
+      setCancelledSales(importedExtensions.cancelledSales);
+      setTerminalConfig(importedExtensions.terminalConfig);
+      setTefConfig(importedExtensions.tefConfig);
+      setTefTransactions(importedExtensions.tefTransactions);
+        setAutoBackupConfig(importedExtensions.autoBackupConfig);
+        setAutoBackups(importedExtensions.autoBackups);
+        setStoreSettings(importedExtensions.storeSettings);
+      setLastEvent("Snapshot recebido do servidor multi-caixa.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao receber snapshot do servidor.");
+    }
+  };
+
+  const exportHistoryCsv = () => {
+    const csv = exportPdvReportCsv({
+      rows: salesHistory.map((item) => ({
+        date: item.finalizedAt,
+        number: item.number,
+        customerName: registeredCustomers.find((customer) => customer.id === item.customerId)?.name ?? item.customerId ?? "Cliente",
+        status: item.status ?? "completed",
+        paymentMethods: item.payments.map((payment) => payment.method).join(", "),
+        total: item.netTotal
+      }))
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `pdv-vendas-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setLastEvent("Historico de vendas exportado em CSV.");
+  };
+
+  const saveCustomer = () => {
+    const name = customerDraft.name.trim();
+    if (!name) return setLastEvent("Informe o nome do cliente.");
+    const currentCustomer = registeredCustomers.find((customer) => customer.id === editingCustomerId);
+    const creditLimit = parsePdvDecimal(customerDraft.creditLimit);
+    if (!Number.isFinite(creditLimit) || creditLimit < 0) return setLastEvent("Informe um limite de credito valido.");
+    const customer: Customer = {
+      id: currentCustomer?.id ?? `CLI-${String(registeredCustomers.length + 1).padStart(3, "0")}`,
+      name,
+      document: customerDraft.document.trim() || "Nao informado",
+      city: customerDraft.city.trim() || "Nao informado",
+      creditLimit,
+      creditUsed: currentCustomer?.creditUsed ?? 0
+    };
+    setRegisteredCustomers((current) => editingCustomerId ? current.map((item) => item.id === editingCustomerId ? customer : item) : [...current, customer]);
+    setCustomerDraft({ name: "", document: "", city: "", creditLimit: "" });
+    setEditingCustomerId("");
+    setLastEvent(editingCustomerId ? `${name} atualizado como cliente.` : `${name} cadastrado como cliente.`);
+  };
+
+  const editCustomer = (customer: Customer) => { setEditingCustomerId(customer.id); setCustomerDraft({ name: customer.name, document: customer.document, city: customer.city, creditLimit: String(customer.creditLimit) }); };
+  const removeCustomer = (customer: Customer) => {
+    const isReferenced = sale?.customerId === customer.id || completedSales.some((item) => item.customerId === customer.id) || cancelledSales.some((item) => item.customerId === customer.id);
+    if (customer.id === "CLI-001" || customer.creditUsed > 0 || isReferenced) return setLastEvent(`${customer.name} possui vinculo com vendas ou credito e nao pode ser excluido.`);
+    setRegisteredCustomers((current) => current.filter((item) => item.id !== customer.id));
+    setLastEvent(`${customer.name} removido.`);
+  };
+
+  const handleEntrySubmit = () => {
+    const value = entryValue.trim();
+    if (!value) return;
+    try {
+      if (/^\d{13}$/.test(value)) {
+        const weighted = barcodeMode === "legacy-brasil" ? resolvePosInputFromBarcode({ barcode: value, products: catalogProducts, profile: defaultBrazilianScaleProfile }) : resolvePosInputFromScaleBarcodeProfile({ barcode: value, products: catalogProducts, profile: barcodeMode as ScaleBarcodeProfileKey });
+        if (weighted.saleItem) {
+          addWeightedSaleItem(weighted.saleItem);
+          setEntryValue("");
+          return;
+        }
+      }
+      const product = catalogProducts.find((item) => item.barcode === value || item.productCode === value || item.productName.toLowerCase() === value.toLowerCase());
+      if (!product) throw new Error("Produto nao encontrado no catalogo atual.");
+      addCatalogProduct(product);
+      setEntryValue("");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao incluir item na venda.");
+    }
+  };
+
+  const updatePayment = (index: number, patch: Partial<PaymentDraft>) => setSale((current) => current ? { ...current, payments: current.payments.map((payment, i) => i === index ? { ...payment, ...patch, amount: patch.amount === undefined ? payment.amount : roundCurrency(Math.max(patch.amount, 0)) } : payment) } : current);
+  const addPayment = (method: PaymentMethod = "A VISTA", amount = remainingTotal) => setSale((current) => current ? { ...current, payments: [...current.payments, { method, amount: roundCurrency(Math.max(amount, 0)) }] } : current);
+  const applyQuickPayment = (method: PaymentMethod) => {
+    if (!sale) return setLastEvent("Inicie uma venda antes de informar pagamento.");
+    setSale((current) => {
+      if (!current) return current;
+      const currentCustomer = registeredCustomers.find((customer) => customer.id === current.customerId) ?? activeCustomer;
+      const amount = resolvePaymentView(calculateSaleNetTotal(current), current.payments, currentCustomer).remainingTotal;
+      const emptyIndex = current.payments.findIndex((payment) => payment.amount === 0);
+      const nextPayment = { method, amount: roundCurrency(Math.max(amount, 0)) };
+      return emptyIndex >= 0 ? { ...current, payments: current.payments.map((payment, index) => index === emptyIndex ? nextPayment : payment) } : { ...current, payments: [...current.payments, nextPayment] };
+    });
+  };
+  const removePayment = (index: number) => setSale((current) => current ? { ...current, payments: current.payments.filter((_, i) => i !== index) } : current);
+  const fillPaymentRemaining = (index: number) => updatePayment(index, { amount: remainingTotal });
+  const updateDiscountPercent = (value: number) => setSale((current) => current ? { ...current, discountPercent: value } : current);
+  const removeLastItem = () => { setSale((current) => current && current.items.length ? { ...current, items: current.items.slice(0, -1) } : current); setLastEvent("Ultimo item removido da venda."); };
+
+  const refreshPorts = async () => {
+    if (!serialBridge) return setLastEvent("Bridge serial disponivel apenas no app desktop Electron.");
+    const ports = await serialBridge.list();
+    setSerialPorts(ports);
+    setSelectedPort((current: string) => current || ports[0]?.path || "");
+    setLastEvent(ports.length ? `${ports.length} porta(s) serial encontrada(s).` : "Nenhuma porta serial encontrada.");
+  };
+  const openSelectedPort = async () => {
+    if (!serialBridge || !selectedPort) return setLastEvent("Selecione uma porta serial antes de conectar.");
+    await serialBridge.open({ path: selectedPort, baudRate: Number(baudRate) || 9600 });
+    setSerialConnected(true);
+    setLastEvent(`Porta ${selectedPort} aberta para leitura da balanca.`);
+  };
+  const closeSelectedPort = async () => {
+    if (!serialBridge || !selectedPort) return;
+    await serialBridge.close(selectedPort);
+    setSerialConnected(false);
+    setLastEvent(`Porta ${selectedPort} fechada.`);
+  };
+  const requestWeightFromScale = async () => {
+    if (!serialBridge || !selectedPort) return setLastEvent("Conecte uma porta serial antes de solicitar o peso.");
+    if (scaleBrand === "generic-streaming") return setLastEvent("Modo streaming ativo: aguarde a balanca enviar o frame automaticamente.");
+    await serialBridge.write(selectedPort, requestCommand || "\u0005");
+    setLastEvent(`Comando enviado para ${selectedPort}. Aguardando resposta da balanca ${scaleBrand}.`);
+  };
+  const requestCashierWeight = async () => {
+    const product = catalogProducts.find((item) => item.productCode === cashierScaleProductCode.trim());
+    if (!product) return setLastEvent("Informe o código de um produto cadastrado para pesar.");
+    if (product.itemType !== "weight") return setLastEvent(`${product.productName} não é vendido por peso.`);
+    setManualProductCode(product.productCode);
+    await requestWeightFromScale();
+  };
+
+  const handleScaleBarcodeSubmit = () => {
+    try {
+      const result = barcodeMode === "legacy-brasil" ? resolvePosInputFromBarcode({ barcode, products: catalogProducts, profile: defaultBrazilianScaleProfile }) : resolvePosInputFromScaleBarcodeProfile({ barcode, products: catalogProducts, profile: barcodeMode as ScaleBarcodeProfileKey });
+      if (result.saleItem) return addWeightedSaleItem(result.saleItem);
+      setLastEvent("Codigo lido nao foi reconhecido como item pesado nesse perfil.");
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao ler codigo de barras.");
+    }
+  };
+
+  const addScaleWeightToCashier = (productCode: string) => {
+    try {
+      const product = catalogProducts.find((item) => item.productCode === productCode);
+      if (!product) throw new Error("Produto manual nao encontrado.");
+      const reading = parseScaleSerialReadingByBrand(scaleBrand, serialFrame || "", { decimalDivisorIfInteger: genericUsbScaleProfile.decimalPlaces === 3 ? 1000 : 100 });
+      if (!reading.stable || reading.weightKg <= 0) throw new Error(`Leitura da balanca ainda nao esta pronta: ${reading.status}.`);
+      addWeightedSaleItem({ productCode: product.productCode, productName: product.productName, quantity: reading.weightKg, unitPrice: product.unitPrice, totalPrice: calculateTotalPrice(reading.weightKg, product.unitPrice) });
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Falha ao ler balanca USB.");
+    }
+  };
+  const handleScaleSubmit = () => addScaleWeightToCashier(manualProductCode);
+
+  if (persistenceState === "booting") {
+    return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Segoe UI, sans-serif" }}>Abrindo dados do SQLite...</main>;
+  }
+
+  if (persistenceState === "error") {
+    return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "Segoe UI, sans-serif" }}><section><h1>Não foi possível abrir o SQLite do PDV</h1><p>{desktopStoreStatus}</p><button onClick={() => window.location.reload()}>Tentar novamente</button></section></main>;
+  }
+
+  return (
+    <AppShell title="Nexus Core - Professional Backoffice PDV" nav={nav} sidebarPosition="right" sidebarTitle="Gestão" hideTitle={route === "/caixa"}>
+      {route === "/caixa" ? <section style={styles.cashierSurface}>
+        <div style={styles.cashierMainPanel}>
+          <div style={styles.cashierBanner}>
+            <div>
+              <p style={styles.cashierEyebrow}>{cashStatus} / {terminalConfig.terminalName}</p>
+              <h2 style={styles.cashierTitle}>Caixa de venda</h2>
+              <p style={styles.cashierSubtitle}>{lastEvent}</p>
+            </div>
+            <div style={styles.cashierStatusGrid}>
+              <div style={styles.cashierStatusTile}><span>Venda</span><strong>{sale?.number ?? "------"}</strong></div>
+              <div style={styles.cashierStatusTile}><span>Operador</span><strong>{activeOperator.name}</strong></div>
+              <div style={styles.cashierStatusTile}><span>Itens</span><strong>{itemCount.toFixed(3)}</strong></div>
+            </div>
+          </div>
+
+          <div style={styles.cashierToolbar}>
+            <input ref={checkoutSearchRef} autoFocus value={entryValue} onChange={(event) => setEntryValue(event.target.value)} onKeyDown={(event) => event.key === "Enter" ? handleEntrySubmit() : null} placeholder="Bipe, digite codigo, barras ou nome exato" style={styles.cashierSearchInput} />
+            <button onClick={handleEntrySubmit} style={styles.cashierAddButton}>Adicionar</button>
+            <button onClick={openCash} style={styles.cashierSecondaryAction} disabled={Boolean(cashSession && !cashSession.closedAt)}>{cashSession && !cashSession.closedAt ? "Caixa aberto" : "Abrir caixa"}</button>
+            <button onClick={() => setCashierScaleOpen((current) => !current)} style={styles.cashierSecondaryAction}>Pesar</button>
+          </div>
+          {cashierScaleOpen ? <div style={styles.cashierScalePanel}><input value={cashierScaleProductCode} onChange={(event) => setCashierScaleProductCode(event.target.value)} placeholder="Código do produto vendido por peso" style={styles.cashierSearchInput} /><button onClick={() => void requestCashierWeight()} style={styles.cashierAddButton}>Solicitar peso</button><button onClick={() => addScaleWeightToCashier(cashierScaleProductCode)} style={styles.cashierSecondaryAction}>Lançar leitura</button></div> : null}
+
+          <div style={styles.categoryStrip}>
+            {checkoutCategories.map((category) => <button key={category} onClick={() => setSelectedCategory(category)} style={category === selectedCategory ? styles.categoryButtonActive : styles.categoryButton}>{category}</button>)}
+          </div>
+
+          <div style={styles.productGrid}>
+            {checkoutProducts.map((product) => <button key={product.productCode} onClick={() => addCatalogProduct(product)} style={styles.productTile} disabled={product.stock <= 0}>
+              <span style={styles.productBadge}>{product.unitLabel}</span>
+              <strong>{product.productName}</strong>
+              <small>{product.category} / Estoque {product.stock.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}</small>
+              <span style={styles.productPrice}>{formatCurrency(product.unitPrice)}</span>
+            </button>)}
+            {checkoutProducts.length ? null : <div style={styles.cashierEmptyState}>Nenhum produto encontrado para esse filtro.</div>}
+          </div>
+        </div>
+
+        <aside style={styles.orderPanel}>
+          <div style={styles.orderHeader}>
+            <div>
+              <p style={styles.cashierEyebrow}>Pedido atual</p>
+              <h3 style={styles.orderTitle}>{activeCustomer.name}</h3>
+            </div>
+            <button onClick={() => startNewSale()} style={styles.iconActionButton}>F2</button>
+          </div>
+
+          <select value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)} style={styles.input}>{registeredCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
+
+          <div style={styles.orderItems}>
+            {(sale?.items ?? []).map((item) => <div key={item.id} style={styles.orderItem}>
+              <div>
+                <strong>{item.productName}</strong>
+                <span>{item.quantity.toFixed(item.unitLabel === "KG" ? 3 : 0)} {item.unitLabel} x {formatCurrency(item.unitPrice)}</span>
+              </div>
+              <strong>{formatCurrency(item.totalPrice)}</strong>
+            </div>)}
+            {sale?.items.length ? null : <div style={styles.cashierEmptyState}>{sale ? "Venda aberta. Adicione produtos." : "Pressione F2 ou clique em um produto para iniciar."}</div>}
+          </div>
+
+          <div style={styles.orderTotals}>
+            <div><span>Subtotal</span><strong>{formatCurrency(grossTotal)}</strong></div>
+            <div><span>Desconto</span><strong>{formatCurrency(discountValue)}</strong></div>
+            <div><span>Pago</span><strong>{formatCurrency(paidTotal)}</strong></div>
+            <div><span>Falta</span><strong>{formatCurrency(remainingTotal)}</strong></div>
+            <div><span>Troco</span><strong>{formatCurrency(change)}</strong></div>
+          </div>
+          <div style={styles.orderGrandTotal}>{formatCurrency(netTotal)}</div>
+
+          <div style={styles.paymentQuickGrid}>{paymentQuickMethods.map((method) => <button key={method} onClick={() => applyQuickPayment(method)} style={["PIX", "CREDITO", "DEBITO"].includes(method) ? styles.manualPaymentButton : styles.paymentButton} disabled={!sale}>{method}</button>)}</div>
+          <div style={styles.manualCaptureNotice}>PIX/cartao: caixa cobra na maquininha/QR Code externo e confirma aqui como recebido.</div>
+          {paymentView.errorMessage ? <div style={styles.paymentAlert}>{paymentView.errorMessage}</div> : null}
+
+          <div style={styles.stack}>{(sale?.payments ?? []).map((payment, index) => <div key={`${payment.method}-${index}`} style={styles.paymentCard}><label style={styles.label}><span>Forma {index + 1}</span><select value={payment.method} onChange={(event) => updatePayment(index, { method: event.target.value as PaymentMethod })} style={styles.input} disabled={!sale}>{activePaymentOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label><label style={styles.label}><span>Valor</span><input type="number" min="0" step="0.01" value={String(payment.amount)} onChange={(event) => updatePayment(index, { amount: Number(event.target.value) || 0 })} style={styles.input} disabled={!sale} /></label><div style={styles.paymentActions}><button onClick={() => fillPaymentRemaining(index)} style={styles.secondaryButton} disabled={!sale}>Restante</button><button onClick={() => removePayment(index)} style={styles.secondaryButton} disabled={!sale || (sale?.payments.length ?? 0) <= 1}>Remover</button></div></div>)}</div>
+          <button onClick={() => addPayment()} style={styles.secondaryButton} disabled={!sale}>Adicionar Forma</button>
+          <label style={styles.label}><span>Desconto geral %</span><input value={String(sale?.discountPercent ?? 0)} onChange={(event) => updateDiscountPercent(Number(event.target.value) || 0)} style={styles.input} disabled={!sale} /></label>
+
+          <div style={styles.bigActionGrid}>
+            <button onClick={() => startNewSale()} style={styles.bigShortcutButton}>F2<br />Nova venda</button>
+            <button onClick={() => checkoutSearchRef.current?.focus()} style={styles.bigShortcutButton}>F3<br />Produto</button>
+            <button onClick={() => applyQuickPayment("A VISTA")} style={styles.bigShortcutButton}>F6<br />Pagamento</button>
+            <button onClick={finalizeSale} style={styles.bigFinishButton} disabled={!sale}>F8<br />Finalizar</button>
+          </div>
+          <button onClick={removeLastItem} style={styles.removeItemButton} disabled={!sale || sale.items.length === 0}>Delete / Remover ultimo item</button>
+        </aside>
+      </section> : null}
+
+{route === "/produtos" ? <section style={styles.pageGrid}>
+<SectionCard title="Estoque" subtitle={`${inventoryMovements.length} movimentos registrados`} defaultOpen={false}>
+<div style={styles.stack}><div style={styles.formRow}><select value={stockProductCode} onChange={(event) => setStockProductCode(event.target.value)} style={styles.input}><option value="">Selecione um produto</option>{catalogProducts.map((product) => <option key={product.productCode} value={product.productCode}>{product.productCode} - {product.productName}</option>)}</select><select value={stockMovementType} onChange={(event) => setStockMovementType(event.target.value as PdvStockMovementType)} style={styles.input}><option value="entry">Entrada</option><option value="adjustment">Saida/Ajuste</option><option value="inventory">Inventario</option></select></div><div style={styles.formRow}><input value={stockQuantityDraft} onChange={(event) => setStockQuantityDraft(event.target.value)} placeholder={stockMovementType === "inventory" ? "Quantidade contada" : "Quantidade"} style={styles.input} /><input value={stockReasonDraft} onChange={(event) => setStockReasonDraft(event.target.value)} placeholder="Motivo" style={styles.input} /></div><button onClick={applyStockAction} style={styles.primaryButton}>Registrar Movimento</button>{lowStockAlerts.length ? <div style={styles.paymentAlert}>Estoque baixo: {lowStockAlerts.map((alert) => `${alert.productName} (${alert.stock}/${alert.minStock})`).join(", ")}</div> : <div style={styles.infoBox}>Nenhum produto abaixo do estoque minimo.</div>}<div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Data</th><th style={styles.th}>Produto</th><th style={styles.th}>Tipo</th><th style={styles.th}>Antes</th><th style={styles.th}>Depois</th></tr></thead><tbody>{inventoryMovements.map((movement) => <tr key={movement.id}><td style={styles.td}>{movement.createdAt}</td><td style={styles.td}>{movement.productName}</td><td style={styles.td}>{movement.type}</td><td style={styles.td}>{movement.stockBefore}</td><td style={styles.td}>{movement.stockAfter}</td></tr>)}{inventoryMovements.length ? null : <tr><td style={styles.emptyRow} colSpan={5}>Nenhuma movimentacao registrada.</td></tr>}</tbody></table></div></div>
+</SectionCard>
+</section> : null}
+
+      {route === "/produtos" ? <section style={styles.pageGrid}>
+<SectionCard title="Produtos" subtitle={`${catalogProducts.length} produto(s) no mesmo cadastro do Estoque`}>
+<div style={styles.stack}>
+  <div style={styles.toolbar}><button onClick={() => { setProductFormOpen((current) => !current); if (productFormOpen) cancelProductEdit(); }} style={styles.primaryButton}>{productFormOpen ? "Recolher cadastro" : "Novo produto"}</button></div>
+  {productFormOpen ? <div style={styles.stack}><p style={styles.infoBox}>Campos com <strong>*</strong> são obrigatórios. O código de barras é opcional e será gerado automaticamente após informar o código, caso fique vazio.</p><div style={styles.formRow}><input value={productDraft.code} onChange={(event) => setProductDraft((current) => ({ ...current, code: event.target.value }))} onBlur={() => setProductDraft((current) => current.code.trim() && !current.barcode.trim() ? { ...current, barcode: createBarcodeFromProductCode(current.code.trim()) } : current)} placeholder="Código *" style={styles.input} /><input value={productDraft.barcode} onChange={(event) => setProductDraft((current) => ({ ...current, barcode: event.target.value }))} placeholder="Código de barras (opcional)" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.name} onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Descrição *" style={styles.input} /><input value={productDraft.category} onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Categoria (opcional)" style={styles.input} /></div><div style={styles.formRow}><select value={productDraft.type} onChange={(event) => setProductDraft((current) => ({ ...current, type: event.target.value as "unit" | "weight" }))} style={styles.input}><option value="unit">Unidade</option><option value="weight">Peso</option></select><input value={productDraft.price} onChange={(event) => setProductDraft((current) => ({ ...current, price: event.target.value }))} placeholder="Preço de venda *" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.stock} onChange={(event) => setProductDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="Estoque inicial (opcional)" style={styles.input} /><input value={productDraft.minimumStock} onChange={(event) => setProductDraft((current) => ({ ...current, minimumStock: event.target.value }))} placeholder="Estoque mínimo (opcional)" style={styles.input} /></div><div style={styles.toolbar}><button onClick={saveProduct} style={styles.primaryButton}>{editingProductCode ? "Salvar alterações" : "Cadastrar produto"}</button><button onClick={cancelProductEdit} style={styles.secondaryButton}>Cancelar</button></div></div> : null}
+  <input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Buscar por código, barras, descrição ou categoria" style={styles.input} />
+  <div style={styles.productTableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Código</th><th style={styles.th}>Produto</th><th style={styles.th}>Categoria</th><th style={styles.th}>Estoque</th><th style={styles.th}>Preço</th><th style={styles.th}></th></tr></thead><tbody>{productList.map((product) => <tr key={product.productCode}><td style={styles.td}>{product.productCode}</td><td style={styles.td}>{product.productName}</td><td style={styles.td}>{product.category}</td><td style={styles.td}>{product.stock.toFixed(product.itemType === "weight" ? 3 : 0)}</td><td style={styles.td}>{formatCurrency(product.unitPrice)}</td><td style={styles.td}><div style={styles.toolbar}><button onClick={() => addCatalogProduct(product)} style={styles.secondaryButton}>Lançar</button><button onClick={() => editProduct(product)} style={styles.secondaryButton}>Editar</button><button onClick={() => removeProduct(product)} style={styles.secondaryButton}>Excluir</button></div></td></tr>)}{productList.length ? null : <tr><td style={styles.emptyRow} colSpan={6}>Nenhum produto cadastrado para este filtro.</td></tr>}</tbody></table></div>
+</div>
+</SectionCard>
+</section> : null}
+
+      {route === "/clientes" ? <section style={styles.pageGrid}>
+<SectionCard title="Clientes" subtitle="Cadastro e limite para venda a prazo">
+<div style={styles.stack}><div style={styles.formRow}><input value={customerDraft.name} onChange={(event) => setCustomerDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Nome do cliente" style={styles.input} /><input value={customerDraft.document} onChange={(event) => setCustomerDraft((current) => ({ ...current, document: event.target.value }))} placeholder="CPF/CNPJ" style={styles.input} /></div><div style={styles.formRow}><input value={customerDraft.city} onChange={(event) => setCustomerDraft((current) => ({ ...current, city: event.target.value }))} placeholder="Cidade" style={styles.input} /><input value={customerDraft.creditLimit} onChange={(event) => setCustomerDraft((current) => ({ ...current, creditLimit: event.target.value }))} placeholder="Limite de credito" style={styles.input} /></div><button onClick={saveCustomer} style={styles.primaryButton}>{editingCustomerId ? "Salvar Alteracoes" : "Cadastrar Cliente"}</button></div><table style={styles.table}><thead><tr><th style={styles.th}>Cliente</th><th style={styles.th}>Documento</th><th style={styles.th}>Cidade</th><th style={styles.th}>Limite</th><th style={styles.th}>Usado</th><th style={styles.th}>Acoes</th></tr></thead><tbody>{registeredCustomers.map((customer) => <tr key={customer.id}><td style={styles.td}>{customer.name}</td><td style={styles.td}>{customer.document}</td><td style={styles.td}>{customer.city}</td><td style={styles.td}>{formatCurrency(customer.creditLimit)}</td><td style={styles.td}>{formatCurrency(customer.creditUsed)}</td><td style={styles.td}><button onClick={() => editCustomer(customer)} style={styles.secondaryButton}>Editar</button><button onClick={() => removeCustomer(customer)} style={styles.secondaryButton}>Excluir</button></td></tr>)}</tbody></table></SectionCard>
+</section> : null}
+
+      {route === "/financeiro" ? <section style={styles.pageGrid}>
+<SectionCard title="Operador e autorização" subtitle={`Operador ativo: ${activeOperator.name}`}>
+<div style={styles.stack}><label style={styles.label}><span>Operador</span><select value={currentOperatorId} onChange={(event) => setCurrentOperatorId(event.target.value)} style={styles.input}>{users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} - {formatUserRole(user.role)}</option>)}</select></label><div style={styles.infoBox}>Ações sensíveis exigem autorização de gerente ou administrador.</div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Quando</th><th style={styles.th}>Ação</th><th style={styles.th}>Operador</th><th style={styles.th}>Autorizado por</th></tr></thead><tbody>{auditLogs.slice(0, 6).map((log) => <tr key={log.id}><td style={styles.td}>{log.createdAt}</td><td style={styles.td}>{log.action}</td><td style={styles.td}>{log.operatorName}</td><td style={styles.td}>{log.authorizedByName ?? "-"}</td></tr>)}{auditLogs.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhuma ação sensível registrada.</td></tr>}</tbody></table></div></div>
+</SectionCard>
+<SectionCard title="Cancelamento e estorno" subtitle="Devolve estoque, reverte crédito a prazo e registra auditoria">
+<div style={styles.stack}><div style={styles.formRow}><select value={cancelSaleNumber} onChange={(event) => setCancelSaleNumber(event.target.value)} style={styles.input}><option value="">Selecione a venda</option>{completedSales.map((item) => <option key={item.number} value={item.number}>{item.number} - {formatCurrency(item.netTotal)}</option>)}</select><input type="password" autoComplete="off" value={managerPasswordDraft} onChange={(event) => setManagerPasswordDraft(event.target.value)} placeholder="Senha do gerente" style={styles.input} /></div><input value={cancelReasonDraft} onChange={(event) => setCancelReasonDraft(event.target.value)} placeholder="Motivo do cancelamento" style={styles.input} /><button onClick={cancelSelectedSale} style={styles.primaryButton} disabled={!completedSales.length}>Cancelar/Estornar venda</button><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Venda</th><th style={styles.th}>Data</th><th style={styles.th}>Motivo</th><th style={styles.th}>Operador</th></tr></thead><tbody>{cancelledSales.slice(0, 6).map((item) => <tr key={`${item.number}-${item.cancelledAt}`}><td style={styles.td}>{item.number}</td><td style={styles.td}>{item.cancelledAt}</td><td style={styles.td}>{item.cancelReason}</td><td style={styles.td}>{users.find((user) => user.id === item.cancelledById)?.name ?? item.cancelledById}</td></tr>)}{cancelledSales.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhuma venda cancelada.</td></tr>}</tbody></table></div></div>
+</SectionCard>
+</section> : null}
+
+      {route === "/financeiro" ? <section style={styles.pageGrid}>
+<SectionCard title="Conferência de caixa" subtitle={cashClosings[0] ? `Último fechamento: ${formatIntegrationStatus(cashClosings[0].status)}` : "Informe os valores contados antes de fechar"}>
+<div style={styles.stack}><div style={styles.formRow}><input value={countedCashDraft} onChange={(event) => setCountedCashDraft(event.target.value)} placeholder="Dinheiro contado" style={styles.input} /><input value={countedPixDraft} onChange={(event) => setCountedPixDraft(event.target.value)} placeholder="PIX conferido" style={styles.input} /></div><div style={styles.formRow}><input value={countedCardDraft} onChange={(event) => setCountedCardDraft(event.target.value)} placeholder="Cartões conferidos" style={styles.input} /><button onClick={closeCash} style={styles.primaryButton}>Fechar com conferência</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Fechamento</th><th style={styles.th}>Status</th><th style={styles.th}>Dinheiro esperado</th><th style={styles.th}>Divergência</th></tr></thead><tbody>{cashClosings.slice(0, 5).map((closing) => <tr key={closing.closedAt}><td style={styles.td}>{closing.closedAt}</td><td style={styles.td}>{formatIntegrationStatus(closing.status)}</td><td style={styles.td}>{formatCurrency(closing.expectedCashTotal)}</td><td style={styles.td}>{formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0)}</td></tr>)}{cashClosings.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhum fechamento conferido ainda.</td></tr>}</tbody></table></div></div>
+</SectionCard>
+<SectionCard title="Comprovante e impressão" subtitle="Pronto para impressora 58/80 mm; teste físico pendente">
+<div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={String(receiptPrinterConfig.paperWidth)} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, paperWidth: Number(event.target.value) || 32 }))} style={styles.input}><option value="32">58mm</option><option value="42">80mm</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => lastReceiptText ? void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig) : setLastEvent("Finalize uma venda antes de imprimir comprovante.")} style={styles.secondaryButton}>Imprimir/Reimprimir</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div>
+</SectionCard>
+</section> : null}
+
+      {route === "/financeiro" ? <section style={styles.pageGrid}>
+<SectionCard wide title="Relatórios e dashboard" subtitle="Últimos 30 dias">
+<div style={styles.stack}><div style={styles.infoBox}>{storageStatusLabel}</div>
+<div style={styles.totalsGrid}><div style={styles.totalTile}><span>Vendas</span><strong>{dashboardReport.salesCount}</strong></div><div style={styles.totalTile}><span>Total vendido</span><strong>{formatCurrency(dashboardReport.salesTotal)}</strong></div><div style={styles.totalTile}><span>Ticket médio</span><strong>{formatCurrency(dashboardReport.averageTicket)}</strong></div><div style={styles.totalTile}><span>Divergência de caixa</span><strong>{formatCurrency(dashboardReport.cashflow.divergenceTotal)}</strong></div></div><div style={styles.reportTables}><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Forma</th><th style={styles.th}>Total</th></tr></thead><tbody>{Object.entries(dashboardReport.paymentsByMethod).map(([method, amount]) => <tr key={method}><td style={styles.td}>{method}</td><td style={styles.td}>{formatCurrency(amount)}</td></tr>)}{Object.keys(dashboardReport.paymentsByMethod).length ? null : <tr><td style={styles.emptyRow} colSpan={2}>Sem pagamentos no período.</td></tr>}</tbody></table></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Produto</th><th style={styles.th}>Qtd.</th><th style={styles.th}>Total</th></tr></thead><tbody>{dashboardReport.topProducts.map((product) => <tr key={product.productCode}><td style={styles.td}>{product.productName}</td><td style={styles.td}>{product.quantity}</td><td style={styles.td}>{formatCurrency(product.total)}</td></tr>)}{dashboardReport.topProducts.length ? null : <tr><td style={styles.emptyRow} colSpan={3}>Sem produtos vendidos no período.</td></tr>}</tbody></table></div></div></div>
+</SectionCard>
+<SectionCard title="Estoque baixo" subtitle={`${dashboardReport.lowStockAlerts.length} alerta(s)`}>
+<div style={styles.stack}>{dashboardReport.lowStockAlerts.map((alert) => <div key={alert.productCode} style={styles.metaCard}><strong>{alert.productName}</strong><span>Estoque: {alert.stock}</span><span>Mínimo: {alert.minStock}</span></div>)}{dashboardReport.lowStockAlerts.length ? null : <div style={styles.compactEmptyState}>Nenhum alerta de estoque baixo.</div>}</div>
+</SectionCard>
+</section> : null}
+
+      {route === "/financeiro" || route === "/administracao" ? <section style={styles.pageGrid}>
+<SectionCard hidden={route !== "/financeiro"} title="Caixa e financeiro" subtitle={cashSession && !cashSession.closedAt ? `Caixa aberto em ${cashSession.openedAt}` : "Caixa fechado"}>
+<div style={styles.stack}><div style={styles.formRow}><input value={cashInitialDraft} onChange={(event) => setCashInitialDraft(event.target.value)} placeholder="Caixa inicial" style={styles.input} /><button onClick={openCash} style={styles.primaryButton}>Abrir Caixa</button></div><div style={styles.formRow}><button onClick={closeCash} style={styles.secondaryButton}>Fechar Caixa</button><span style={styles.infoBox}>Status: {cashSession && !cashSession.closedAt ? "ABERTO" : "FECHADO"}</span></div><div style={styles.formRow}><input value={withdrawalDraft} onChange={(event) => setWithdrawalDraft(event.target.value)} placeholder="Valor sangria" style={styles.input} /><input value={withdrawalNote} onChange={(event) => setWithdrawalNote(event.target.value)} placeholder="Observacao" style={styles.input} /></div><button onClick={addWithdrawal} style={styles.secondaryButton}>Registrar Sangria</button></div>
+</SectionCard>
+<SectionCard hidden={route !== "/administracao"} title="Armazenamento e multi-caixa" subtitle={`${terminalConfig.terminalName} / ${formatTerminalMode(terminalConfig.mode)}`}>
+<div style={styles.stack}>
+  <div style={styles.infoBox}>{desktopStoreStatus}</div>
+  <div style={styles.toolbar}><button onClick={exportPdvBackup} style={styles.primaryButton}>Exportar backup</button><button onClick={() => backupInputRef.current?.click()} style={styles.secondaryButton}>Restaurar backup</button><button onClick={() => void verifySqliteStorage()} style={styles.secondaryButton}>Verificar SQLite</button></div>
+  <input ref={backupInputRef} type="file" accept="application/json,.json" onChange={(event) => void importPdvBackup(event.target.files?.[0] ?? null)} style={styles.hiddenInput} />
+  <div style={styles.formRow}><input value={terminalDraft.terminalId} onChange={(event) => setTerminalDraft((current) => ({ ...current, terminalId: event.target.value }))} placeholder="ID do caixa" style={styles.input} /><input value={terminalDraft.terminalName} onChange={(event) => setTerminalDraft((current) => ({ ...current, terminalName: event.target.value }))} placeholder="Nome do caixa" style={styles.input} /></div>
+  <div style={styles.formRow}><select value={terminalDraft.mode} onChange={(event) => setTerminalDraft((current) => ({ ...current, mode: event.target.value as PdvTerminalConfig["mode"] }))} style={styles.input}><option value="single">Somente este computador</option><option value="server">Computador base (servidor)</option><option value="client">Outro caixa (cliente)</option></select>{terminalDraft.mode === "client" ? <input value={terminalDraft.serverUrl} onChange={(event) => setTerminalDraft((current) => ({ ...current, serverUrl: event.target.value }))} placeholder="URL do computador base" style={styles.input} /> : null}</div>
+  <button onClick={saveTerminalConfig} style={styles.secondaryButton}>Salvar modo deste computador</button>
+  {terminalConfig.mode === "single" ? <div style={styles.infoBox}>Multi-caixa desativado. Este computador usa somente o banco SQLite local acima.</div> : null}
+  {terminalConfig.mode === "server" ? <details style={styles.advancedPanel}><summary>Computador base: disponibilizar dados para outros caixas</summary><div style={styles.stack}><div style={styles.formRow}><input value={syncServerDraft.port} onChange={(event) => setSyncServerDraft((current) => ({ ...current, port: event.target.value }))} placeholder="Porta do servidor" style={styles.input} /><input type="password" autoComplete="off" value={syncServerDraft.token} onChange={(event) => setSyncServerDraft((current) => ({ ...current, token: event.target.value }))} placeholder="Token opcional" style={styles.input} /></div><div style={styles.infoBox}>{syncServerStatus.running ? `Servidor ativo em ${syncServerStatus.url}` : "Servidor multi-caixa parado"}</div><div style={styles.toolbar}><button onClick={() => void startPdvSyncServer()} style={styles.secondaryButton}>Iniciar servidor</button><button onClick={() => void stopPdvSyncServer()} style={styles.secondaryButton}>Parar servidor</button></div></div></details> : null}
+  {terminalConfig.mode === "client" ? <details style={styles.advancedPanel}><summary>Outro caixa: sincronizar com computador base</summary><div style={styles.stack}><div style={styles.formRow}><input type="password" autoComplete="off" value={syncServerDraft.token} onChange={(event) => setSyncServerDraft((current) => ({ ...current, token: event.target.value }))} placeholder="Token, se definido na base" style={styles.input} /><input value={syncServerDraft.remoteUrl} onChange={(event) => setSyncServerDraft((current) => ({ ...current, remoteUrl: event.target.value }))} placeholder="URL do computador base" style={styles.input} /></div><div style={styles.toolbar}><button onClick={() => void pullSnapshotFromPdvServer()} style={styles.secondaryButton}>Receber dados da base</button><button onClick={() => void pushSnapshotToPdvServer()} style={styles.secondaryButton}>Enviar alterações à base</button></div></div></details> : null}
+</div>
+</SectionCard>
+<SectionCard hidden={route !== "/financeiro"} title="Resumo local das vendas finalizadas" subtitle="Valores calculados localmente">
+<div style={styles.totalsGrid}><div style={styles.totalTile}><span>Caixa Inicial</span><strong>{formatCurrency(cashSession?.initialAmount ?? 0)}</strong></div><div style={styles.totalTile}><span>Vendas finalizadas</span><strong>{formatCurrency(completedSales.reduce((sum, item) => sum + item.netTotal, 0))}</strong></div><div style={styles.totalTile}><span>Canceladas</span><strong>{cancelledSales.length}</strong></div><div style={styles.totalTile}><span>Sangrias</span><strong>{formatCurrency(cashSession?.withdrawals.reduce((sum, item) => sum + item.amount, 0) ?? 0)}</strong></div></div>
+</SectionCard>
+<SectionCard hidden={route !== "/financeiro"} title="Formas de pagamento" subtitle="Cadastro local de taxas e fluxo de caixa">
+<div style={styles.stack}><div style={styles.formRow}><input value={paymentOptionDraft.name} onChange={(event) => setPaymentOptionDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Forma" style={styles.input} /><input value={paymentOptionDraft.feePercent} onChange={(event) => setPaymentOptionDraft((current) => ({ ...current, feePercent: event.target.value }))} placeholder="Taxa %" style={styles.input} /></div><div style={styles.formRow}><select value={paymentOptionDraft.kind} onChange={(event) => setPaymentOptionDraft((current) => ({ ...current, kind: event.target.value as PaymentOption["kind"] }))} style={styles.input}><option value="cash">Dinheiro</option><option value="pix">PIX</option><option value="credit">Crédito</option><option value="debit">Débito</option><option value="store-credit">A prazo</option><option value="check">Cheque</option><option value="other">Outros</option></select><label style={styles.label}><span><input type="checkbox" checked={paymentOptionDraft.showsInCashflow} onChange={(event) => setPaymentOptionDraft((current) => ({ ...current, showsInCashflow: event.target.checked }))} /> Entra no fluxo</span></label></div><button onClick={savePaymentOption} style={styles.primaryButton}>{editingPaymentName ? "Salvar forma" : "Cadastrar forma"}</button><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Forma</th><th style={styles.th}>Taxa</th><th style={styles.th}>Fluxo</th><th style={styles.th}>Ações</th></tr></thead><tbody>{paymentOptions.map((option) => <tr key={option.name}><td style={styles.td}><strong>{option.name}</strong>{option.active === false ? " (inativa)" : ""}</td><td style={styles.td}>{option.feePercent.toLocaleString("pt-BR")} %</td><td style={styles.td}>{option.showsInCashflow ? "Sim" : "Não"}</td><td style={styles.td}><div style={styles.toolbar}><button onClick={() => editPaymentOption(option)} style={styles.compactButton}>Editar</button><button onClick={() => togglePaymentOption(option)} style={styles.compactButton}>{option.active === false ? "Ativar" : "Desativar"}</button></div></td></tr>)}</tbody></table></div></div>
+</SectionCard>
+<SectionCard hidden={route !== "/administracao"} title="Usuários e permissões" subtitle={`Operador atual: ${activeOperator.name}`}>
+<div style={styles.stack}><div style={styles.formRow}><select value={currentOperatorId} onChange={(event) => setCurrentOperatorId(event.target.value)} style={styles.input}>{users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} ({formatUserRole(user.role)})</option>)}</select><input value={userDraft.id} onChange={(event) => setUserDraft((current) => ({ ...current, id: event.target.value }))} placeholder="Código do usuário" style={styles.input} /></div><div style={styles.formRow}><input value={userDraft.name} onChange={(event) => setUserDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Nome" style={styles.input} /><select value={userDraft.role} onChange={(event) => setUserDraft((current) => ({ ...current, role: event.target.value as PdvUser["role"] }))} style={styles.input}><option value="cashier">Caixa</option><option value="manager">Gerente</option><option value="admin">Administrador</option></select></div><div style={styles.formRow}><input type="password" autoComplete="new-password" value={userDraft.managerPassword} onChange={(event) => setUserDraft((current) => ({ ...current, managerPassword: event.target.value }))} placeholder={editingUserId ? "Nova senha (deixe vazio para manter)" : "Senha/PIN com 6 ou mais caracteres"} style={styles.input} /><button onClick={saveUser} style={styles.primaryButton}>{editingUserId ? "Salvar usuário" : "Cadastrar usuário"}</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Usuário</th><th style={styles.th}>Perfil</th><th style={styles.th}>Status</th><th style={styles.th}>Ações</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td style={styles.td}><strong>{user.name}</strong><br /><small>{user.id}</small></td><td style={styles.td}>{formatUserRole(user.role)}</td><td style={styles.td}>{user.active ? "Ativo" : "Inativo"}</td><td style={styles.td}><div style={styles.toolbar}><button onClick={() => editUser(user)} style={styles.compactButton}>Editar</button><button onClick={() => toggleUser(user)} style={styles.compactButton}>{user.active ? "Desativar" : "Ativar"}</button></div></td></tr>)}</tbody></table></div></div>
+</SectionCard>
+<SectionCard wide hidden title="Histórico completo de vendas" subtitle={`${salesHistory.length} registro(s) filtrados`}>
+<div style={styles.stack}><div style={styles.historyFilters}><input value={historyFilters.query} onChange={(event) => setHistoryFilters((current) => ({ ...current, query: event.target.value }))} placeholder="Buscar venda/cliente" style={styles.input} /><select value={historyFilters.status} onChange={(event) => setHistoryFilters((current) => ({ ...current, status: event.target.value as typeof historyFilters.status }))} style={styles.input}><option value="all">Todas</option><option value="completed">Finalizadas</option><option value="cancelled">Canceladas</option></select><select value={historyFilters.customerId} onChange={(event) => setHistoryFilters((current) => ({ ...current, customerId: event.target.value }))} style={styles.input}><option value="">Todos os clientes</option>{registeredCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select><select value={historyFilters.paymentMethod} onChange={(event) => setHistoryFilters((current) => ({ ...current, paymentMethod: event.target.value }))} style={styles.input}><option value="">Todas as formas</option>{paymentOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select><button onClick={exportHistoryCsv} style={styles.secondaryButton}>Exportar CSV</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Venda</th><th style={styles.th}>Data</th><th style={styles.th}>Cliente</th><th style={styles.th}>Status</th><th style={styles.th}>Total</th></tr></thead><tbody>{salesHistory.slice(0, 12).map((item) => <tr key={`${item.status ?? "completed"}-${item.number}`}><td style={styles.td}>{item.number}</td><td style={styles.td}>{item.finalizedAt}</td><td style={styles.td}>{registeredCustomers.find((customer) => customer.id === item.customerId)?.name ?? item.customerId}</td><td style={styles.td}>{formatSaleStatus(item.status)}</td><td style={styles.td}>{formatCurrency(item.netTotal)}</td></tr>)}{salesHistory.length ? null : <tr><td style={styles.emptyRow} colSpan={5}>Nenhuma venda encontrada.</td></tr>}</tbody></table></div></div>
+</SectionCard>
+</section> : null}
+
+      {route === "/configuracoes" ? <section style={styles.pageGrid}>
+<SectionCard title="Dados da loja" subtitle="Informações usadas em recibos e na operação">
+<div style={styles.stack}><input value={storeSettings.storeName} onChange={(event) => setStoreSettings((current) => ({ ...current, storeName: event.target.value }))} placeholder="Nome da loja" style={styles.input} /><input value={storeSettings.document} onChange={(event) => setStoreSettings((current) => ({ ...current, document: event.target.value }))} placeholder="CNPJ/Documento" style={styles.input} /><input value={storeSettings.phone} onChange={(event) => setStoreSettings((current) => ({ ...current, phone: event.target.value }))} placeholder="Telefone" style={styles.input} /><input value={storeSettings.address} onChange={(event) => setStoreSettings((current) => ({ ...current, address: event.target.value }))} placeholder="Endereco" style={styles.input} /></div>
+</SectionCard>
+<SectionCard title="Login e segurança" subtitle={`Operador atual: ${activeOperator.name}`}>
+<div style={styles.stack}><select value={currentOperatorId} onChange={(event) => setCurrentOperatorId(event.target.value)} style={styles.input}>{users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} ({formatUserRole(user.role)})</option>)}</select><div style={styles.formRow}><input value={loginPasswordDraft} onChange={(event) => setLoginPasswordDraft(event.target.value)} placeholder="Senha/PIN do operador" type="password" autoComplete="current-password" style={styles.input} /><button onClick={loginCurrentOperator} style={styles.primaryButton}>Entrar</button></div><div style={styles.infoBox}>Use senha/PIN por usuário. Gerentes e administradores autorizam operações sensíveis.</div></div>
+</SectionCard>
+<SectionCard title="Backup automático" subtitle={autoBackupConfig.enabled ? "Ativo" : "Desativado"}>
+<div style={styles.stack}><label style={styles.label}><span><input type="checkbox" checked={autoBackupConfig.enabled} onChange={(event) => setAutoBackupConfig((current) => ({ ...current, enabled: event.target.checked }))} /> Backup ao finalizar venda</span></label><div style={styles.formRow}><input value={String(autoBackupConfig.retention)} onChange={(event) => setAutoBackupConfig((current) => ({ ...current, retention: Number(event.target.value) || 1 }))} placeholder="Retencao" style={styles.input} /><button onClick={() => void runAutoBackup("manual")} style={styles.primaryButton}>Backup Agora</button></div><button onClick={() => void refreshDesktopBackups()} style={styles.secondaryButton}>Listar backups do desktop</button><table style={styles.table}><thead><tr><th style={styles.th}>Backup</th><th style={styles.th}>Quando</th><th style={styles.th}>Tamanho</th></tr></thead><tbody>{desktopBackupFiles.slice(0, 7).map((file) => <tr key={file.path}><td style={styles.td}>{file.name}</td><td style={styles.td}>{file.createdAt}</td><td style={styles.td}>{file.size}</td></tr>)}{desktopBackupFiles.length ? null : autoBackups.slice(0, 7).map((backup) => <tr key={backup.id}><td style={styles.td}>{backup.id}</td><td style={styles.td}>{backup.createdAt}</td><td style={styles.td}>{backup.reason}</td></tr>)}{desktopBackupFiles.length || autoBackups.length ? null : <tr><td style={styles.emptyRow} colSpan={3}>Nenhum backup ainda.</td></tr>}</tbody></table></div>
+</SectionCard>
+<SectionCard title="TEF e maquininha" subtitle={tefConfig.integrationMode === "http-bridge" ? "Ponte HTTP para provedor/maquininha" : "Simulador"}>
+<div style={styles.stack}><div style={styles.formRow}><select value={tefConfig.integrationMode} onChange={(event) => setTefConfig((current) => ({ ...current, integrationMode: event.target.value as TefConfig["integrationMode"], simulationMode: event.target.value !== "http-bridge" }))} style={styles.input}><option value="simulated">Simulador</option><option value="http-bridge">Ponte HTTP maquininha</option></select><input value={tefConfig.provider} onChange={(event) => setTefConfig((current) => ({ ...current, provider: event.target.value }))} placeholder="Provedor" style={styles.input} /></div><input value={tefConfig.endpointUrl} onChange={(event) => setTefConfig((current) => ({ ...current, endpointUrl: event.target.value }))} placeholder="URL da ponte TEF ex: http://127.0.0.1:9090/pay" style={styles.input} /><input value={tefConfig.merchantCode} onChange={(event) => setTefConfig((current) => ({ ...current, merchantCode: event.target.value }))} placeholder="Codigo lojista" style={styles.input} /><label style={styles.label}><span><input type="checkbox" checked={tefConfig.enabled} onChange={(event) => setTefConfig((current) => ({ ...current, enabled: event.target.checked }))} /> TEF habilitado</span></label><div style={styles.infoBox}>Para maquininha real, instale/rode a ponte do provedor na URL acima. O PDV envia a venda e grava autorizacao/NSU retornados.</div></div>
+</SectionCard>
+<SectionCard title="Atalhos" subtitle="Operação de caixa">
+<div style={styles.stack}><div style={styles.infoBox}>F2 = nova venda | F3 = localizar produto | F6 = pagamento à vista | Delete = remover último item | F8 = finalizar venda</div><div style={styles.infoBox}>Os atalhos principais também aparecem em botões grandes no caixa.</div></div>
+</SectionCard>
+</section> : null}
+      {route === "/balanca" ? <section style={styles.pageGrid}>
+<SectionCard title="Configuração da balança" subtitle="Configuração salva localmente">
+<div style={styles.stack}><label style={styles.label}><span>Marca da balanca</span><select value={scaleBrand} onChange={(event) => setScaleBrand(event.target.value as ScaleSerialBrand)} style={styles.input}><option value="toledo">Toledo</option><option value="filizola">Filizola</option><option value="generic-request-response">Generic request/response</option><option value="generic-streaming">Generic streaming</option></select></label><label style={styles.label}><span>Perfil de codigo</span><select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeProfileMode)} style={styles.input}><option value="DEFAULT_PRICE">Preco embutido</option><option value="DEFAULT_WEIGHT">Peso embutido</option><option value="EXTENDED_PRODUCT">Produto estendido</option><option value="legacy-brasil">Legado brasileiro</option></select></label><label style={styles.label}><span>Comando serial</span><input value={requestCommand} onChange={(event) => setRequestCommand(event.target.value)} style={styles.input} /></label><div style={styles.infoBox}><strong>Exemplo de etiqueta</strong><div style={styles.infoValue}>{generatedBarcode}</div></div></div>
+</SectionCard>
+<SectionCard title="Leitor USB" subtitle={keyboardWedgeScannerProfile.name}>
+<div style={styles.stack}><div style={styles.formRow}><input value={barcode} onChange={(event) => setBarcode(event.target.value)} onKeyDown={(event) => event.key === keyboardWedgeScannerProfile.submitKey ? handleScaleBarcodeSubmit() : null} style={styles.input} /><button onClick={handleScaleBarcodeSubmit} style={styles.primaryButton}>Bipar</button></div><div style={styles.infoBox}><strong>Perfil ativo</strong><div style={styles.infoValue}>{barcodeMode === "legacy-brasil" ? "Legado com tipo embutido" : SCALE_BARCODE_PROFILES[barcodeMode as ScaleBarcodeProfileKey].name}</div></div></div>
+</SectionCard>
+<SectionCard title="Balanca Serial" subtitle={serialBridge ? "Bridge Electron ativa" : "Disponivel no desktop"}>
+<div style={styles.stack}><div style={styles.formRow}><button onClick={refreshPorts} style={styles.secondaryButton}>Listar portas</button><button onClick={serialConnected ? closeSelectedPort : openSelectedPort} style={styles.secondaryButton}>{serialConnected ? "Desconectar" : "Conectar"}</button></div><select value={selectedPort} onChange={(event) => setSelectedPort(event.target.value)} style={styles.input}><option value="">Selecione a porta COM</option>{serialPorts.map((port) => <option key={port.path} value={port.path}>{port.path} {port.manufacturer ? `- ${port.manufacturer}` : ""}</option>)}</select><label style={styles.label}><span>Velocidade da porta (baud rate)</span><input value={baudRate} onChange={(event) => setBaudRate(event.target.value)} placeholder="Ex.: 9600" style={styles.input} /></label><div style={styles.infoBox}>9600 é a velocidade de comunicação serial mais comum. Consulte o manual da balança para confirmar o valor.</div><button onClick={requestWeightFromScale} style={styles.primaryButton}>Solicitar peso</button></div>
+</SectionCard>
+<SectionCard title="Leitura recebida" subtitle="Resposta bruta da balança">
+<div style={styles.stack}><textarea value={serialFrame} onChange={(event) => setSerialFrame(event.target.value)} style={styles.textarea} /><select value={manualProductCode} onChange={(event) => setManualProductCode(event.target.value)} style={styles.input}>{catalogProducts.filter((product) => product.itemType === "weight").map((product) => <option key={product.productCode} value={product.productCode}>{product.productCode} - {product.productName}</option>)}</select><button onClick={handleScaleSubmit} style={styles.primaryButton}>Lancar peso no caixa</button></div>
+</SectionCard>
+<SectionCard title="Arquivos da balança" subtitle="Carga para Toledo e Urano">
+<div style={styles.stack}><pre style={styles.pre}>{toledoFile}</pre><pre style={styles.pre}>{uranoFile}</pre></div>
+</SectionCard>
+</section> : null}
+      {receiptPreviewOpen && lastReceiptText ? <div style={styles.receiptOverlay} role="dialog" aria-modal="true" aria-label="Comprovante da venda"><div style={styles.receiptDialog}><div style={styles.receiptDialogHeader}><strong>Comprovante da venda</strong><button onClick={() => setReceiptPreviewOpen(false)} style={styles.secondaryButton}>Fechar</button></div><pre style={styles.pre}>{lastReceiptText}</pre><button onClick={() => void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig)} style={styles.primaryButton}>Imprimir comprovante</button></div></div> : null}
+    </AppShell>
+  );
+}
+
+function loadInitialPdvStore() {
+  return createDefaultPdvLocalStore(defaultPdvStore);
+}
+
+function parsePdvSnapshot(raw: string) {
+  const value = JSON.parse(raw) as Partial<PdvStoreDefaults>;
+  if (!value || typeof value !== "object") throw new Error("Snapshot do PDV invalido.");
+  return createDefaultPdvLocalStore({
+    catalogProducts: Array.isArray(value.catalogProducts) ? value.catalogProducts as CatalogProduct[] : defaultPdvStore.catalogProducts,
+    registeredCustomers: Array.isArray(value.registeredCustomers) ? value.registeredCustomers as Customer[] : defaultPdvStore.registeredCustomers,
+    completedSales: Array.isArray(value.completedSales) ? value.completedSales as CompletedSale[] : [],
+    cashSession: value.cashSession && typeof value.cashSession === "object" ? value.cashSession as CashSession : null,
+    paymentOptions: Array.isArray(value.paymentOptions) ? value.paymentOptions as PaymentOption[] : defaultPdvStore.paymentOptions,
+    deviceConfig: value.deviceConfig && typeof value.deviceConfig === "object" ? value.deviceConfig as PdvDeviceConfig : defaultPdvStore.deviceConfig,
+    extensions: value.extensions && typeof value.extensions === "object" ? value.extensions : defaultExtensions
+  });
+}
+
+function formatCurrency(value: number) { return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+function parsePdvDecimal(value: string) {
+  const raw = value.trim();
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  return normalized ? Number(normalized) : 0;
+}
+function normalizeProductCategory(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+  return normalized ? normalized[0].toLocaleUpperCase("pt-BR") + normalized.slice(1) : "Geral";
+}
+function createBarcodeFromProductCode(productCode: string) {
+  const base = `789${productCode.replace(/\D/g, "").padStart(9, "0").slice(-9)}`;
+  const sum = base.split("").reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+  return `${base}${(10 - (sum % 10)) % 10}`;
+}
+function formatUserRole(role: PdvUser["role"]) { return ({ cashier: "Caixa", manager: "Gerente", admin: "Administrador" } as const)[role]; }
+function formatSaleStatus(status: CompletedSale["status"]) { return status === "cancelled" ? "Cancelada" : "Finalizada"; }
+function formatTerminalMode(mode: PdvTerminalConfig["mode"]) { return ({ single: "Caixa único", server: "Servidor", client: "Cliente" } as const)[mode]; }
+function formatIntegrationStatus(status: string) {
+  const labels: Record<string, string> = { approved: "Recebido", completed: "Finalizada", cancelled: "Cancelada", pending: "Pendente", ready: "Pronto", balanced: "Conferido", divergent: "Divergente", declined: "Recusado", error: "Erro" };
+  return labels[status.toLowerCase()] ?? status;
+}
+function roundCurrency(value: number) { return Number(value.toFixed(2)); }
+function roundStock(value: number) { return Number(value.toFixed(3)); }
+function calculateSaleNetTotal(sale: SaleState) {
+  const gross = sale.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  return roundCurrency(gross - gross * (sale.discountPercent / 100));
+}
+
+function allocateNextSaleNumber(input: { completedSales: CompletedSale[]; cancelledSales: CompletedSale[]; currentSaleNumber?: string }) {
+  const usedNumbers = new Set([
+    ...input.completedSales.map((sale) => sale.number),
+    ...input.cancelledSales.map((sale) => sale.number),
+    ...(input.currentSaleNumber ? [input.currentSaleNumber] : [])
+  ]);
+  let sequence = Math.max(0, ...[...usedNumbers].map((number) => Number(number)).filter(Number.isFinite).map(Math.floor)) + 1;
+  let saleNumber = formatSaleSequence(sequence);
+
+  while (usedNumbers.has(saleNumber)) {
+    sequence += 1;
+    saleNumber = formatSaleSequence(sequence);
+  }
+
+  return saleNumber;
+}
+
+function formatSaleSequence(sequence: number) {
+  return String(Math.max(Math.floor(sequence), 1)).padStart(6, "0");
+}
+
+function normalizePdvExtensions(value: unknown): PdvExtensions {
+  const candidate = value && typeof value === "object" ? value as Partial<PdvExtensions> : {};
+  return {
+    inventoryMovements: Array.isArray(candidate.inventoryMovements) ? candidate.inventoryMovements : [],
+    cashClosings: Array.isArray(candidate.cashClosings) ? candidate.cashClosings : [],
+    receiptPrinterConfig: candidate.receiptPrinterConfig ?? defaultPrinterConfig,
+    lastReceiptText: typeof candidate.lastReceiptText === "string" ? candidate.lastReceiptText : "",
+    users: Array.isArray(candidate.users) && candidate.users.length ? candidate.users : defaultUsers,
+    currentOperatorId: typeof candidate.currentOperatorId === "string" ? candidate.currentOperatorId : "OP-001",
+    auditLogs: Array.isArray(candidate.auditLogs) ? candidate.auditLogs : [],
+    cancelledSales: Array.isArray(candidate.cancelledSales) ? candidate.cancelledSales : [],
+    terminalConfig: candidate.terminalConfig ?? defaultTerminalConfig,
+    tefConfig: candidate.tefConfig ? { ...defaultTefConfig, ...candidate.tefConfig } : defaultTefConfig,
+    tefTransactions: Array.isArray(candidate.tefTransactions) ? candidate.tefTransactions : [],
+    autoBackupConfig: candidate.autoBackupConfig ? { ...defaultAutoBackupConfig, ...candidate.autoBackupConfig } : defaultAutoBackupConfig,
+    autoBackups: Array.isArray(candidate.autoBackups) ? candidate.autoBackups : [],
+    storeSettings: candidate.storeSettings ? { ...defaultStoreSettings, ...candidate.storeSettings } : defaultStoreSettings
+  };
+}
+function buildSaleStockMovements(sale: SaleState, products: CatalogProduct[], createdAt: string): PdvStockMovement[] {
+  const soldByProduct = sale.items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.productCode] = roundStock((acc[item.productCode] ?? 0) + item.quantity);
+    return acc;
+  }, {});
+
+  return Object.entries(soldByProduct).map(([productCode, quantity], index) => {
+    const product = products.find((item) => item.productCode === productCode);
+    const stockBefore = roundStock(product?.stock ?? quantity);
+    return {
+      id: `SALE-${sale.number}-${index}`,
+      productCode,
+      productName: product?.productName ?? productCode,
+      type: "sale",
+      quantityDelta: -quantity,
+      reason: `Venda ${sale.number}`,
+      createdAt,
+      stockBefore,
+      stockAfter: roundStock(stockBefore - quantity)
+    };
+  });
+}
+function renderReceiptForSale(sale: CompletedSale, customerName: string, width: number) {
+  return renderPdvReceipt({
+    storeName: "PDV Nexus",
+    documentLabel: "CUPOM NAO FISCAL",
+    width,
+    sale: {
+      number: sale.number,
+      finalizedAt: sale.finalizedAt,
+      seller: sale.seller,
+      customerName,
+      netTotal: sale.netTotal,
+      paymentSummary: sale.paymentSummary,
+      items: sale.items,
+      payments: sale.payments
+    }
+  });
+}
+async function requestReceiptPrint(receipt: string, desktopPrintingBridge: ReturnType<typeof getDesktopPrintingBridge>, config: ReceiptPrinterConfig) {
+  if (desktopPrintingBridge) {
+    await desktopPrintingBridge.receipt({ text: receipt, width: config.paperWidth, printerName: config.printerName });
+    return;
+  }
+  const printWindow = window.open("", "pdv-receipt-print", "width=420,height=640");
+  if (!printWindow) return;
+  printWindow.document.write(`<pre style="font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;">${escapeHtml(receipt)}</pre>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+function escapeHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+function resolvePaymentView(total: number, payments: PaymentDraft[], customer: Customer): PdvPaymentSummary & { errorMessage?: string } {
+  try {
+    return resolvePdvPayment({
+      total,
+      payments,
+      availableCredit: Math.max(customer.creditLimit - customer.creditUsed, 0),
+      customerName: customer.name
+    });
+  } catch (error) {
+    return {
+      status: "insufficient",
+      total,
+      paidTotal: roundCurrency(payments.reduce((sum, payment) => sum + Math.max(payment.amount, 0), 0)),
+      remainingTotal: total,
+      changeDue: 0,
+      creditTotal: roundCurrency(payments.filter((payment) => payment.method === "A PRAZO").reduce((sum, payment) => sum + Math.max(payment.amount, 0), 0)),
+      immediateTotal: roundCurrency(payments.filter((payment) => payment.method !== "A PRAZO").reduce((sum, payment) => sum + Math.max(payment.amount, 0), 0)),
+      errorMessage: error instanceof Error ? error.message : "Falha ao validar pagamento."
+    };
+  }
+}
+function safeEncodeScaleBarcode(productCode: string, profile: ScaleBarcodeProfileKey) { try { return encodeScaleBarcode(productCode || defaultConfig.manualProductCode, 12.5, profile); } catch { return "Configure um produto de balança válido"; } }
+
+function normalizeSyncUrl(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
+const styles = {
+  hero: { display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(240px, 0.8fr)", gap: "18px", padding: "24px", borderRadius: "24px", marginBottom: "18px", background: "linear-gradient(135deg, #121826 0%, #053b50 48%, #0ea5e9 100%)", color: "#f8fafc", alignItems: "center" },
+  eyebrow: { margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.18em", fontSize: "12px", color: "#a5f3fc" },
+  heroTitle: { margin: "0 0 10px", fontSize: "30px", lineHeight: 1.12 },
+  heroText: { margin: 0, maxWidth: "64ch", color: "#d5f3ff" },
+  pageGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px", alignItems: "start" },
+  cashierSurface: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.8fr)", gap: "16px", alignItems: "start", maxWidth: "1100px" },
+  cashierMainPanel: { minWidth: 0, display: "grid", gap: "16px" },
+  cashierBanner: { display: "grid", gridTemplateColumns: "minmax(150px, 1fr) minmax(260px, 1.25fr)", gap: "12px", alignItems: "center", padding: "14px", borderRadius: "6px", background: "#ffffff", color: "#0f172a", border: "1px solid #e2e8f0", boxShadow: "0 8px 22px rgba(15, 23, 42, 0.04)" },
+  cashierEyebrow: { margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.1em", fontSize: "9px", fontWeight: 800, color: "#64748b" },
+  cashierTitle: { margin: 0, fontSize: "18px", lineHeight: 1.1 },
+  cashierSubtitle: { display: "none" },
+  cashierStatusGrid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0" },
+  cashierStatusTile: { display: "grid", gap: "3px", padding: "2px 10px", borderRadius: 0, background: "transparent", borderLeft: "1px solid #e2e8f0", fontSize: "10px" },
+  cashierToolbar: { display: "grid", gridTemplateColumns: "minmax(180px, 1fr) 112px 112px 72px", gap: "8px", padding: "10px", borderRadius: "6px", background: "#ffffff", border: "1px solid #e2e8f0" },
+  cashierSearchInput: { width: "100%", minHeight: "38px", padding: "8px 12px", border: "1px solid #dbe3f0", borderRadius: "6px", boxSizing: "border-box", background: "#ffffff", fontSize: "12px", fontWeight: 500 },
+  cashierAddButton: { minHeight: "38px", border: "0", borderRadius: "6px", color: "#ffffff", background: "#2563eb", cursor: "pointer", fontSize: "12px", fontWeight: 800 },
+  cashierSecondaryAction: { minHeight: "38px", padding: "0 10px", border: "1px solid #cbd5e1", borderRadius: "6px", color: "#0f172a", background: "#ffffff", cursor: "pointer", fontSize: "12px", fontWeight: 800 },
+  cashierScalePanel: { display: "grid", gridTemplateColumns: "minmax(180px, 1fr) 130px 120px", gap: "8px", padding: "10px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #bfdbfe" },
+  categoryStrip: { display: "flex", gap: "7px", overflowX: "auto", padding: "10px 10px 0", borderRadius: "6px 6px 0 0", background: "#ffffff", border: "1px solid #e2e8f0", borderBottom: "0" },
+  categoryButton: { minHeight: "28px", minWidth: "auto", padding: "0 10px", border: "1px solid #e2e8f0", borderRadius: "14px", color: "#334155", background: "#ffffff", cursor: "pointer", fontSize: "10px", fontWeight: 700 },
+  categoryButtonActive: { minHeight: "28px", minWidth: "auto", padding: "0 10px", border: "1px solid #bfdbfe", borderRadius: "14px", color: "#2563eb", background: "#eff6ff", cursor: "pointer", fontSize: "10px", fontWeight: 800 },
+  productGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "8px", padding: "12px", borderRadius: "0 0 6px 6px", background: "#ffffff", border: "1px solid #e2e8f0", borderTop: "0" },
+  productTile: { position: "relative", minHeight: "82px", padding: "8px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#ffffff", color: "#0f172a", cursor: "pointer", display: "grid", gap: "3px", alignContent: "space-between", textAlign: "left", fontSize: "10px" },
+  productBadge: { justifySelf: "start", padding: "2px 5px", borderRadius: "3px", background: "#f8fafc", color: "#64748b", fontSize: "8px", fontWeight: 800 },
+  productPrice: { color: "#0f172a", fontSize: "12px", fontWeight: 900 },
+  cashierEmptyState: { padding: "24px 12px", borderRadius: "6px", background: "#f8fafc", color: "#94a3b8", textAlign: "center", fontSize: "11px", fontWeight: 600 },
+  orderPanel: { position: "sticky", top: "12px", display: "grid", gap: "12px", padding: "12px", borderRadius: "6px", background: "#ffffff", border: "1px solid #e2e8f0", boxShadow: "0 8px 22px rgba(15, 23, 42, 0.04)" },
+  orderHeader: { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" },
+  orderTitle: { margin: 0, fontSize: "13px", color: "#0f172a" },
+  iconActionButton: { width: "24px", height: "24px", border: "1px solid #dbe3f0", borderRadius: "5px", background: "#ffffff", color: "#2563eb", cursor: "pointer", fontSize: "10px", fontWeight: 900 },
+  orderItems: { display: "grid", gap: "6px", minHeight: "92px", maxHeight: "180px", overflow: "auto", padding: "8px 0" },
+  orderItem: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "8px", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #eef2f7", fontSize: "11px" },
+  orderTotals: { display: "grid", gap: "6px", padding: "10px 0", borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", borderRadius: 0, background: "#ffffff", fontSize: "10px" },
+  orderGrandTotal: { padding: 0, border: 0, background: "#ffffff", color: "#0f172a", fontSize: "18px", lineHeight: 1, fontWeight: 900, textAlign: "right" },
+  manualCaptureNotice: { padding: "8px 10px", borderRadius: "5px", background: "#eff6ff", border: "1px solid #bfdbfe", color: "#2563eb", fontWeight: 600, fontSize: "9px" },
+  manualPaymentButton: { minHeight: "32px", padding: "0 8px", border: "1px solid #dbe3f0", borderRadius: "5px", color: "#0f172a", background: "#ffffff", cursor: "pointer", fontSize: "9px", fontWeight: 800 },
+  bigActionGrid: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" },
+  bigShortcutButton: { minHeight: "36px", border: "1px solid #dbe3f0", borderRadius: "5px", color: "#0f172a", background: "#ffffff", cursor: "pointer", fontSize: "10px", fontWeight: 800 },
+  bigFinishButton: { minHeight: "36px", gridColumn: "auto", border: "0", borderRadius: "5px", color: "#ffffff", background: "#86d3a7", cursor: "pointer", fontSize: "10px", fontWeight: 900 },
+  removeItemButton: { minHeight: "44px", border: "1px solid #fecaca", borderRadius: "8px", color: "#991b1b", background: "#fef2f2", cursor: "pointer", fontWeight: 800 },
+  checkoutGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 420px)", gap: "16px", alignItems: "start" },
+  checkoutMain: { display: "grid", gap: "16px", minWidth: 0 },
+  checkoutSide: { display: "grid", gap: "16px", position: "sticky", top: "12px" },
+  checkoutHeader: { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" },
+  saleIdentity: { display: "grid", gap: "4px" },
+  scanBox: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "10px", alignItems: "center" },
+  scanInput: { width: "100%", minHeight: "58px", padding: "12px 14px", border: "2px solid #0369a1", borderRadius: "8px", boxSizing: "border-box", background: "#ffffff", fontSize: "18px", fontWeight: 700 },
+  scanButton: { minHeight: "58px", padding: "0 18px", border: "0", borderRadius: "8px", color: "#eff6ff", background: "#0369a1", cursor: "pointer", fontWeight: 800 },
+  itemsPanel: { maxHeight: "420px", overflow: "auto", border: "1px solid #e2e8f0", borderRadius: "8px" },
+  totalDue: { padding: "16px", borderRadius: "8px", background: "#0f172a", color: "#f8fafc", fontSize: "36px", lineHeight: 1, fontWeight: 800, textAlign: "right", marginBottom: "12px" },
+  finishButton: { width: "100%", minHeight: "56px", marginTop: "12px", padding: "0 18px", border: "0", borderRadius: "8px", color: "#eff6ff", background: "#15803d", cursor: "pointer", fontWeight: 800 },
+  toolbar: { display: "flex", gap: "10px", flexWrap: "wrap" }, saleMetaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }, metaCard: { display: "grid", gap: "6px", padding: "14px", borderRadius: "14px", background: "#f8fafc", border: "1px solid #dbeafe" },
+  reportTables: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", alignItems: "start" },
+  historyFilters: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "10px", alignItems: "center" },
+  tableScroll: { width: "100%", maxHeight: "420px", overflow: "auto" },
+  productTableScroll: { width: "100%", overflowX: "auto" },
+  receiptOverlay: { position: "fixed", inset: 0, zIndex: 1000, display: "grid", placeItems: "center", padding: "24px", background: "rgba(15, 23, 42, 0.52)" },
+  receiptDialog: { width: "min(420px, 100%)", display: "grid", gap: "14px", padding: "18px", borderRadius: "16px", background: "#ffffff", boxShadow: "0 24px 64px rgba(15, 23, 42, 0.35)" },
+  receiptDialogHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" },
+  compactEmptyState: { padding: "14px", borderRadius: "10px", background: "#f8fafc", color: "#64748b" },
+  compactButton: { minHeight: "34px", padding: "0 10px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", background: "#ffffff", cursor: "pointer", fontWeight: 600 },
+  advancedPanel: { padding: "12px 14px", borderRadius: "12px", border: "1px solid #cbd5e1", background: "#f8fafc" },
+  paymentGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }, paymentQuickGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: "8px" }, paymentButton: { minHeight: "42px", padding: "0 10px", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1d4ed8", background: "#eff6ff", cursor: "pointer", fontWeight: 800 }, paymentCard: { display: "grid", gap: "10px", padding: "14px", borderRadius: "8px", background: "#f8fafc", border: "1px solid #dbeafe" }, paymentActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }, paymentAlert: { padding: "10px 12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontWeight: 700 }, totalsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }, totalTile: { display: "grid", gap: "6px", padding: "14px", borderRadius: "8px", background: "#ffffff", border: "1px solid #bfdbfe" },
+  formRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: "10px" }, stack: { display: "grid", gap: "10px" }, label: { display: "grid", gap: "6px", color: "#334155", fontSize: "14px" },
+  input: { width: "100%", minHeight: "44px", padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: "10px", boxSizing: "border-box", background: "#ffffff" }, textarea: { width: "100%", minHeight: "140px", padding: "12px", border: "1px solid #cbd5e1", borderRadius: "10px", fontFamily: "Consolas, monospace", resize: "vertical", boxSizing: "border-box" },
+  primaryButton: { minHeight: "44px", padding: "0 16px", border: "0", borderRadius: "10px", color: "#eff6ff", background: "linear-gradient(135deg, #0f172a, #0369a1)", cursor: "pointer", fontWeight: 700 }, secondaryButton: { minHeight: "44px", padding: "0 16px", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", background: "#f8fafc", cursor: "pointer", fontWeight: 600 },
+  infoBox: { padding: "12px 14px", borderRadius: "12px", background: "#eff6ff", border: "1px solid #bfdbfe" }, infoValue: { marginTop: "6px", color: "#1e3a8a", fontFamily: "Consolas, monospace" },
+  table: { width: "100%", borderCollapse: "collapse" }, th: { textAlign: "left", padding: "10px", borderBottom: "1px solid #cbd5e1" }, td: { padding: "10px", borderBottom: "1px solid #e2e8f0" }, emptyRow: { padding: "18px 10px", textAlign: "center", color: "#64748b" }, pre: { margin: 0, padding: "12px", background: "#0f172a", color: "#e2e8f0", borderRadius: "6px", overflowX: "auto" },
+  hiddenInput: { display: "none" }
+} as const;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@nexus-core/module-dashboard": ["packages/modules/dashboard/src/index.ts"],
+      "@nexus-core/core": ["packages/core/src/index.ts"]
+    },
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

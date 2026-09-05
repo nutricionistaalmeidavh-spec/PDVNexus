@@ -1,0 +1,20 @@
+{
+  "name": "@nexus-core/dashboard-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Demonstração de dashboards reutilizáveis com identidades visuais diferentes.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@nexus-core/module-dashboard": "0.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "vite": "^7.1.0"
+  }
+}

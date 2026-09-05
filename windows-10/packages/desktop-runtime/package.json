@@ -1,0 +1,11 @@
+{
+  "name": "@nexus-core/desktop-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bridge local para configuracoes e chaves por usuario.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

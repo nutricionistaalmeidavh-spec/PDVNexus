@@ -1,0 +1,24 @@
+{
+  "name": "@nexus-core/pdv-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Demonstra��o de PDV com modulo de balanca, leitor USB e leitura de peso.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base ./",
+    "postbuild": "node --test ../../tests/pdv-packaging.test.mjs"
+  },
+  "dependencies": {
+    "@nexus-core/database": "0.1.0",
+    "@nexus-core/desktop-runtime": "0.1.0",
+    "@nexus-core/module-balanca": "0.1.0",
+    "@nexus-core/ui": "0.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "vite": "^7.1.0"
+  }
+}

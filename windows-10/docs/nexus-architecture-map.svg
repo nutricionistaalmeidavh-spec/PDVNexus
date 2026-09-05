@@ -1,0 +1,163 @@
+<svg width="1600" height="1100" viewBox="0 0 1600 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F1E8"/>
+      <stop offset="1" stop-color="#E6F0EA"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFDF8"/>
+      <stop offset="1" stop-color="#F5FBF7"/>
+    </linearGradient>
+    <linearGradient id="apps" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#FB923C"/>
+    </linearGradient>
+    <linearGradient id="shared" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+    <linearGradient id="runtime" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#60A5FA"/>
+    </linearGradient>
+    <linearGradient id="local" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#163020" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0 0L14 7L0 14V0Z" fill="#355E52"/>
+    </marker>
+    <style>
+      .title { font: 700 40px 'Segoe UI', Arial, sans-serif; fill: #17342D; }
+      .subtitle { font: 500 19px 'Segoe UI', Arial, sans-serif; fill: #4C6B62; }
+      .section { font: 700 22px 'Segoe UI', Arial, sans-serif; fill: #14312A; }
+      .label { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: white; }
+      .body { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #24453D; }
+      .small { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #44655D; }
+      .whiteSmall { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: rgba(255,255,255,0.92); }
+      .arrowText { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #355E52; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" rx="32" fill="url(#bg)"/>
+  <circle cx="1430" cy="120" r="170" fill="#FFF7ED" opacity="0.75"/>
+  <circle cx="170" cy="980" r="230" fill="#E0F2FE" opacity="0.55"/>
+
+  <text x="70" y="80" class="title">Mapa Mental da Arquitetura do Software Factory Nexus Core</text>
+  <text x="70" y="115" class="subtitle">Monorepo local-first com produtos React, shell desktop Electron e pacotes reutilizáveis</text>
+
+  <rect x="60" y="160" width="1480" height="170" rx="28" fill="url(#panel)" filter="url(#shadow)"/>
+  <text x="90" y="205" class="section">1. Produtos finais montados sobre a plataforma</text>
+
+  <rect x="90" y="225" width="270" height="78" rx="20" fill="url(#apps)"/>
+  <text x="112" y="255" class="label">Meu Engenheiro</text>
+  <text x="112" y="279" class="whiteSmall">App acadêmico com CRM + IA + documentos</text>
+
+  <rect x="390" y="225" width="270" height="78" rx="20" fill="url(#apps)"/>
+  <text x="412" y="255" class="label">PDV Demo</text>
+  <text x="412" y="279" class="whiteSmall">Caixa, estoque, TEF, balança, backup</text>
+
+  <rect x="690" y="225" width="270" height="78" rx="20" fill="url(#apps)"/>
+  <text x="712" y="255" class="label">Nexus CRM</text>
+  <text x="712" y="279" class="whiteSmall">Segundo produto usando a mesma base</text>
+
+  <rect x="990" y="225" width="240" height="78" rx="20" fill="url(#apps)"/>
+  <text x="1012" y="255" class="label">Dashboard Demo</text>
+  <text x="1012" y="279" class="whiteSmall">Painéis e visualizações de apoio</text>
+
+  <rect x="1260" y="225" width="240" height="78" rx="20" fill="url(#apps)"/>
+  <text x="1282" y="255" class="label">Nexus Desktop</text>
+  <text x="1282" y="279" class="whiteSmall">Shell Electron que entrega os apps</text>
+
+  <rect x="60" y="370" width="1480" height="260" rx="28" fill="url(#panel)" filter="url(#shadow)"/>
+  <text x="90" y="415" class="section">2. Camada compartilhada da plataforma</text>
+
+  <rect x="90" y="445" width="220" height="150" rx="22" fill="url(#shared)"/>
+  <text x="112" y="478" class="label">packages/core</text>
+  <text x="112" y="505" class="whiteSmall">Contratos da plataforma</text>
+  <text x="112" y="526" class="whiteSmall">defineApp / defineModule</text>
+  <text x="112" y="547" class="whiteSmall">rotas, navegação, metadados</text>
+
+  <rect x="335" y="445" width="220" height="150" rx="22" fill="url(#shared)"/>
+  <text x="357" y="478" class="label">packages/ui</text>
+  <text x="357" y="505" class="whiteSmall">Componentes e design system</text>
+  <text x="357" y="526" class="whiteSmall">layouts e experiência reutilizável</text>
+
+  <rect x="580" y="445" width="220" height="150" rx="22" fill="url(#shared)"/>
+  <text x="602" y="478" class="label">packages/auth</text>
+  <text x="602" y="505" class="whiteSmall">Sessão, permissões</text>
+  <text x="602" y="526" class="whiteSmall">e autenticação local</text>
+
+  <rect x="825" y="445" width="300" height="150" rx="22" fill="url(#shared)"/>
+  <text x="847" y="478" class="label">packages/modules/*</text>
+  <text x="847" y="505" class="whiteSmall">crm, financeiro, documentos, ai,</text>
+  <text x="847" y="526" class="whiteSmall">dashboard, balança e regras de domínio</text>
+  <text x="847" y="547" class="whiteSmall">cada app ativa apenas os módulos necessários</text>
+
+  <rect x="1150" y="445" width="350" height="150" rx="22" fill="url(#shared)"/>
+  <text x="1172" y="478" class="label">packages/database</text>
+  <text x="1172" y="505" class="whiteSmall">Seeds, modelos e utilidades de persistência</text>
+  <text x="1172" y="526" class="whiteSmall">base para snapshots locais e evolução para SQLite</text>
+
+  <rect x="60" y="670" width="1480" height="230" rx="28" fill="url(#panel)" filter="url(#shadow)"/>
+  <text x="90" y="715" class="section">3. Runtime desktop e serviços de infraestrutura local</text>
+
+  <rect x="90" y="745" width="310" height="120" rx="22" fill="url(#runtime)"/>
+  <text x="112" y="778" class="label">packages/desktop-runtime</text>
+  <text x="112" y="805" class="whiteSmall">Bridge tipada para preload + IPC</text>
+  <text x="112" y="826" class="whiteSmall">segredos, serial, impressão, backup e sync</text>
+
+  <rect x="430" y="745" width="310" height="120" rx="22" fill="url(#runtime)"/>
+  <text x="452" y="778" class="label">Electron Main + Preload</text>
+  <text x="452" y="805" class="whiteSmall">carrega o renderer React</text>
+  <text x="452" y="826" class="whiteSmall">expõe APIs seguras em window.nexusDesktop</text>
+
+  <rect x="770" y="745" width="350" height="120" rx="22" fill="url(#runtime)"/>
+  <text x="792" y="778" class="label">packages/ai-runtime</text>
+  <text x="792" y="805" class="whiteSmall">Fallback entre Gemini, OpenRouter e Groq</text>
+  <text x="792" y="826" class="whiteSmall">ChatService para recursos com IA</text>
+
+  <rect x="1150" y="745" width="350" height="120" rx="22" fill="url(#runtime)"/>
+  <text x="1172" y="778" class="label">Serviços locais do shell</text>
+  <text x="1172" y="805" class="whiteSmall">servidor TEF demo, sincronização multi-caixa,</text>
+  <text x="1172" y="826" class="whiteSmall">porta serial, impressão e gestão de backup</text>
+
+  <rect x="60" y="940" width="1480" height="110" rx="28" fill="url(#panel)" filter="url(#shadow)"/>
+  <text x="90" y="985" class="section">4. Persistência e ambiente local-first</text>
+
+  <rect x="395" y="962" width="260" height="60" rx="18" fill="url(#local)"/>
+  <text x="418" y="999" class="label">localStorage / memória</text>
+
+  <rect x="685" y="962" width="260" height="60" rx="18" fill="url(#local)"/>
+  <text x="723" y="999" class="label">SQLite desktop</text>
+
+  <rect x="975" y="962" width="340" height="60" rx="18" fill="url(#local)"/>
+  <text x="998" y="989" class="label">Arquivos locais no userData</text>
+  <text x="998" y="1010" class="whiteSmall">segredos criptografados + backups JSON</text>
+
+  <path d="M225 303 C225 350, 200 390, 200 445" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M525 303 C525 350, 445 390, 445 445" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M825 303 C825 350, 975 390, 975 445" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M1110 303 C1110 345, 975 395, 975 445" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M1380 303 C1380 350, 585 705, 585 745" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <path d="M1240 595 C1240 660, 1325 705, 1325 745" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M960 595 C960 660, 945 705, 945 745" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M245 595 C245 660, 245 705, 245 745" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <path d="M555 865 C555 915, 525 940, 525 962" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M585 865 C585 915, 815 940, 815 962" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M1325 865 C1325 915, 1145 940, 1145 962" stroke="#355E52" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <text x="1345" y="520" class="arrowText">dados e snapshots</text>
+  <text x="985" y="690" class="arrowText">IA aplicada</text>
+  <text x="1275" y="690" class="arrowText">hardware e sync</text>
+  <text x="490" y="925" class="arrowText">fallback web</text>
+  <text x="760" y="925" class="arrowText">persistência desktop</text>
+  <text x="1098" y="925" class="arrowText">segredos e backups</text>
+
+  <text x="88" y="1078" class="small">Leitura do repositório em 11 de agosto de 2026: arquitetura baseada em apps React dentro de um monorepo, compartilhando módulos, runtime e infraestrutura local.</text>
+</svg>

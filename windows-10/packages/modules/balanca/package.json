@@ -1,0 +1,11 @@
+{
+  "name": "@nexus-core/module-balanca",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modulo reutilizavel para integracao de balanca, etiquetas e leitura de codigo de barras.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

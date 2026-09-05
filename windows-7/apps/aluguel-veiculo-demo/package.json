@@ -1,0 +1,22 @@
+{
+  "name": "@nexus-core/aluguel-veiculo-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Gestao de aluguel de veiculos para locadoras.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base ./"
+  },
+  "dependencies": {
+    "@nexus-core/desktop-runtime": "^0.1.0",
+    "@nexus-core/module-aluguel-veiculo": "^0.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "vite": "^7.1.0"
+  }
+}

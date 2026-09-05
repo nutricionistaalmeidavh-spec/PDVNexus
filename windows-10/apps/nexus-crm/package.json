@@ -1,0 +1,23 @@
+{
+  "name": "@nexus-core/nexus-crm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "App exemplo para demonstrar reutilizacao de modulos do Nexus Core.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@nexus-core/core": "0.1.0",
+    "@nexus-core/module-ai": "0.1.0",
+    "@nexus-core/module-crm": "0.1.0",
+    "@nexus-core/ui": "0.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "vite": "^7.1.0"
+  }
+}

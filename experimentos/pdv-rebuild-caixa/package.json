@@ -1,0 +1,30 @@
+{
+    "name":  "nexus-core",
+    "private":  true,
+    "version":  "0.1.0",
+    "description":  "Software factory para ERPs e sistemas desktop reutilizaveis.",
+    "workspaces":  [
+                       "apps/*",
+                       "packages/*",
+                       "packages/modules/*"
+                   ],
+    "scripts":  {
+                    "docs:check":  "node -e \"console.log(\u0027docs ok\u0027)\"",
+                    "test:pdv-payments":  "tsc -p tsconfig.test.json \u0026\u0026 node --test .tmp-tests/tests/pdv-payment.test.js",
+                    "tef:bridge-demo":  "node scripts/tef-bridge-demo.mjs",
+                    "typecheck":  "tsc --noEmit -p tsconfig.base.json",
+                    "build:meu-engenheiro":  "npm run build --workspace @nexus-core/meu-engenheiro",
+                    "build:pdv-demo":  "npm run build --workspace @nexus-core/pdv-demo",
+                    "build:dashboard-demo":  "npm run build --workspace @nexus-core/dashboard-demo",
+                    "desktop:start":  "npm run build:meu-engenheiro \u0026\u0026 npm run start --workspace @nexus-core/nexus-desktop",
+                    "desktop:start:pdv":  "npm run build:pdv-demo \u0026\u0026 npm run start:pdv --workspace @nexus-core/nexus-desktop",
+                    "desktop:pack":  "npm run build:meu-engenheiro \u0026\u0026 npm run build:pdv-demo \u0026\u0026 npm run pack --workspace @nexus-core/nexus-desktop",
+                    "desktop:dist:meu-engenheiro":  "npm run build:meu-engenheiro \u0026\u0026 npm run dist:meu-engenheiro --workspace @nexus-core/nexus-desktop",
+                    "desktop:dist:pdv":  "npm run build:pdv-demo \u0026\u0026 npm run dist:pdv --workspace @nexus-core/pdv-rebuild-desktop"
+                },
+    "devDependencies":  {
+                            "electron":  "39.8.10",
+                            "electron-builder":  "^26.0.12",
+                            "typescript":  "^5.6.3"
+                        }
+}

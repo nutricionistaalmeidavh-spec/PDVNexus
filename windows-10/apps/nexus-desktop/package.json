@@ -1,0 +1,24 @@
+{
+    "name": "@nexus-core/nexus-desktop",
+    "private": true,
+    "version": "0.1.16",
+    "description": "Shell desktop Electron do Nexus Core.",
+    "main": "main.cjs",
+    "scripts": {
+        "start": "electron .",
+        "start:pdv": "set NEXUS_APP=pdv-demo&& electron .",
+        "start:oficina": "set NEXUS_APP=oficina-demo&& electron .",
+        "pack": "electron-builder --dir --config electron-builder.cjs",
+        "dist": "electron-builder --config electron-builder.cjs",
+        "dist:meu-engenheiro": "set NEXUS_APP=meu-engenheiro&& electron-builder --config electron-builder.cjs",
+        "dist:pdv": "electron-builder --config electron-builder-pdv.cjs",
+        "dist:oficina": "set NEXUS_APP=oficina-demo&& electron-builder --config electron-builder.cjs",
+        "dist:locadora": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& set NEXUS_APP=aluguel-veiculo-demo&& electron-builder --config electron-builder.cjs",
+        "dist:oficina:portable": "electron-builder --config electron-builder-oficina-portable.cjs",
+        "dist:pdv:portable": "electron-builder --config electron-builder-pdv-portable.cjs",
+        "dist:pdv:store": "electron-builder --config electron-builder-pdv-store.cjs"
+    },
+    "dependencies": {
+        "serialport": "^13.0.0"
+    }
+}
