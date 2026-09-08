@@ -1,0 +1,59 @@
+name: Build Windows 10 PDV
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-windows10-pdv.yml"
+      - "windows-10/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows10:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-10/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test PDV payments
+        run: npm run test:pdv-payments
+
+      - name: Build Windows installer
+        run: npm run desktop:dist:pdv
+
+      - name: Verify installer and hash
+        run: |
+          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo" -Filter "PDV-Nexus-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $exe) { throw "Installer EXE not found" }
+          Write-Host "Installer: $($exe.FullName)"
+          Write-Host "Size: $($exe.Length) bytes"
+          Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Windows-10
+          path: windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14
