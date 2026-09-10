@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
@@ -741,16 +741,27 @@ ipcMain.handle("nexus-pdv-backup:write", (_event, options) => writePdvBackup(opt
 ipcMain.handle("nexus-print:receipt", async (_event, options) => {
   const receipt = String(options?.text ?? "");
   const width = Number(options?.width ?? 32);
+  const requestedPaperFormat = String(options?.paperFormat ?? "");
+  const paperFormat = ["58mm", "80mm", "a4-half"].includes(requestedPaperFormat)
+    ? requestedPaperFormat
+    : width >= 80 ? "a4-half" : width >= 42 ? "80mm" : "58mm";
+  const isA4Half = paperFormat === "a4-half";
   const printWindow = new BrowserWindow({
-    width: width <= 32 ? 320 : 420,
-    height: 640,
+    width: isA4Half ? 840 : width <= 32 ? 320 : 420,
+    height: isA4Half ? 600 : 640,
     show: false,
     webPreferences: { sandbox: true }
   });
   const safeReceipt = receipt.replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-  await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<pre style="font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;">${safeReceipt}</pre>`)}`);
+  const printHtml = isA4Half
+    ? `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; padding: 0; background: #fff; color: #000; } .receipt-half { width: 210mm; height: 148.5mm; box-sizing: border-box; padding: 8mm 10mm; overflow: visible; } pre { margin: 0; font-family: Consolas, "Courier New", monospace; font-size: 9pt; line-height: 1.15; white-space: pre-wrap; overflow-wrap: anywhere; }</style></head><body><section class="receipt-half"><pre>${safeReceipt}</pre></section></body></html>`
+    : `<pre style="font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;">${safeReceipt}</pre>`;
+  await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHtml)}`);
+  const printOptions = isA4Half
+    ? { silent: false, printBackground: false, pageSize: "A4", margins: { marginType: "none" } }
+    : { silent: false, printBackground: false };
   const result = await new Promise((resolve) => {
-    printWindow.webContents.print({ silent: false, printBackground: false }, (success, failureReason) => {
+    printWindow.webContents.print(printOptions, (success, failureReason) => {
       resolve({ success, failureReason: failureReason || "" });
     });
   });

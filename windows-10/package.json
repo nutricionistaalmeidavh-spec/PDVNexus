@@ -10,7 +10,7 @@
                    ],
     "scripts":  {
                     "docs:check":  "node -e \"console.log(\u0027docs ok\u0027)\"",
-                    "test:pdv-payments":  "tsc -p tsconfig.test.json \u0026\u0026 node --test .tmp-tests/tests/pdv-payment.test.js",
+                    "test:pdv-payments":  "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-payment.test.js .tmp-tests/tests/pdv-receipt-format.test.js",
                     "tef:bridge-demo":  "node scripts/tef-bridge-demo.mjs",
                     "typecheck":  "tsc --noEmit -p tsconfig.base.json",
                     "build:meu-engenheiro":  "npm run build --workspace @nexus-core/meu-engenheiro",

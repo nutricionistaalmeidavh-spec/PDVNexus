@@ -51,6 +51,7 @@ import {
 import { AppShell, Pill, SectionCard } from "@nexus-core/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useHashRoute } from "../../meu-engenheiro/src/lib/useHashRoute";
+import { buildReceiptPrintHtml, normalizeReceiptPaperFormat, receiptColumnsForFormat, type ReceiptPaperFormat } from "./receiptPrintFormat";
 
 type PaymentMethod = string;
 type PaymentOption = { name: string; feePercent: number; showsInCashflow: boolean; active?: boolean; kind?: "cash" | "pix" | "credit" | "debit" | "store-credit" | "check" | "other"; };
@@ -61,7 +62,7 @@ type SaleItem = { id: string; productCode: string; productName: string; unitLabe
 type SaleState = { number: string; openedAt: string; customerId: string; seller: string; discountPercent: number; items: SaleItem[]; payments: PaymentDraft[]; terminalId?: string; operatorId?: string; };
 type CompletedSale = SaleState & { finalizedAt: string; netTotal: number; paymentSummary: PdvPaymentSummary; status?: "completed" | "cancelled"; cancelledAt?: string; cancelReason?: string; cancelledById?: string; authorizedById?: string; };
 type CashSession = { openedAt: string; initialAmount: number; closedAt?: string; withdrawals: Array<{ amount: number; note: string; createdAt: string }>; };
-type ReceiptPrinterConfig = { paperWidth: number; autoPrint: boolean; printerName: string; };
+type ReceiptPrinterConfig = { paperFormat: ReceiptPaperFormat; paperWidth: number; autoPrint: boolean; printerName: string; };
 type TefConfig = { enabled: boolean; simulationMode: boolean; provider: string; merchantCode: string; endpointUrl: string; integrationMode: "simulated" | "http-bridge"; };
 type AutoBackupConfig = { enabled: boolean; retention: number; trigger: "sale-finalized" | "manual"; };
 type StoreSettings = { storeName: string; document: string; phone: string; address: string; };
@@ -98,7 +99,7 @@ const defaultPaymentOptions: PaymentOption[] = [{ name: "A VISTA", feePercent: 0
 const paymentQuickMethods = ["A VISTA", "PIX", "DEBITO", "CREDITO", "A PRAZO"];
 const defaultRoute = "/caixa";
 const defaultConfig: PdvDeviceConfig = { scaleBrand: "toledo", barcodeMode: "DEFAULT_PRICE", requestCommand: SCALE_REQUEST_COMMANDS.toledo, selectedPort: "", baudRate: "9600", manualProductCode: "00034" };
-const defaultPrinterConfig: ReceiptPrinterConfig = { paperWidth: 32, autoPrint: false, printerName: "Impressora termica 58/80mm" };
+const defaultPrinterConfig: ReceiptPrinterConfig = { paperFormat: "58mm", paperWidth: receiptColumnsForFormat("58mm"), autoPrint: false, printerName: "Impressora 58/80mm ou A4" };
 const defaultUsers: PdvUser[] = [{ id: "OP-001", name: "Operador Caixa", role: "cashier", active: true }, { id: "GER-001", name: "Gerente", role: "manager", active: true }];
 const defaultTerminalConfig: PdvTerminalConfig = { terminalId: "CAIXA-01", terminalName: "Caixa principal", mode: "single", active: true };
 const defaultTefConfig: TefConfig = { enabled: false, simulationMode: false, provider: "Captura manual", merchantCode: "", endpointUrl: "", integrationMode: "simulated" };
@@ -190,6 +191,15 @@ export function PdvDemoApp() {
   const desktopPdvSyncBridge = getDesktopPdvSyncBridge();
   const desktopPdvBackupBridge = getDesktopPdvBackupBridge();
   const desktopPrintingBridge = getDesktopPrintingBridge();
+
+  const updateReceiptPaperFormat = (paperFormat: ReceiptPaperFormat) => {
+    const paperWidth = receiptColumnsForFormat(paperFormat);
+    setReceiptPrinterConfig((current) => ({ ...current, paperFormat, paperWidth }));
+    const latestSale = completedSales[0];
+    if (!latestSale) return;
+    const latestCustomerName = registeredCustomers.find((customer) => customer.id === latestSale.customerId)?.name ?? "Cliente";
+    setLastReceiptText(renderReceiptForSale(latestSale, latestCustomerName, paperWidth));
+  };
 
   const activeCustomer = registeredCustomers.find((customer) => customer.id === (sale?.customerId ?? selectedCustomerId)) ?? registeredCustomers[0] ?? fallbackCustomer;
   const activeOperator = users.find((user) => user.id === currentOperatorId) ?? users[0] ?? defaultUsers[0];
@@ -1003,8 +1013,8 @@ export function PdvDemoApp() {
 <SectionCard title="Conferência de caixa" subtitle={cashClosings[0] ? `Último fechamento: ${formatIntegrationStatus(cashClosings[0].status)}` : "Informe os valores contados antes de fechar"}>
 <div style={styles.stack}><div style={styles.formRow}><input value={countedCashDraft} onChange={(event) => setCountedCashDraft(event.target.value)} placeholder="Dinheiro contado" style={styles.input} /><input value={countedPixDraft} onChange={(event) => setCountedPixDraft(event.target.value)} placeholder="PIX conferido" style={styles.input} /></div><div style={styles.formRow}><input value={countedCardDraft} onChange={(event) => setCountedCardDraft(event.target.value)} placeholder="Cartões conferidos" style={styles.input} /><button onClick={closeCash} style={styles.primaryButton}>Fechar com conferência</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Fechamento</th><th style={styles.th}>Status</th><th style={styles.th}>Dinheiro esperado</th><th style={styles.th}>Divergência</th></tr></thead><tbody>{cashClosings.slice(0, 5).map((closing) => <tr key={closing.closedAt}><td style={styles.td}>{closing.closedAt}</td><td style={styles.td}>{formatIntegrationStatus(closing.status)}</td><td style={styles.td}>{formatCurrency(closing.expectedCashTotal)}</td><td style={styles.td}>{formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0)}</td></tr>)}{cashClosings.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhum fechamento conferido ainda.</td></tr>}</tbody></table></div></div>
 </SectionCard>
-<SectionCard title="Comprovante e impressão" subtitle="Pronto para impressora 58/80 mm; teste físico pendente">
-<div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={String(receiptPrinterConfig.paperWidth)} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, paperWidth: Number(event.target.value) || 32 }))} style={styles.input}><option value="32">58mm</option><option value="42">80mm</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => lastReceiptText ? void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig) : setLastEvent("Finalize uma venda antes de imprimir comprovante.")} style={styles.secondaryButton}>Imprimir/Reimprimir</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div>
+<SectionCard title="Comprovante e impressão" subtitle="Bobina 58/80 mm ou cupom não fiscal na metade superior da A4">
+<div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={receiptPrinterConfig.paperFormat} onChange={(event) => updateReceiptPaperFormat(event.target.value as ReceiptPaperFormat)} style={styles.input}><option value="58mm">58mm (bobina)</option><option value="80mm">80mm (bobina)</option><option value="a4-half">A4 meia folha</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => lastReceiptText ? void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig) : setLastEvent("Finalize uma venda antes de imprimir comprovante.")} style={styles.secondaryButton}>Imprimir/Reimprimir</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div>
 </SectionCard>
 </section> : null}
 
@@ -1158,10 +1168,15 @@ function formatSaleSequence(sequence: number) {
 
 function normalizePdvExtensions(value: unknown): PdvExtensions {
   const candidate = value && typeof value === "object" ? value as Partial<PdvExtensions> : {};
+  const rawPrinterConfig = candidate.receiptPrinterConfig as Partial<ReceiptPrinterConfig> | undefined;
+  const paperFormat = normalizeReceiptPaperFormat(rawPrinterConfig?.paperFormat, rawPrinterConfig?.paperWidth);
+  const receiptPrinterConfig: ReceiptPrinterConfig = rawPrinterConfig
+    ? { ...defaultPrinterConfig, ...rawPrinterConfig, paperFormat, paperWidth: receiptColumnsForFormat(paperFormat) }
+    : defaultPrinterConfig;
   return {
     inventoryMovements: Array.isArray(candidate.inventoryMovements) ? candidate.inventoryMovements : [],
     cashClosings: Array.isArray(candidate.cashClosings) ? candidate.cashClosings : [],
-    receiptPrinterConfig: candidate.receiptPrinterConfig ?? defaultPrinterConfig,
+    receiptPrinterConfig,
     lastReceiptText: typeof candidate.lastReceiptText === "string" ? candidate.lastReceiptText : "",
     users: Array.isArray(candidate.users) && candidate.users.length ? candidate.users : defaultUsers,
     currentOperatorId: typeof candidate.currentOperatorId === "string" ? candidate.currentOperatorId : "OP-001",
@@ -1216,18 +1231,16 @@ function renderReceiptForSale(sale: CompletedSale, customerName: string, width: 
 }
 async function requestReceiptPrint(receipt: string, desktopPrintingBridge: ReturnType<typeof getDesktopPrintingBridge>, config: ReceiptPrinterConfig) {
   if (desktopPrintingBridge) {
-    await desktopPrintingBridge.receipt({ text: receipt, width: config.paperWidth, printerName: config.printerName });
+    await desktopPrintingBridge.receipt({ text: receipt, width: config.paperWidth, paperFormat: config.paperFormat, printerName: config.printerName });
     return;
   }
-  const printWindow = window.open("", "pdv-receipt-print", "width=420,height=640");
+  const printWindowFeatures = config.paperFormat === "a4-half" ? "width=840,height=600" : "width=420,height=640";
+  const printWindow = window.open("", "pdv-receipt-print", printWindowFeatures);
   if (!printWindow) return;
-  printWindow.document.write(`<pre style="font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;">${escapeHtml(receipt)}</pre>`);
+  printWindow.document.write(buildReceiptPrintHtml(receipt, config.paperFormat));
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
-}
-function escapeHtml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 function resolvePaymentView(total: number, payments: PaymentDraft[], customer: Customer): PdvPaymentSummary & { errorMessage?: string } {
   try {
