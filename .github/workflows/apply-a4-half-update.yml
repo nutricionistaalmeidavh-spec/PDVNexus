@@ -1,0 +1,91 @@
+name: Apply A4 Half-Page Receipt Update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-a4-half-update.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-verify:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply focused A4 half-page update
+        run: python .github/scripts/apply-a4-half-update.py
+
+      - name: Validate patch whitespace
+        shell: pwsh
+        run: git diff --check
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-10/package-lock.json
+
+      - name: Install dependencies
+        shell: pwsh
+        working-directory: windows-10
+        run: npm ci
+
+      - name: Typecheck
+        shell: pwsh
+        working-directory: windows-10
+        run: npm run typecheck
+
+      - name: Run PDV regression tests
+        shell: pwsh
+        working-directory: windows-10
+        run: npm run test:pdv-payments
+
+      - name: Build Windows installer
+        shell: pwsh
+        working-directory: windows-10
+        run: npm run desktop:dist:pdv
+
+      - name: Verify installer and SHA256
+        id: installer
+        shell: pwsh
+        working-directory: windows-10
+        run: |
+          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo" -Filter "PDV-Nexus-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $exe) { throw "Installer EXE not found" }
+          if ($exe.Length -lt 1MB) { throw "Installer EXE is unexpectedly small" }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe.FullName).Hash
+          $manifest = Join-Path $exe.DirectoryName "SHA256.txt"
+          "File: $($exe.Name)`nSize: $($exe.Length) bytes`nSHA256: $hash" | Set-Content -Path $manifest -Encoding utf8
+          Write-Host "Installer: $($exe.FullName)"
+          Write-Host "Size: $($exe.Length) bytes"
+          Write-Host "SHA256: $hash"
+
+      - name: Upload verified installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Windows-10-A4-Meia-Folha
+          path: |
+            windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Setup-*.exe
+            windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified source update
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add windows-10
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "feat: add A4 half-page receipt printing"
+            git push origin HEAD:main
+          } else {
+            Write-Host "No source changes to commit."
+          }
