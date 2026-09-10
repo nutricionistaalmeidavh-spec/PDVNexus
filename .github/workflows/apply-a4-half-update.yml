@@ -18,6 +18,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Normalize package test command
+        run: python .github/scripts/normalize-package-test.py
+
       - name: Apply focused A4 half-page update
         run: python .github/scripts/apply-a4-half-update.py
 
