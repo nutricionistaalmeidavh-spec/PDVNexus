@@ -39,7 +39,7 @@
     { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00034", "name": "adicionar-hortifruti", "holdMs": 300 },
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-hortifruti", "holdMs": 550 },
     { "action": "expectVisible", "text": "1.000 KG x R$ 8,99", "exact": true, "name": "hortifruti-no-carrinho", "holdMs": 250 },
-    { "action": "expectVisible", "text": "R$ 100,89", "exact": true, "name": "total-demo", "holdMs": 300 },
+    { "action": "expectVisible", "selector": ":nth-match(strong:has-text(\"R$ 100,89\"), 1)", "name": "total-demo", "holdMs": 300 },
     { "action": "screenshot", "name": "04-cesta-demo" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 900 },
