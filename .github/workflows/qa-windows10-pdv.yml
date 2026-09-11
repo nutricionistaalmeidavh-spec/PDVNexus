@@ -62,6 +62,9 @@ jobs:
       - name: Capture PDV UI with ArtiSys QA
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow ui-review --output qa-artifacts
 
+      - name: Install open-source FFmpeg for QA demo
+        run: choco install ffmpeg -y --no-progress
+
       - name: Verify demo video tools
         run: |
           ffmpeg -version | Select-Object -First 1
