@@ -1,0 +1,32 @@
+{
+  "id": "pdv-ui-review",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000 },
+    { "action": "screenshot", "name": "01-caixa-rapido" },
+
+    { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos" },
+    { "action": "expectURL", "includes": "#/produtos", "name": "produtos-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "produtos-render" },
+    { "action": "screenshot", "name": "02-produtos" },
+
+    { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "open-clientes" },
+    { "action": "expectURL", "includes": "#/clientes", "name": "clientes-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "clientes-render" },
+    { "action": "screenshot", "name": "03-clientes" },
+
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "open-financeiro" },
+    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "financeiro-render" },
+    { "action": "screenshot", "name": "04-financeiro" },
+
+    { "action": "click", "selector": "a[href=\"#/administracao\"]", "name": "open-administracao" },
+    { "action": "expectURL", "includes": "#/administracao", "name": "administracao-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "administracao-render" },
+    { "action": "screenshot", "name": "05-administracao" },
+
+    { "action": "click", "selector": "a[href=\"#/balanca\"]", "name": "open-balanca" },
+    { "action": "expectURL", "includes": "#/balanca", "name": "balanca-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "balanca-render" },
+    { "action": "screenshot", "name": "06-balanca" }
+  ]
+}

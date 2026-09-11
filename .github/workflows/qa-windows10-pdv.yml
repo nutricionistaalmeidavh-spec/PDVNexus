@@ -1,0 +1,70 @@
+name: QA Windows 10 PDV UI
+
+on:
+  push:
+    branches:
+      - main
+      - "qa/**"
+    paths:
+      - ".github/workflows/qa-windows10-pdv.yml"
+      - "windows-10/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/qa-windows10-pdv.yml"
+      - "windows-10/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artisys-qa-pdv:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+
+      - name: Install PDV dependencies
+        run: npm ci
+
+      - name: Install ArtiSys QA dependencies
+        run: npm ci --prefix tools/artisys-qa
+
+      - name: Validate ArtiSys QA manifest
+        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test PDV payments
+        run: npm run test:pdv-payments
+
+      - name: Build PDV renderer
+        run: npm run build:pdv-demo
+
+      - name: Capture PDV UI with ArtiSys QA
+        run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow ui-review --output qa-artifacts
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA
+          path: windows-10/qa-artifacts
+          if-no-files-found: warn
+          retention-days: 14
