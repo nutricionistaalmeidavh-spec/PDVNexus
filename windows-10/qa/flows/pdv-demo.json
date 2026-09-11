@@ -28,7 +28,7 @@
 
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 900 },
     { "action": "expectVisible", "text": "Resumo local das vendas finalizadas", "exact": true, "name": "financeiro-aberto", "holdMs": 400 },
-    { "action": "expectVisible", "selector": "section article strong", "name": "financeiro-com-dados", "holdMs": 300 },
+    { "action": "expectText", "selector": ":nth-match(article:has(h2:has-text(\"Resumo local das vendas finalizadas\")) strong, 2)", "expected": "100,00", "name": "financeiro-total-vendido", "holdMs": 300 },
     { "action": "screenshot", "name": "06-financeiro-pos-venda" }
   ]
 }
