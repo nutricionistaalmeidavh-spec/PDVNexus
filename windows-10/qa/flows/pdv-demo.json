@@ -5,6 +5,7 @@
     { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "brand-visible", "holdMs": 500 },
     { "action": "waitFor", "selector": "[data-cashier-client-icon=\"true\"]", "name": "client-card-icon", "timeoutMs": 5000 },
     { "action": "waitFor", "selector": "[data-cashier-seller-icon=\"true\"]", "name": "seller-card-icon", "timeoutMs": 5000 },
+    { "action": "expectVisible", "selector": "[data-e55-non-fiscal=\"true\"]", "name": "nao-fiscal-visible", "holdMs": 250 },
     { "action": "screenshot", "name": "01-demo-inicio" },
 
     { "action": "click", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa", "holdMs": 900 },
@@ -29,23 +30,31 @@
     { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "venda-limpa", "holdMs": 400 },
     { "action": "screenshot", "name": "03-rodape-operacional" },
 
-    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "produto-venda-final", "holdMs": 350 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-produto-final", "holdMs": 700 },
-    { "action": "expectVisible", "text": "1 UN x R$ 100,00", "exact": true, "name": "produto-final-no-carrinho", "holdMs": 400 },
-    { "action": "screenshot", "name": "04-produto-adicionado" },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00103", "name": "adicionar-bebida", "holdMs": 300 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-bebida", "holdMs": 550 },
+    { "action": "expectVisible", "text": "1 UN x R$ 12,00", "exact": true, "name": "bebida-no-carrinho", "holdMs": 250 },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00021", "name": "adicionar-picanha", "holdMs": 300 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-picanha", "holdMs": 550 },
+    { "action": "expectVisible", "text": "1.000 KG x R$ 79,90", "exact": true, "name": "picanha-no-carrinho", "holdMs": 250 },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00034", "name": "adicionar-hortifruti", "holdMs": 300 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-hortifruti", "holdMs": 550 },
+    { "action": "expectVisible", "text": "1.000 KG x R$ 8,99", "exact": true, "name": "hortifruti-no-carrinho", "holdMs": 250 },
+    { "action": "expectVisible", "text": "R$ 100,89", "exact": true, "name": "total-demo", "holdMs": 300 },
+    { "action": "screenshot", "name": "04-cesta-demo" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 900 },
-    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"100\"]", "name": "pagamento-registrado", "holdMs": 400 },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"100.89\"]", "name": "pagamento-registrado", "holdMs": 400 },
     { "action": "screenshot", "name": "05-pagamento" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 1400 },
     { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "comprovante-aberto", "holdMs": 800 },
+    { "action": "expectVisible", "text": "CUPOM NAO FISCAL", "exact": true, "name": "cupom-nao-fiscal", "holdMs": 250 },
     { "action": "screenshot", "name": "06-venda-finalizada" },
     { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante", "holdMs": 500 },
 
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 800 },
     { "action": "expectVisible", "text": "Resumo local das vendas finalizadas", "exact": true, "name": "financeiro-aberto", "holdMs": 350 },
-    { "action": "expectText", "selector": ":nth-match(article:has(h2:has-text(\"Resumo local das vendas finalizadas\")) strong, 2)", "expected": "100,00", "name": "financeiro-total-vendido", "holdMs": 250 },
+    { "action": "expectText", "selector": ":nth-match(article:has(h2:has-text(\"Resumo local das vendas finalizadas\")) strong, 2)", "expected": "100,89", "name": "financeiro-total-vendido", "holdMs": 250 },
     { "action": "screenshot", "name": "07-financeiro-pos-venda" }
   ]
 }
