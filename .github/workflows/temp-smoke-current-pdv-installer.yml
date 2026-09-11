@@ -1,0 +1,48 @@
+name: Temp smoke current PDV installer
+
+on:
+  push:
+    branches: ["feature/store-receipt-info-20260911"]
+    paths:
+      - ".github/workflows/temp-smoke-current-pdv-installer.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  smoke-installer:
+    runs-on: windows-2025
+    steps:
+      - name: Download exact validated installer artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 34620632653 --repo nutricionistaalmeidavh-spec/PDVNexus --name PDV-Nexus-Validated-Installers --dir assets
+          Get-ChildItem assets | Format-Table Name,Length
+
+      - name: Verify exact SHA256
+        shell: pwsh
+        run: |
+          $path = "assets/PDV-Nexus-Setup-0.1.16.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $path).Hash
+          Write-Host "SHA256=$hash"
+          if ($hash -ne "0477BBC5B8B6FCADB0F151B161698CB66C8A155610605B33A9F661FD8362CCA2") {
+            throw "Installer hash mismatch before smoke test"
+          }
+
+      - name: Silent install smoke test
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "assets/PDV-Nexus-Setup-0.1.16.exe").Path
+          $p = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "NSIS installer failed with exit code $($p.ExitCode)" }
+
+          $uninstall = Get-ChildItem 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue |
+            Get-ItemProperty -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -eq 'PDV Nexus' } |
+            Select-Object -First 1
+          if (-not $uninstall) { throw "PDV Nexus uninstall registration not found after install" }
+          Write-Host "Installed: $($uninstall.DisplayName) $($uninstall.DisplayVersion)"
