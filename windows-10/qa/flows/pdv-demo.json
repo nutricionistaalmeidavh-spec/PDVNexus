@@ -14,10 +14,11 @@
 
     { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "digitar-produto", "holdMs": 700 },
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-produto", "holdMs": 1100 },
-    { "action": "expectVisible", "text": "Teclado com fio", "exact": true, "name": "produto-no-carrinho", "holdMs": 700 },
+    { "action": "expectVisible", "text": "1 UN x R$ 100,00", "exact": true, "name": "produto-no-carrinho", "holdMs": 700 },
     { "action": "screenshot", "name": "03-produto-adicionado" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 1000 },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"100\"]", "name": "pagamento-registrado", "holdMs": 500 },
     { "action": "screenshot", "name": "04-pagamento" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 1400 },
@@ -26,7 +27,8 @@
     { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante", "holdMs": 600 },
 
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 900 },
-    { "action": "expectVisible", "text": "Vendas finalizadas", "exact": true, "name": "venda-refletida-financeiro", "holdMs": 700 },
+    { "action": "expectVisible", "text": "Resumo local das vendas finalizadas", "exact": true, "name": "financeiro-aberto", "holdMs": 400 },
+    { "action": "expectVisible", "selector": "section article strong", "name": "financeiro-com-dados", "holdMs": 300 },
     { "action": "screenshot", "name": "06-financeiro-pos-venda" }
   ]
 }
