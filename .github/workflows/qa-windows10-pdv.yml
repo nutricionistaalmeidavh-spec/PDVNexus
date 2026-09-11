@@ -73,6 +73,9 @@ jobs:
       - name: Run checkout demo with ArtiSys QA
         run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo checkout-flow --output qa-demo-artifacts
 
+      - name: Audit all cashier buttons with ArtiSys QA
+        run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo button-audit --output qa-button-audit-artifacts
+
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -88,5 +91,14 @@ jobs:
         with:
           name: PDV-Nexus-ArtiSys-QA-Demo
           path: windows-10/qa-demo-artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload cashier button audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA-Buttons
+          path: windows-10/qa-button-audit-artifacts
           if-no-files-found: warn
           retention-days: 14
