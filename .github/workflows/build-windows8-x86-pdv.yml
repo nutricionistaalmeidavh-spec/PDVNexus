@@ -43,7 +43,10 @@ jobs:
         run: npm run build:pdv-demo
 
       - name: Build Windows 8 32-bit installer
-        run: npx electron-builder --config apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs
+        run: |
+          Push-Location apps/nexus-desktop
+          npx electron-builder --config electron-builder-pdv-win8-x86.cjs
+          Pop-Location
 
       - name: Verify installer and hash
         run: |
