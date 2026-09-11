@@ -48,7 +48,7 @@
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 1400 },
     { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "comprovante-aberto", "holdMs": 800 },
-    { "action": "expectVisible", "text": "CUPOM NAO FISCAL", "exact": true, "name": "cupom-nao-fiscal", "holdMs": 250 },
+    { "action": "expectVisible", "selector": "pre:has-text(\"CUPOM NAO FISCAL\")", "name": "cupom-nao-fiscal", "holdMs": 250 },
     { "action": "screenshot", "name": "06-venda-finalizada" },
     { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante", "holdMs": 500 },
 
