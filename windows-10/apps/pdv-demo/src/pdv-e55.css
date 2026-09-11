@@ -1,0 +1,65 @@
+/* E55 customer-facing polish. Business logic stays untouched; advanced diagnostics remain available with ?advanced=1. */
+.e55-non-fiscal-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  z-index: 90;
+  display: grid;
+  gap: 1px;
+  min-width: 156px;
+  padding: 8px 11px;
+  border: 1px solid #d7e1ec;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 35, 62, 0.08);
+  color: #10213a;
+  pointer-events: none;
+}
+
+.e55-non-fiscal-badge strong {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.e55-non-fiscal-badge span {
+  color: #667b91;
+  font-size: 8px;
+}
+
+/* Diagnostics/protocol details are intentionally hidden from the normal customer surface. */
+[data-shell="pdv-nexus"][data-view="balanca"] .e55-technical,
+[data-shell="pdv-nexus"][data-view="administracao"] .e55-technical,
+[data-shell="pdv-nexus"][data-view="configuracoes"] .e55-technical {
+  display: none !important;
+}
+
+/* Support can explicitly reopen advanced controls without creating a second build. */
+.pdv-density-root[data-e55-advanced="true"] [data-shell="pdv-nexus"] .e55-technical {
+  display: revert !important;
+}
+
+/* Make the remaining peripheral setup read as one clean configuration surface. */
+[data-shell="pdv-nexus"][data-view="balanca"] article {
+  max-width: 880px;
+}
+
+[data-shell="pdv-nexus"][data-view="balanca"] article select,
+[data-shell="pdv-nexus"][data-view="balanca"] article input,
+[data-shell="pdv-nexus"][data-view="configuracoes"] article select,
+[data-shell="pdv-nexus"][data-view="configuracoes"] article input {
+  font-size: 13px !important;
+}
+
+[data-shell="pdv-nexus"][data-view="administracao"] article:first-of-type,
+[data-shell="pdv-nexus"][data-view="configuracoes"] article {
+  overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  .e55-non-fiscal-badge {
+    right: 8px;
+    bottom: 8px;
+    min-width: 132px;
+    padding: 7px 9px;
+  }
+}
