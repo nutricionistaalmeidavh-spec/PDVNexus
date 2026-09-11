@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { PdvDemoApp } from "./PdvDemoApp";
 import "./pdv-dense-v2.css";
+import "./pdv-dense-v2-grid.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
