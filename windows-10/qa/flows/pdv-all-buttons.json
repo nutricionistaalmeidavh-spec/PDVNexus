@@ -1,0 +1,79 @@
+{
+  "id": "pdv-all-buttons",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 300 },
+    { "action": "expectVisible", "selector": "[data-shell=\"pdv-nexus\"][data-view=\"caixa\"]", "name": "cashier-visible" },
+    { "action": "expectVisible", "selector": "button:has-text(\"Cancelar item\"):disabled", "name": "cancel-item-disabled-empty" },
+    { "action": "expectVisible", "selector": "button:has-text(\"Limpar venda\"):disabled", "name": "clear-sale-disabled-empty" },
+    { "action": "screenshot", "name": "01-botoes-inicio" },
+
+    { "action": "click", "text": "Abrir caixa", "exact": true, "name": "btn-abrir-caixa", "holdMs": 500 },
+    { "action": "expectVisible", "selector": "button:has-text(\"Caixa aberto\"):disabled", "name": "abrir-caixa-ok" },
+
+    { "action": "click", "selector": ":nth-match(button:has-text(\"F2\"), 1)", "name": "btn-f2-cabecalho", "holdMs": 450 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "f2-cabecalho-ok" },
+
+    { "action": "click", "text": "Pesar", "exact": true, "name": "btn-pesar", "holdMs": 350 },
+    { "action": "expectVisible", "selector": "input[placeholder*=\"produto vendido por peso\"]", "name": "painel-pesar-aberto" },
+    { "action": "click", "text": "Solicitar peso", "exact": true, "name": "btn-solicitar-peso", "holdMs": 400 },
+    { "action": "expectVisible", "text": "Conecte uma porta serial antes de solicitar o peso.", "exact": true, "name": "solicitar-peso-feedback" },
+    { "action": "click", "text": "Lançar leitura", "exact": true, "name": "btn-lancar-leitura", "holdMs": 500 },
+    { "action": "expectVisible", "text": "Tomate Italiano", "exact": true, "name": "lancar-leitura-ok" },
+    { "action": "click", "text": "Cancelar item", "exact": true, "name": "btn-cancelar-item", "holdMs": 400 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "cancelar-item-ok" },
+
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "preparar-adicionar" },
+    { "action": "click", "text": "Adicionar", "exact": true, "name": "btn-adicionar", "holdMs": 450 },
+    { "action": "expectVisible", "text": "1 UN x R$ 100,00", "exact": true, "name": "adicionar-ok" },
+    { "action": "click", "text": "Limpar venda", "exact": true, "name": "btn-limpar-venda", "holdMs": 450 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "limpar-venda-ok" },
+
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "preparar-f2-grande" },
+    { "action": "click", "text": "Adicionar", "exact": true, "name": "adicionar-antes-f2-grande", "holdMs": 350 },
+    { "action": "click", "selector": ":nth-match(button:has-text(\"F2\"), 2)", "name": "btn-f2-nova-venda", "holdMs": 450 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "f2-grande-ok" },
+
+    { "action": "click", "selector": "button:has-text(\"F3\")", "name": "btn-f3-produto", "holdMs": 250 },
+    { "action": "expectVisible", "selector": "input[placeholder*=\"Bipe\"]:focus", "name": "f3-foco-ok" },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "produto-pagamentos" },
+    { "action": "click", "text": "Adicionar", "exact": true, "name": "adicionar-produto-pagamentos", "holdMs": 350 },
+    { "action": "expectVisible", "text": "1 UN x R$ 100,00", "exact": true, "name": "produto-pagamentos-ok" },
+
+    { "action": "click", "text": "A VISTA", "exact": true, "name": "btn-pagamento-a-vista", "holdMs": 300 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "A VISTA", "name": "a-vista-ok" },
+    { "action": "click", "text": "PIX", "exact": true, "name": "btn-pagamento-pix", "holdMs": 300 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "PIX", "name": "pix-ok" },
+    { "action": "click", "text": "DEBITO", "exact": true, "name": "btn-pagamento-debito", "holdMs": 300 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "DEBITO", "name": "debito-ok" },
+    { "action": "click", "text": "CREDITO", "exact": true, "name": "btn-pagamento-credito", "holdMs": 300 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "CREDITO", "name": "credito-ok" },
+    { "action": "click", "text": "A PRAZO", "exact": true, "name": "btn-pagamento-a-prazo", "holdMs": 300 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "A PRAZO", "name": "a-prazo-ok" },
+
+    { "action": "click", "text": "Adicionar Forma", "exact": true, "name": "btn-adicionar-forma", "holdMs": 300 },
+    { "action": "expectVisible", "text": "Forma 2", "exact": true, "name": "segunda-forma-ok" },
+    { "action": "fill", "selector": ":nth-match(input[type=\"number\"], 1)", "value": "40", "name": "ajustar-forma-1" },
+    { "action": "fill", "selector": ":nth-match(input[type=\"number\"], 2)", "value": "0", "name": "zerar-forma-2" },
+    { "action": "click", "selector": ":nth-match(button:has-text(\"Restante\"), 2)", "name": "btn-restante-forma-2", "holdMs": 300 },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"60\"]", "name": "restante-forma-2-ok" },
+    { "action": "fill", "selector": ":nth-match(input[type=\"number\"], 1)", "value": "0", "name": "zerar-forma-1" },
+    { "action": "click", "selector": ":nth-match(button:has-text(\"Restante\"), 1)", "name": "btn-restante-forma-1", "holdMs": 300 },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"40\"]", "name": "restante-forma-1-ok" },
+    { "action": "click", "selector": ":nth-match(button:has-text(\"Remover\"), 2)", "name": "btn-remover-forma-2", "holdMs": 300 },
+    { "action": "waitFor", "text": "Forma 2", "exact": true, "state": "hidden", "timeoutMs": 3000, "name": "remover-forma-2-ok" },
+    { "action": "click", "text": "Adicionar Forma", "exact": true, "name": "recriar-forma-2", "holdMs": 250 },
+    { "action": "click", "selector": ":nth-match(button:has-text(\"Remover\"), 1)", "name": "btn-remover-forma-1", "holdMs": 300 },
+    { "action": "expectVisible", "text": "Forma 1", "exact": true, "name": "remover-forma-1-ok" },
+
+    { "action": "click", "selector": "button:has-text(\"F6\")", "name": "btn-f6-pagamento", "holdMs": 350 },
+    { "action": "expectText", "selector": "label:has-text(\"Forma 1\") select option:checked", "expected": "A VISTA", "name": "f6-metodo-ok" },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"100\"]", "name": "f6-valor-ok" },
+    { "action": "screenshot", "name": "02-botoes-pagamento" },
+
+    { "action": "click", "selector": "button:has-text(\"F8\")", "name": "btn-f8-finalizar", "holdMs": 900 },
+    { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "f8-finalizar-ok" },
+    { "action": "click", "text": "Fechar", "exact": true, "name": "btn-fechar-comprovante", "holdMs": 250 },
+    { "action": "waitFor", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "state": "hidden", "timeoutMs": 3000, "name": "fechar-comprovante-ok" },
+    { "action": "screenshot", "name": "03-auditoria-botoes-concluida" }
+  ]
+}
