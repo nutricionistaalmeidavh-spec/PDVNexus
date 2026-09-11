@@ -1,4 +1,4 @@
-﻿export type PdvProductType = "unit" | "weight";
+export type PdvProductType = "unit" | "weight";
 
 export interface PdvProduct {
   id: string;
@@ -329,6 +329,8 @@ export interface PdvReceiptSale {
 
 export interface PdvReceiptInput {
   storeName: string;
+  address?: string;
+  phone?: string;
   documentLabel: string;
   sale: PdvReceiptSale;
   width?: number;
@@ -778,6 +780,8 @@ export function renderPdvReceipt(input: PdvReceiptInput): string {
   const width = input.width ?? 42;
   const lines = [
     centerText(input.storeName, width),
+    ...(input.address?.trim() ? [centerText(input.address.trim(), width)] : []),
+    ...(input.phone?.trim() ? [centerText(`Telefone: ${input.phone.trim()}`, width)] : []),
     centerText(input.documentLabel, width),
     "-".repeat(width),
     `Venda: ${input.sale.number}`,

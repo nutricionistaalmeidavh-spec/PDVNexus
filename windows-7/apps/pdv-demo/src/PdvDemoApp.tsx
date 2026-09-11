@@ -51,6 +51,7 @@ import {
 import { AppShell, Pill, SectionCard } from "@nexus-core/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useHashRoute } from "../../meu-engenheiro/src/lib/useHashRoute";
+import { resolveReceiptStoreHeader } from "./storeReceiptSettings";
 
 type PaymentMethod = string;
 type PaymentOption = { name: string; feePercent: number; showsInCashflow: boolean; active?: boolean; kind?: "cash" | "pix" | "credit" | "debit" | "store-credit" | "check" | "other"; };
@@ -64,7 +65,7 @@ type CashSession = { openedAt: string; initialAmount: number; closedAt?: string;
 type ReceiptPrinterConfig = { paperWidth: number; autoPrint: boolean; printerName: string; };
 type TefConfig = { enabled: boolean; simulationMode: boolean; provider: string; merchantCode: string; endpointUrl: string; integrationMode: "simulated" | "http-bridge"; };
 type AutoBackupConfig = { enabled: boolean; retention: number; trigger: "sale-finalized" | "manual"; };
-type StoreSettings = { storeName: string; document: string; phone: string; address: string; };
+type StoreSettings = { storeName: string; document: string; phone: string; address: string; showOnReceipt: boolean; };
 type PdvExtensions = { inventoryMovements: PdvStockMovement[]; cashClosings: PdvCashClosingSummary[]; receiptPrinterConfig: ReceiptPrinterConfig; lastReceiptText: string; users: PdvUser[]; currentOperatorId: string; auditLogs: PdvAuditLog[]; cancelledSales: CompletedSale[]; terminalConfig: PdvTerminalConfig; tefConfig: TefConfig; tefTransactions: PdvTefTransaction[]; autoBackupConfig: AutoBackupConfig; autoBackups: Array<{ id: string; createdAt: string; reason: string; snapshotJson: string }>; storeSettings: StoreSettings; };
 type PdvDeviceConfig = { scaleBrand: ScaleSerialBrand; barcodeMode: BarcodeProfileMode; requestCommand: string; selectedPort: string; baudRate: string; manualProductCode: string; };
 type PdvStoreDefaults = PdvLocalStoreDefaults<CatalogProduct, Customer, CompletedSale, CashSession, PaymentOption, PdvDeviceConfig>;
@@ -103,7 +104,7 @@ const defaultUsers: PdvUser[] = [{ id: "OP-001", name: "Operador Caixa", role: "
 const defaultTerminalConfig: PdvTerminalConfig = { terminalId: "CAIXA-01", terminalName: "Caixa principal", mode: "single", active: true };
 const defaultTefConfig: TefConfig = { enabled: false, simulationMode: false, provider: "Captura manual", merchantCode: "", endpointUrl: "", integrationMode: "simulated" };
 const defaultAutoBackupConfig: AutoBackupConfig = { enabled: true, retention: 7, trigger: "sale-finalized" };
-const defaultStoreSettings: StoreSettings = { storeName: "PDV Nexus", document: "Nao informado", phone: "", address: "" };
+const defaultStoreSettings: StoreSettings = { storeName: "PDV Nexus", document: "Nao informado", phone: "", address: "", showOnReceipt: false };
 const defaultExtensions: PdvExtensions = { inventoryMovements: [], cashClosings: [], receiptPrinterConfig: defaultPrinterConfig, lastReceiptText: "", users: defaultUsers, currentOperatorId: "OP-001", auditLogs: [], cancelledSales: [], terminalConfig: defaultTerminalConfig, tefConfig: defaultTefConfig, tefTransactions: [], autoBackupConfig: defaultAutoBackupConfig, autoBackups: [], storeSettings: defaultStoreSettings };
 const defaultPdvStore: PdvStoreDefaults = { catalogProducts: seedProducts, registeredCustomers: seedCustomers, completedSales: [], cashSession: null, paymentOptions: defaultPaymentOptions, deviceConfig: defaultConfig, extensions: defaultExtensions };
 
@@ -428,7 +429,7 @@ export function PdvDemoApp() {
       setRegisteredCustomers((current) => current.map((customer) => customer.id === result.customer.id ? result.customer : customer));
       setCompletedSales(result.completedSales as CompletedSale[]);
       setInventoryMovements((current) => [...buildSaleStockMovements(sale, catalogProducts, new Date().toLocaleString("pt-BR")), ...current].slice(0, 200));
-      const receipt = renderReceiptForSale(result.completedSale, activeCustomer.name, receiptPrinterConfig.paperWidth);
+      const receipt = renderReceiptForSale(result.completedSale, activeCustomer.name, receiptPrinterConfig.paperWidth, storeSettings);
       setLastReceiptText(receipt);
       setReceiptPreviewOpen(true);
       const manualCapturePayments = sale.payments.filter((payment) => ["PIX", "CREDITO", "DEBITO"].includes(payment.method.toUpperCase()) && payment.amount > 0);
@@ -1004,7 +1005,7 @@ export function PdvDemoApp() {
 <div style={styles.stack}><div style={styles.formRow}><input value={countedCashDraft} onChange={(event) => setCountedCashDraft(event.target.value)} placeholder="Dinheiro contado" style={styles.input} /><input value={countedPixDraft} onChange={(event) => setCountedPixDraft(event.target.value)} placeholder="PIX conferido" style={styles.input} /></div><div style={styles.formRow}><input value={countedCardDraft} onChange={(event) => setCountedCardDraft(event.target.value)} placeholder="Cartões conferidos" style={styles.input} /><button onClick={closeCash} style={styles.primaryButton}>Fechar com conferência</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Fechamento</th><th style={styles.th}>Status</th><th style={styles.th}>Dinheiro esperado</th><th style={styles.th}>Divergência</th></tr></thead><tbody>{cashClosings.slice(0, 5).map((closing) => <tr key={closing.closedAt}><td style={styles.td}>{closing.closedAt}</td><td style={styles.td}>{formatIntegrationStatus(closing.status)}</td><td style={styles.td}>{formatCurrency(closing.expectedCashTotal)}</td><td style={styles.td}>{formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0)}</td></tr>)}{cashClosings.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhum fechamento conferido ainda.</td></tr>}</tbody></table></div></div>
 </SectionCard>
 <SectionCard title="Comprovante e impressão" subtitle="Pronto para impressora 58/80 mm; teste físico pendente">
-<div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={String(receiptPrinterConfig.paperWidth)} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, paperWidth: Number(event.target.value) || 32 }))} style={styles.input}><option value="32">58mm</option><option value="42">80mm</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => lastReceiptText ? void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig) : setLastEvent("Finalize uma venda antes de imprimir comprovante.")} style={styles.secondaryButton}>Imprimir/Reimprimir</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div>
+<div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={String(receiptPrinterConfig.paperWidth)} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, paperWidth: Number(event.target.value) || 32 }))} style={styles.input}><option value="32">58mm</option><option value="42">80mm</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => lastReceiptText ? void requestReceiptPrint(lastReceiptText, desktopPrintingBridge, receiptPrinterConfig) : setLastEvent("Finalize uma venda antes de imprimir comprovante.")} style={styles.secondaryButton}>Imprimir/Reimprimir</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth, storeSettings) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div>
 </SectionCard>
 </section> : null}
 
@@ -1051,7 +1052,7 @@ export function PdvDemoApp() {
 
       {route === "/configuracoes" ? <section style={styles.pageGrid}>
 <SectionCard title="Dados da loja" subtitle="Informações usadas em recibos e na operação">
-<div style={styles.stack}><input value={storeSettings.storeName} onChange={(event) => setStoreSettings((current) => ({ ...current, storeName: event.target.value }))} placeholder="Nome da loja" style={styles.input} /><input value={storeSettings.document} onChange={(event) => setStoreSettings((current) => ({ ...current, document: event.target.value }))} placeholder="CNPJ/Documento" style={styles.input} /><input value={storeSettings.phone} onChange={(event) => setStoreSettings((current) => ({ ...current, phone: event.target.value }))} placeholder="Telefone" style={styles.input} /><input value={storeSettings.address} onChange={(event) => setStoreSettings((current) => ({ ...current, address: event.target.value }))} placeholder="Endereco" style={styles.input} /></div>
+<div style={styles.stack}><input value={storeSettings.storeName} onChange={(event) => setStoreSettings((current) => ({ ...current, storeName: event.target.value }))} placeholder="Nome da loja" style={styles.input} /><input value={storeSettings.document} onChange={(event) => setStoreSettings((current) => ({ ...current, document: event.target.value }))} placeholder="CNPJ/Documento" style={styles.input} /><input value={storeSettings.phone} onChange={(event) => setStoreSettings((current) => ({ ...current, phone: event.target.value }))} placeholder="Telefone" style={styles.input} /><input value={storeSettings.address} onChange={(event) => setStoreSettings((current) => ({ ...current, address: event.target.value }))} placeholder="Endereco" style={styles.input} /><label style={styles.label}><span><input type="checkbox" checked={storeSettings.showOnReceipt} onChange={(event) => setStoreSettings((current) => ({ ...current, showOnReceipt: event.target.checked }))} /> Exibir nome, endereço e telefone no cupom não fiscal</span></label></div>
 </SectionCard>
 <SectionCard title="Login e segurança" subtitle={`Operador atual: ${activeOperator.name}`}>
 <div style={styles.stack}><select value={currentOperatorId} onChange={(event) => setCurrentOperatorId(event.target.value)} style={styles.input}>{users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} ({formatUserRole(user.role)})</option>)}</select><div style={styles.formRow}><input value={loginPasswordDraft} onChange={(event) => setLoginPasswordDraft(event.target.value)} placeholder="Senha/PIN do operador" type="password" autoComplete="current-password" style={styles.input} /><button onClick={loginCurrentOperator} style={styles.primaryButton}>Entrar</button></div><div style={styles.infoBox}>Use senha/PIN por usuário. Gerentes e administradores autorizam operações sensíveis.</div></div>
@@ -1197,9 +1198,10 @@ function buildSaleStockMovements(sale: SaleState, products: CatalogProduct[], cr
     };
   });
 }
-function renderReceiptForSale(sale: CompletedSale, customerName: string, width: number) {
+function renderReceiptForSale(sale: CompletedSale, customerName: string, width: number, storeSettings: StoreSettings) {
+  const storeHeader = resolveReceiptStoreHeader(storeSettings);
   return renderPdvReceipt({
-    storeName: "PDV Nexus",
+    ...storeHeader,
     documentLabel: "CUPOM NAO FISCAL",
     width,
     sale: {

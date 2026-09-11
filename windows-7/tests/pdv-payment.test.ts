@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveReceiptStoreHeader } from "../apps/pdv-demo/src/storeReceiptSettings";
 import {
   applyPdvInventoryCount,
   applyPdvStockMovement,
@@ -517,4 +518,55 @@ test("createPdvTefProviderRequest prepares a machine integration payload without
   assert.equal(request.payload.amount, 45.75);
   assert.equal(request.payload.captureMode, "card-present");
   assert.equal(request.expectedStatus, "pending-provider");
+});
+
+
+test("store receipt header keeps legacy branding until opt-in", () => {
+  const header = resolveReceiptStoreHeader({
+    storeName: "Loja Exemplo",
+    address: "Rua Central, 123",
+    phone: "(16) 99999-0000",
+    showOnReceipt: false
+  });
+
+  assert.deepEqual(header, { storeName: "PDV Nexus" });
+});
+
+test("store receipt header exposes optional data after opt-in", () => {
+  const header = resolveReceiptStoreHeader({
+    storeName: "  Loja Exemplo  ",
+    address: "  Rua Central, 123  ",
+    phone: "  (16) 99999-0000  ",
+    showOnReceipt: true
+  });
+
+  assert.deepEqual(header, {
+    storeName: "Loja Exemplo",
+    address: "Rua Central, 123",
+    phone: "(16) 99999-0000"
+  });
+});
+
+test("renderPdvReceipt prints optional store address and phone", () => {
+  const receipt = renderPdvReceipt({
+    storeName: "Loja Exemplo",
+    address: "Rua Central, 123",
+    phone: "(16) 99999-0000",
+    documentLabel: "CUPOM NAO FISCAL",
+    sale: {
+      number: "000999",
+      finalizedAt: "2026-09-11 13:00",
+      seller: "Operador",
+      customerName: "Cliente",
+      netTotal: 10,
+      paymentSummary: { paidTotal: 10, changeDue: 0 },
+      items: [{ productName: "Produto", quantity: 1, unitLabel: "UN", unitPrice: 10, totalPrice: 10 }],
+      payments: [{ method: "PIX", amount: 10 }]
+    },
+    width: 42
+  });
+
+  assert.match(receipt, /Loja Exemplo/);
+  assert.match(receipt, /Rua Central, 123/);
+  assert.match(receipt, /Telefone: \(16\) 99999-0000/);
 });
