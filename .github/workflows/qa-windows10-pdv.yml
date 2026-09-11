@@ -50,6 +50,9 @@ jobs:
           node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
           node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
 
+      - name: E55 presentation requirements
+        run: npm run test:e55-presentation
+
       - name: Typecheck
         run: npm run typecheck
 
