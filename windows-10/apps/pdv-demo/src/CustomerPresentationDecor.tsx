@@ -1,10 +1,6 @@
 import { useEffect } from "react";
 
-const TECHNICAL_CARD_TITLES = new Set([
-  "Leitor USB",
-  "Leitura recebida",
-  "Arquivos da balança"
-]);
+const TECHNICAL_CARD_TITLES = new Set(["Leitor USB", "Leitura recebida", "Arquivos da balança"]);
 
 function textOf(element: Element | null) {
   return element?.textContent?.trim() ?? "";
@@ -12,6 +8,10 @@ function textOf(element: Element | null) {
 
 function setTextIfChanged(element: Element | null, value: string) {
   if (element && element.textContent !== value) element.textContent = value;
+}
+
+function setAttributeIfChanged(element: Element | null, name: string, value: string) {
+  if (element && element.getAttribute(name) !== value) element.setAttribute(name, value);
 }
 
 function replaceHeading(article: Element, from: string, to: string) {
@@ -33,18 +33,34 @@ function replaceTextNode(element: Element | null, from: string, to: string) {
   }
 }
 
+function cleanApplicationChrome(shell: Element) {
+  for (const paragraph of Array.from(shell.querySelectorAll("p"))) {
+    if (textOf(paragraph) === "PDV NEXUS / OPERAÇÃO LOCAL") {
+      setTextIfChanged(paragraph, "PDV NEXUS / GESTÃO COMERCIAL");
+    }
+  }
+
+  for (const strong of Array.from(shell.querySelectorAll("strong"))) {
+    if (textOf(strong) !== "Operação local") continue;
+    setTextIfChanged(strong, "Sistema pronto");
+    setTextIfChanged(strong.parentElement?.querySelector("span") ?? null, "Operação disponível");
+  }
+}
+
 function cleanAdministration(article: Element) {
   replaceHeading(article, "Armazenamento e multi-caixa", "Dados, backup e multi-caixa");
 
   for (const button of Array.from(article.querySelectorAll("button"))) {
     if (textOf(button) === "Verificar SQLite") markTechnical(button);
   }
-
   for (const details of Array.from(article.querySelectorAll("details"))) markTechnical(details);
 
   for (const candidate of Array.from(article.querySelectorAll("div"))) {
+    if (candidate.children.length) continue;
     const text = textOf(candidate);
-    if (!candidate.children.length && /SQLite ativo|Banco:|SQLite desktop/i.test(text)) {
+    if (/Multi-caixa desativado.*SQLite/i.test(text)) {
+      setTextIfChanged(candidate, "Este caixa está configurado para uso neste computador.");
+    } else if (/SQLite ativo|Banco:|SQLite desktop/i.test(text)) {
       setTextIfChanged(candidate, "Dados salvos neste computador.");
     }
   }
@@ -59,24 +75,36 @@ function cleanScaleConfiguration(article: Element) {
   }
 
   if (title === "Configuração da balança") {
+    setTextIfChanged(article.querySelector("h2 + p"), "Selecione a marca do equipamento.");
+
     for (const label of Array.from(article.querySelectorAll("label"))) {
-      const text = textOf(label);
-      if (/Perfil de codigo|Comando serial/i.test(text)) markTechnical(label);
+      const labelNode = label.querySelector("span") ?? label;
+      const labelText = textOf(labelNode);
+      if (/^Marca da balanca$/i.test(labelText)) setTextIfChanged(labelNode, "Marca da balança");
+      if (/^Perfil de codigo$|^Comando serial$/i.test(labelText)) markTechnical(label);
     }
+
     for (const candidate of Array.from(article.querySelectorAll("div"))) {
-      if (textOf(candidate).includes("Exemplo de etiqueta")) markTechnical(candidate);
+      const directStrong = Array.from(candidate.children).find((child) => child.tagName === "STRONG") ?? null;
+      if (textOf(directStrong) === "Exemplo de etiqueta") markTechnical(candidate);
     }
   }
 
-  if (/Balanca Serial|Balança Serial/i.test(title)) {
+  if (/Balanca Serial|Balança Serial|Conexão da balança/i.test(title)) {
     replaceHeading(article, title, "Conexão da balança");
-    setTextIfChanged(article.querySelector("h2 + p"), "Selecione a porta e conecte o equipamento.");
+    setTextIfChanged(article.querySelector("h2 + p"), "Selecione a conexão e conecte o equipamento.");
 
+    for (const button of Array.from(article.querySelectorAll("button"))) {
+      if (textOf(button) === "Listar portas") setTextIfChanged(button, "Buscar conexões");
+    }
+    for (const option of Array.from(article.querySelectorAll("option"))) {
+      if (textOf(option) === "Selecione a porta COM") setTextIfChanged(option, "Selecione a conexão");
+    }
     for (const label of Array.from(article.querySelectorAll("label"))) {
       if (/baud rate|velocidade da porta/i.test(textOf(label))) markTechnical(label);
     }
     for (const candidate of Array.from(article.querySelectorAll("div"))) {
-      if (/9600 é a velocidade|comunicação serial/i.test(textOf(candidate))) markTechnical(candidate);
+      if (!candidate.children.length && /9600 é a velocidade|comunicação serial/i.test(textOf(candidate))) markTechnical(candidate);
     }
   }
 }
@@ -88,14 +116,14 @@ function cleanPaymentConfiguration(article: Element) {
   replaceHeading(article, "TEF e maquininha", "Maquininha e pagamentos");
   setTextIfChanged(article.querySelector("h2 + p"), "Configuração opcional para recebimentos integrados.");
 
-  for (const select of Array.from(article.querySelectorAll("select"))) {
-    if (Array.from(select.querySelectorAll("option")).some((option) => textOf(option).includes("Ponte HTTP"))) {
-      markTechnical(select.parentElement);
-    }
+  for (const option of Array.from(article.querySelectorAll("select option"))) {
+    if (textOf(option) === "Simulador") setTextIfChanged(option, "Sem integração automática");
+    if (textOf(option) === "Ponte HTTP maquininha") setTextIfChanged(option, "Maquininha integrada");
   }
 
   for (const input of Array.from(article.querySelectorAll("input"))) {
     const placeholder = input.getAttribute("placeholder") ?? "";
+    if (placeholder === "Provedor") setAttributeIfChanged(input, "placeholder", "Fornecedor da maquininha (opcional)");
     if (/URL da ponte TEF|Codigo lojista|Código lojista/i.test(placeholder)) markTechnical(input);
   }
 
@@ -104,9 +132,16 @@ function cleanPaymentConfiguration(article: Element) {
   }
 
   for (const candidate of Array.from(article.querySelectorAll("div"))) {
-    if (/ponte do provedor|NSU retornados|URL acima/i.test(textOf(candidate))) {
+    if (!candidate.children.length && /ponte do provedor|NSU retornados|URL acima/i.test(textOf(candidate))) {
       setTextIfChanged(candidate, "Pagamentos externos continuam disponíveis normalmente. Ative a integração apenas quando utilizar uma maquininha compatível.");
     }
+  }
+}
+
+function cleanConfiguration(article: Element) {
+  cleanPaymentConfiguration(article);
+  for (const button of Array.from(article.querySelectorAll("button"))) {
+    if (textOf(button) === "Listar backups do desktop") setTextIfChanged(button, "Ver backups salvos");
   }
 }
 
@@ -119,12 +154,13 @@ function applyCustomerPresentation() {
 
   const shell = document.querySelector('[data-shell="pdv-nexus"]');
   if (!shell) return;
+  cleanApplicationChrome(shell);
   const view = shell.getAttribute("data-view");
 
   for (const article of Array.from(shell.querySelectorAll("article"))) {
     if (view === "administracao") cleanAdministration(article);
     if (view === "balanca") cleanScaleConfiguration(article);
-    if (view === "configuracoes") cleanPaymentConfiguration(article);
+    if (view === "configuracoes") cleanConfiguration(article);
   }
 }
 
@@ -134,7 +170,6 @@ export function CustomerPresentationDecor() {
     const observer = new MutationObserver(applyCustomerPresentation);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener("hashchange", applyCustomerPresentation);
-
     return () => {
       observer.disconnect();
       window.removeEventListener("hashchange", applyCustomerPresentation);
