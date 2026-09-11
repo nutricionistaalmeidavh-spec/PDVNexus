@@ -1,0 +1,46 @@
+name: Temp publish validated installers
+
+on:
+  push:
+    branches: ["feature/store-receipt-info-20260911"]
+    paths:
+      - ".github/workflows/temp-publish-store-receipt-assets.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download already validated artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34620632653 --repo nutricionistaalmeidavh-spec/PDVNexus --name PDV-Nexus-Validated-Installers --dir release-assets
+
+      - name: Verify downloaded assets
+        shell: bash
+        run: |
+          test -f release-assets/PDV-Nexus-Setup-0.1.16.exe
+          test -f release-assets/PDV-Nexus-Windows-7-Setup-0.1.16.exe
+          test -f release-assets/PDV-Nexus-Windows-8-32bit-Setup-0.1.16.exe
+          test -f release-assets/SHA256SUMS.txt
+          cd release-assets
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Publish temporary release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create pdv-store-receipt-20260911 \
+            release-assets/PDV-Nexus-Setup-0.1.16.exe \
+            release-assets/PDV-Nexus-Windows-7-Setup-0.1.16.exe \
+            release-assets/PDV-Nexus-Windows-8-32bit-Setup-0.1.16.exe \
+            release-assets/SHA256SUMS.txt \
+            --repo nutricionistaalmeidavh-spec/PDVNexus \
+            --target a0d8901f0aeeed9b4bfe5084db6831b3e55924e7 \
+            --title "PDV Nexus 0.1.16 - cupom com dados da loja" \
+            --notes "Artefatos validados para sincronização do Google Drive. Build 2026-09-11." \
+            --prerelease
