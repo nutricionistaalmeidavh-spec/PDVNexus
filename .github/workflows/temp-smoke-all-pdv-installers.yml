@@ -1,0 +1,39 @@
+name: Temp smoke all PDV installers
+
+on:
+  push:
+    branches: ["feature/store-receipt-info-20260911"]
+    paths:
+      - ".github/workflows/temp-smoke-all-pdv-installers.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  install-smoke:
+    timeout-minutes: 8
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        installer:
+          - PDV-Nexus-Setup-0.1.16.exe
+          - PDV-Nexus-Windows-7-Setup-0.1.16.exe
+          - PDV-Nexus-Windows-8-32bit-Setup-0.1.16.exe
+    steps:
+      - name: Download exact validated artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34620632653 --repo nutricionistaalmeidavh-spec/PDVNexus --name PDV-Nexus-Validated-Installers --dir assets
+
+      - name: Verify archive and install silently
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path "assets/${{ matrix.installer }}").Path
+          & 'C:\Program Files\7-Zip\7z.exe' t $path
+          if ($LASTEXITCODE -ne 0) { throw "Archive integrity failed for ${{ matrix.installer }}" }
+          $p = Start-Process -FilePath $path -ArgumentList '/S' -PassThru -Wait
+          Write-Host "${{ matrix.installer }} exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Installer execution failed for ${{ matrix.installer }} with exit code $($p.ExitCode)" }
