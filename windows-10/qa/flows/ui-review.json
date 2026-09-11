@@ -2,6 +2,7 @@
   "id": "pdv-ui-review",
   "steps": [
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000 },
+    { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "new-pdv-brand" },
     { "action": "screenshot", "name": "01-caixa-rapido" },
 
     { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos" },
@@ -27,6 +28,11 @@
     { "action": "click", "selector": "a[href=\"#/balanca\"]", "name": "open-balanca" },
     { "action": "expectURL", "includes": "#/balanca", "name": "balanca-route" },
     { "action": "waitForTimeout", "timeoutMs": 250, "name": "balanca-render" },
-    { "action": "screenshot", "name": "06-balanca" }
+    { "action": "screenshot", "name": "06-balanca" },
+
+    { "action": "click", "selector": "a[href=\"#/configuracoes\"]", "name": "open-configuracoes" },
+    { "action": "expectURL", "includes": "#/configuracoes", "name": "configuracoes-route" },
+    { "action": "waitForTimeout", "timeoutMs": 250, "name": "configuracoes-render" },
+    { "action": "screenshot", "name": "07-configuracoes" }
   ]
 }
