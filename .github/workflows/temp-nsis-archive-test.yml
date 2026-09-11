@@ -1,0 +1,38 @@
+name: Temp NSIS archive test
+
+on:
+  push:
+    branches: ["feature/store-receipt-info-20260911"]
+    paths:
+      - ".github/workflows/temp-nsis-archive-test.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  archive-test:
+    runs-on: windows-2025
+    steps:
+      - name: Download exact validated artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34620632653 --repo nutricionistaalmeidavh-spec/PDVNexus --name PDV-Nexus-Validated-Installers --dir assets
+
+      - name: Verify hashes and NSIS archives with 7-Zip
+        shell: pwsh
+        run: |
+          $expected = @{
+            'PDV-Nexus-Setup-0.1.16.exe' = '0477BBC5B8B6FCADB0F151B161698CB66C8A155610605B33A9F661FD8362CCA2'
+            'PDV-Nexus-Windows-7-Setup-0.1.16.exe' = '181A5271CB53A79585A8A5557821238F4E0AD5396887EEAFBEABD4E0A19956C7'
+            'PDV-Nexus-Windows-8-32bit-Setup-0.1.16.exe' = 'C175240E5824143F843E9731EA1ECC6AA20020F7205F2592B112D620FF01E6A2'
+          }
+          foreach ($name in $expected.Keys) {
+            $path = Join-Path assets $name
+            $hash = (Get-FileHash -Algorithm SHA256 $path).Hash
+            if ($hash -ne $expected[$name]) { throw "Hash mismatch: $name" }
+            Write-Host "=== 7z t $name ==="
+            & 'C:\Program Files\7-Zip\7z.exe' t $path
+            if ($LASTEXITCODE -ne 0) { throw "7-Zip archive test failed: $name" }
+          }
