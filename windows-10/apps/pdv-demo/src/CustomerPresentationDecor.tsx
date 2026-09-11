@@ -10,13 +10,17 @@ function textOf(element: Element | null) {
   return element?.textContent?.trim() ?? "";
 }
 
+function setTextIfChanged(element: Element | null, value: string) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
 function replaceHeading(article: Element, from: string, to: string) {
   const heading = article.querySelector("h2");
-  if (textOf(heading) === from && heading) heading.textContent = to;
+  if (textOf(heading) === from) setTextIfChanged(heading, to);
 }
 
 function markTechnical(element: Element | null) {
-  if (element) element.classList.add("e55-technical");
+  if (element && !element.classList.contains("e55-technical")) element.classList.add("e55-technical");
 }
 
 function replaceTextNode(element: Element | null, from: string, to: string) {
@@ -41,7 +45,7 @@ function cleanAdministration(article: Element) {
   for (const candidate of Array.from(article.querySelectorAll("div"))) {
     const text = textOf(candidate);
     if (!candidate.children.length && /SQLite ativo|Banco:|SQLite desktop/i.test(text)) {
-      candidate.textContent = "Dados salvos neste computador.";
+      setTextIfChanged(candidate, "Dados salvos neste computador.");
     }
   }
 }
@@ -66,8 +70,7 @@ function cleanScaleConfiguration(article: Element) {
 
   if (/Balanca Serial|Balança Serial/i.test(title)) {
     replaceHeading(article, title, "Conexão da balança");
-    const subtitle = article.querySelector("h2 + p");
-    if (subtitle) subtitle.textContent = "Selecione a porta e conecte o equipamento.";
+    setTextIfChanged(article.querySelector("h2 + p"), "Selecione a porta e conecte o equipamento.");
 
     for (const label of Array.from(article.querySelectorAll("label"))) {
       if (/baud rate|velocidade da porta/i.test(textOf(label))) markTechnical(label);
@@ -83,8 +86,7 @@ function cleanPaymentConfiguration(article: Element) {
   if (title !== "TEF e maquininha" && title !== "Maquininha e pagamentos") return;
 
   replaceHeading(article, "TEF e maquininha", "Maquininha e pagamentos");
-  const subtitle = article.querySelector("h2 + p");
-  if (subtitle) subtitle.textContent = "Configuração opcional para recebimentos integrados.";
+  setTextIfChanged(article.querySelector("h2 + p"), "Configuração opcional para recebimentos integrados.");
 
   for (const select of Array.from(article.querySelectorAll("select"))) {
     if (Array.from(select.querySelectorAll("option")).some((option) => textOf(option).includes("Ponte HTTP"))) {
@@ -103,22 +105,23 @@ function cleanPaymentConfiguration(article: Element) {
 
   for (const candidate of Array.from(article.querySelectorAll("div"))) {
     if (/ponte do provedor|NSU retornados|URL acima/i.test(textOf(candidate))) {
-      candidate.textContent = "Pagamentos externos continuam disponíveis normalmente. Ative a integração apenas quando utilizar uma maquininha compatível.";
+      setTextIfChanged(candidate, "Pagamentos externos continuam disponíveis normalmente. Ative a integração apenas quando utilizar uma maquininha compatível.");
     }
   }
 }
 
 function applyCustomerPresentation() {
-  document.title = "PDV Nexus";
+  if (document.title !== "PDV Nexus") document.title = "PDV Nexus";
   const root = document.querySelector(".pdv-density-root");
   const advanced = new URLSearchParams(window.location.search).get("advanced") === "1";
-  if (root) root.setAttribute("data-e55-advanced", advanced ? "true" : "false");
+  const advancedValue = advanced ? "true" : "false";
+  if (root?.getAttribute("data-e55-advanced") !== advancedValue) root?.setAttribute("data-e55-advanced", advancedValue);
 
   const shell = document.querySelector('[data-shell="pdv-nexus"]');
   if (!shell) return;
+  const view = shell.getAttribute("data-view");
 
   for (const article of Array.from(shell.querySelectorAll("article"))) {
-    const view = shell.getAttribute("data-view");
     if (view === "administracao") cleanAdministration(article);
     if (view === "balanca") cleanScaleConfiguration(article);
     if (view === "configuracoes") cleanPaymentConfiguration(article);
