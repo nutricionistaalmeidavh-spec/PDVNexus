@@ -3,6 +3,8 @@
   "steps": [
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000 },
     { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "new-pdv-brand" },
+    { "action": "expectVisible", "text": "BIPAR / DIGITAR CÓDIGO DO PRODUTO", "exact": true, "name": "cashier-code-label" },
+    { "action": "expectVisible", "text": "TOTAL DA VENDA", "exact": true, "name": "cashier-total-label" },
     { "action": "screenshot", "name": "01-caixa-rapido" },
 
     { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos" },
