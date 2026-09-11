@@ -33,6 +33,15 @@
         "width": 1440,
         "height": 960
       }
+    },
+    "button-audit": {
+      "file": "flows/pdv-all-buttons.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 40,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
     }
   },
   "defaultDemo": "checkout-flow"
