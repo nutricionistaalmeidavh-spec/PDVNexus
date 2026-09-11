@@ -1,0 +1,136 @@
+/* Dense-v2 row tuning: keep the left selling area and right payment column independent. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+  grid-template-rows: 56px 104px 62px 232px 46px 24px 76px 34px 44px 122px !important;
+  grid-auto-flow: row !important;
+}
+
+/* Header spans both columns. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) {
+  grid-row: 1 !important;
+  grid-column: 1 / -1 !important;
+}
+
+/* Scanner and total share the same operational row. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
+  grid-row: 2 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(4) {
+  grid-row: 2 !important;
+  grid-column: 2 !important;
+  align-self: stretch !important;
+}
+
+/* Client and current order no longer inherit the height of payment methods. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) {
+  grid-row: 3 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+  height: 62px !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > select {
+  grid-row: 3 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  margin-top: 0 !important;
+}
+
+/* Payment quick methods span the compact customer + item-table area on the right. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) {
+  grid-row: 3 / span 2 !important;
+  grid-column: 2 !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
+}
+
+/* Sale item list gets a fixed operational viewport; rows stay content-height. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) {
+  grid-row: 4 !important;
+  grid-column: 1 !important;
+  min-height: 232px !important;
+  height: 232px !important;
+  max-height: 232px !important;
+  align-content: start !important;
+  grid-auto-rows: max-content !important;
+  align-self: stretch !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) > div {
+  align-self: start !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) > div:last-child:has(> div > strong) {
+  min-height: 50px !important;
+  height: auto !important;
+  align-self: start !important;
+}
+
+/* Totals strip stays immediately under the item table. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(3) {
+  grid-row: 5 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+}
+
+/* Keep the real manual-payment explanation small under the methods. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(6) {
+  grid-row: 5 !important;
+  grid-column: 2 !important;
+  align-self: start !important;
+  margin-top: 0 !important;
+}
+
+/* Existing quick product filter + products stay available below the sale table. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-last-child(2) {
+  grid-row: 6 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:last-child {
+  grid-row: 7 !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
+}
+
+/* Payment editor, add-form, discount and shortcuts occupy independent right-column rows. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) {
+  grid-row: 6 / span 2 !important;
+  grid-column: 2 !important;
+  align-self: stretch !important;
+  overflow: auto !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button {
+  grid-row: 8 !important;
+  grid-column: 2 !important;
+  margin-top: 0 !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button + label {
+  grid-row: 9 !important;
+  grid-column: 2 !important;
+  margin-top: 0 !important;
+}
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type {
+  grid-row: 10 !important;
+  grid-column: 2 !important;
+  align-self: stretch !important;
+}
+
+/* Existing remove-item action remains visible without consuming the payment column. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > button:last-child {
+  grid-row: 8 !important;
+  grid-column: 1 !important;
+  align-self: start !important;
+}
+
+@media (max-width: 900px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+    grid-template-rows: none !important;
+    grid-auto-rows: auto !important;
+  }
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > * {
+    grid-row: auto !important;
+    grid-column: 1 !important;
+  }
+}
