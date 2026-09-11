@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "systemId": "pdv-nexus-demo",
+  "mode": "electron",
+  "defaultEnvironment": "local",
+  "defaultViewport": "desktop",
+  "launchTimeoutMs": 45000,
+  "capture": {
+    "video": true,
+    "fps": 4,
+    "screenshotEachStep": false
+  },
+  "environments": {
+    "local": {
+      "env": {
+        "NEXUS_APP": "pdv-demo"
+      }
+    }
+  },
+  "electron": {
+    "entry": "../apps/nexus-desktop/main.cjs",
+    "executablePath": "../node_modules/electron/dist/electron.exe",
+    "env": {
+      "NEXUS_APP": "pdv-demo"
+    }
+  },
+  "demos": {
+    "checkout-flow": {
+      "file": "flows/pdv-demo.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 24,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    }
+  },
+  "defaultDemo": "checkout-flow"
+}
