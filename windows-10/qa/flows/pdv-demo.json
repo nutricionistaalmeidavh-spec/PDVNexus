@@ -1,0 +1,32 @@
+{
+  "id": "pdv-demo",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 700 },
+    { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "brand-visible", "holdMs": 500 },
+    { "action": "screenshot", "name": "01-demo-inicio" },
+
+    { "action": "click", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa", "holdMs": 900 },
+    { "action": "expectVisible", "text": "Caixa aberto", "exact": false, "name": "caixa-aberto", "holdMs": 600 },
+    { "action": "screenshot", "name": "02-caixa-aberto" },
+
+    { "action": "click", "selector": "button:has-text(\"F2\")", "name": "nova-venda", "holdMs": 900 },
+    { "action": "expectVisible", "text": "Venda", "exact": true, "name": "venda-iniciada", "holdMs": 500 },
+
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "digitar-produto", "holdMs": 700 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-produto", "holdMs": 1100 },
+    { "action": "expectVisible", "text": "Teclado com fio", "exact": true, "name": "produto-no-carrinho", "holdMs": 700 },
+    { "action": "screenshot", "name": "03-produto-adicionado" },
+
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 1000 },
+    { "action": "expectVisible", "text": "A VISTA", "exact": true, "name": "pagamento-registrado", "holdMs": 600 },
+    { "action": "screenshot", "name": "04-pagamento" },
+
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 1400 },
+    { "action": "expectVisible", "text": "finalizada com total liquido", "exact": false, "name": "venda-finalizada", "holdMs": 900 },
+    { "action": "screenshot", "name": "05-venda-finalizada" },
+
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 900 },
+    { "action": "expectVisible", "text": "Vendas finalizadas", "exact": true, "name": "venda-refletida-financeiro", "holdMs": 700 },
+    { "action": "screenshot", "name": "06-financeiro-pos-venda" }
+  ]
+}
