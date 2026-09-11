@@ -43,7 +43,7 @@ function cleanApplicationChrome(shell: Element) {
   for (const strong of Array.from(shell.querySelectorAll("strong"))) {
     if (textOf(strong) !== "Operação local") continue;
     setTextIfChanged(strong, "Sistema pronto");
-    setTextIfChanged(strong.parentElement?.querySelector("span") ?? null, "Operação disponível");
+    setTextIfChanged(strong.parentElement?.querySelector("span") ?? null, "");
   }
 }
 
@@ -52,6 +52,7 @@ function cleanAdministration(article: Element) {
 
   for (const button of Array.from(article.querySelectorAll("button"))) {
     if (textOf(button) === "Verificar SQLite") markTechnical(button);
+    if (textOf(button) === "Salvar modo deste computador") setTextIfChanged(button, "Salvar configuração");
   }
   for (const details of Array.from(article.querySelectorAll("details"))) markTechnical(details);
 
