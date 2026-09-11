@@ -45,8 +45,10 @@ jobs:
       - name: Install ArtiSys QA dependencies
         run: npm ci --prefix tools/artisys-qa
 
-      - name: Validate ArtiSys QA manifest
-        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
+      - name: Validate ArtiSys QA manifests
+        run: |
+          node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
+          node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
 
       - name: Typecheck
         run: npm run typecheck
@@ -60,11 +62,28 @@ jobs:
       - name: Capture PDV UI with ArtiSys QA
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow ui-review --output qa-artifacts
 
+      - name: Verify demo video tools
+        run: |
+          ffmpeg -version | Select-Object -First 1
+          ffprobe -version | Select-Object -First 1
+
+      - name: Run checkout demo with ArtiSys QA
+        run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo checkout-flow --output qa-demo-artifacts
+
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-ArtiSys-QA
           path: windows-10/qa-artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload QA demo evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA-Demo
+          path: windows-10/qa-demo-artifacts
           if-no-files-found: warn
           retention-days: 14
