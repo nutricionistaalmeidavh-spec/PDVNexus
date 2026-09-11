@@ -3,7 +3,8 @@
   "steps": [
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000 },
     { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "new-pdv-brand" },
-    { "action": "waitFor", "selector": "[data-cashier-layout=\"reference-v1\"]", "name": "cashier-reference-layout", "timeoutMs": 5000 },
+    { "action": "waitFor", "selector": "[data-cashier-layout=\"dense-v2\"]", "name": "dense-cashier-layout", "timeoutMs": 5000 },
+    { "action": "expectVisible", "text": "VENDA (PDV)", "exact": true, "name": "cashier-operational-heading" },
     { "action": "screenshot", "name": "01-caixa-rapido" },
 
     { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos" },
