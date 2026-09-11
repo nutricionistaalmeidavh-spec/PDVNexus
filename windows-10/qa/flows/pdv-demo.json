@@ -10,19 +10,20 @@
     { "action": "screenshot", "name": "02-caixa-aberto" },
 
     { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda", "holdMs": 900 },
-    { "action": "expectVisible", "text": "iniciada no", "exact": false, "name": "venda-iniciada", "holdMs": 500 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "venda-iniciada", "holdMs": 500 },
 
     { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00101", "name": "digitar-produto", "holdMs": 700 },
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-produto", "holdMs": 1100 },
-    { "action": "expectVisible", "text": "adicionado ao caixa", "exact": false, "name": "produto-no-carrinho", "holdMs": 700 },
+    { "action": "expectVisible", "text": "Teclado com fio", "exact": true, "name": "produto-no-carrinho", "holdMs": 700 },
     { "action": "screenshot", "name": "03-produto-adicionado" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 1000 },
     { "action": "screenshot", "name": "04-pagamento" },
 
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 1400 },
-    { "action": "expectVisible", "text": "finalizada com total liquido", "exact": false, "name": "venda-finalizada", "holdMs": 900 },
+    { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "comprovante-aberto", "holdMs": 900 },
     { "action": "screenshot", "name": "05-venda-finalizada" },
+    { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante", "holdMs": 600 },
 
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 900 },
     { "action": "expectVisible", "text": "Vendas finalizadas", "exact": true, "name": "venda-refletida-financeiro", "holdMs": 700 },
