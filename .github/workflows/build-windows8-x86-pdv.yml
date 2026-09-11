@@ -1,0 +1,62 @@
+name: Build Windows 8 x86 PDV
+
+on:
+  push:
+    branches: ["build/win8-x86"]
+    paths:
+      - ".github/workflows/build-windows8-x86-pdv.yml"
+      - "windows-7/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows8-x86:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-7
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-7/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test PDV payments
+        run: npm run test:pdv-payments
+
+      - name: Build PDV web bundle
+        run: npm run build:pdv-demo
+
+      - name: Build Windows 8 32-bit installer
+        run: npx electron-builder --config apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs
+
+      - name: Verify installer and hash
+        run: |
+          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86" -Filter "PDV-Nexus-Windows-8-32bit-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $exe) { throw "Windows 8 x86 installer EXE not found" }
+          Write-Host "Installer: $($exe.FullName)"
+          Write-Host "Size: $($exe.Length) bytes"
+          Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Windows-8-32bit
+          path: windows-7/apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86/PDV-Nexus-Windows-8-32bit-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14
