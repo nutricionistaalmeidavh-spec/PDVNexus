@@ -1,0 +1,257 @@
+/* Reference-v3 cashier refinements. Presentation-only except for the footer actions mounted by CashierReferenceDecor. */
+.cashier-reference-icon {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.cashier-reference-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.cashier-reference-icon--client { background: #0f4ea3; }
+.cashier-reference-icon--seller { background: #ff5a45; }
+
+/* Give the cashier more horizontal room without changing other PDV pages. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] {
+  grid-template-columns: 220px minmax(0, 1fr) !important;
+}
+
+.pdv-density-root:has([data-shell="pdv-nexus"][data-view="caixa"]) > .pdv-operation-title {
+  left: 220px !important;
+  height: 42px !important;
+  padding: 0 14px !important;
+  font-size: 15px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main {
+  padding: 48px 10px 10px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+  grid-template-columns: minmax(0, 1fr) 304px !important;
+  grid-template-rows: 52px 92px 56px 210px 40px 52px 52px 30px 38px 104px !important;
+  gap: 6px !important;
+  max-width: none !important;
+}
+
+/* Header / scanner / sale list get slightly tighter. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) {
+  min-height: 52px !important;
+  height: 52px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child,
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child > div {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
+  padding: 25px 8px 8px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) input,
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) button {
+  min-height: 36px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) {
+  min-height: 210px !important;
+  height: 210px !important;
+  max-height: 210px !important;
+}
+
+/* Client and seller icon cards follow the approved reference. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) auto !important;
+  column-gap: 9px !important;
+  align-items: center !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 8px 10px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) > .cashier-reference-icon {
+  grid-row: 1 / span 2;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > select {
+  min-height: 56px !important;
+  height: 56px !important;
+  padding-top: 18px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child > div:nth-child(2) {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  column-gap: 8px !important;
+  align-items: center !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child > div:nth-child(2) > .cashier-reference-icon {
+  grid-row: 1 / span 2;
+}
+
+/* Quick products are intentionally removed from the cashier surface. Product search/scan and the Products page remain unchanged. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-last-child(2),
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:last-child {
+  display: none !important;
+}
+
+/* The legacy Delete button remains in the DOM for the existing shortcut behavior, but the reference footer replaces it visually. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > button:last-child {
+  display: none !important;
+}
+
+/* New operational footer, matching the reference: counters on the left, destructive/reset actions on the right. */
+.cashier-reference-footer {
+  grid-row: 6 !important;
+  grid-column: 1 !important;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(20px, 1fr) 132px 132px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  box-sizing: border-box;
+  border: 1px solid #cfd7e2;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.cashier-reference-metric {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 11px;
+  border: 1px solid #d9e0e8;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.cashier-reference-metric strong {
+  color: #102642;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.cashier-reference-metric--quantity { min-width: 106px; }
+.cashier-reference-footer-spacer { min-width: 0; }
+
+.cashier-reference-action {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+  font: 800 9px/1 "Segoe UI", Inter, system-ui, sans-serif;
+  box-shadow: 0 1px 2px rgba(15, 38, 68, .04);
+}
+
+.cashier-reference-action--cancel {
+  border: 1px solid #f0a49d;
+  color: #c64d43;
+}
+
+.cashier-reference-action--clear {
+  border: 1px solid #7589a3;
+  color: #243a56;
+}
+
+.cashier-reference-action:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+/* Reuse the rows that previously belonged to quick products for the payment editor only. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) {
+  grid-row: 6 / span 2 !important;
+  grid-column: 2 !important;
+  align-self: stretch !important;
+  overflow: auto !important;
+  padding: 6px 8px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) > div {
+  padding: 5px !important;
+  gap: 4px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) input,
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) select {
+  min-height: 27px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button {
+  grid-row: 8 !important;
+  min-height: 30px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button + label {
+  grid-row: 9 !important;
+  min-height: 38px !important;
+  padding: 4px 8px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type {
+  grid-row: 10 !important;
+  padding: 25px 8px 8px !important;
+  gap: 5px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button {
+  min-height: 45px !important;
+}
+
+/* Slightly tighter total/payment column. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(4) {
+  min-height: 92px !important;
+  padding: 31px 12px 10px !important;
+  font-size: 31px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) {
+  padding: 27px 8px 7px !important;
+  gap: 3px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) > button {
+  min-height: 27px !important;
+}
+
+@media (max-width: 900px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] {
+    grid-template-columns: 78px minmax(0, 1fr) !important;
+  }
+
+  .pdv-density-root:has([data-shell="pdv-nexus"][data-view="caixa"]) > .pdv-operation-title {
+    left: 78px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+    grid-template-rows: none !important;
+    grid-auto-rows: auto !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .cashier-reference-footer {
+    grid-row: auto !important;
+    grid-column: 1 !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cashier-reference-footer-spacer { display: none; }
+  .cashier-reference-action { min-height: 40px; }
+}
