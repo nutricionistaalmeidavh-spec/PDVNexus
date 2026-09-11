@@ -37,6 +37,15 @@ test("E55 keeps protocol and diagnostic controls out of the normal customer view
   assert.match(css, /e55-technical/);
 });
 
+test("E55 keeps customer-facing peripheral cards useful after hiding diagnostics", () => {
+  const decor = read(decorPath);
+  assert.match(decor, /Selecione a marca do equipamento/);
+  assert.match(decor, /Sem integração automática/);
+  assert.match(decor, /Maquininha integrada/);
+  assert.match(decor, /Ver backups salvos/);
+  assert.match(decor, /Sistema pronto/);
+});
+
 test("E55 demo flow captures a realistic multi-item retail sale", () => {
   const flow = read(demoFlowPath);
   assert.match(flow, /00021/);
