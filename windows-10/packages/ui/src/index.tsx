@@ -11,7 +11,7 @@ type AppShellProps = PropsWithChildren<{
 }>;
 
 const PDV_LABELS: Record<string, string> = {
-  caixa: "Caixa (PDV)",
+  caixa: "Caixa",
   produtos: "Produtos",
   clientes: "Clientes",
   financeiro: "Financeiro",
@@ -19,6 +19,404 @@ const PDV_LABELS: Record<string, string> = {
   balanca: "Balança",
   configuracoes: "Configurações"
 };
+
+const PDV_CASHIER_CSS = `
+[data-shell="pdv-nexus"][data-view="caixa"] main {
+  padding: 14px 16px 18px !important;
+  background: #f4f7fb !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 292px !important;
+  gap: 12px !important;
+  align-items: start !important;
+  max-width: none !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child,
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside {
+  display: contents !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) {
+  order: 1;
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: 1fr 2fr !important;
+  min-height: 72px !important;
+  padding: 0 !important;
+  border: 1px solid #d9e0e8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 7px rgba(15, 38, 68, 0.05) !important;
+  overflow: hidden;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child {
+  display: grid;
+  align-content: center;
+  padding: 12px 20px;
+  border-right: 1px solid #e4e9ef;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child::before {
+  content: "Status do caixa";
+  color: #445064;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child > h2,
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child > p:last-child {
+  display: none !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child > p:first-child {
+  margin: 0 !important;
+  color: #16864b !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child {
+  display: grid !important;
+  grid-template-columns: 1fr 1.15fr !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child > div {
+  display: grid !important;
+  align-content: center !important;
+  gap: 4px !important;
+  padding: 10px 22px !important;
+  border: 0 !important;
+  border-left: 1px solid #e4e9ef !important;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child > div:last-child {
+  display: none !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child span {
+  color: #536174 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child strong {
+  color: #12213a !important;
+  font-size: 14px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
+  order: 2;
+  grid-column: 1;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto auto !important;
+  gap: 7px !important;
+  padding: 32px 12px 12px !important;
+  position: relative;
+  border: 1px solid #d9e0e8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2)::before {
+  content: "BIPAR / DIGITAR CÓDIGO DO PRODUTO";
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  color: #27364b;
+  font-size: 10px;
+  font-weight: 800;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) input {
+  min-height: 46px !important;
+  border: 2px solid #164c95 !important;
+  border-radius: 7px !important;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.04) !important;
+  font-size: 14px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) button {
+  min-height: 46px !important;
+  border-radius: 7px !important;
+  font-size: 10px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-last-child(2) {
+  order: 9;
+  grid-column: 1;
+  position: relative;
+  padding-top: 28px !important;
+  margin-top: 2px;
+  border: 1px solid #d9e0e8 !important;
+  border-bottom: 0 !important;
+  border-radius: 8px 8px 0 0 !important;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-last-child(2)::before {
+  content: "PRODUTOS RÁPIDOS";
+  position: absolute;
+  top: 9px;
+  left: 12px;
+  color: #526174;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:last-child {
+  order: 10;
+  grid-column: 1;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  border: 1px solid #d9e0e8 !important;
+  border-top: 0 !important;
+  border-radius: 0 0 8px 8px !important;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:last-child > button {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) {
+  order: 3;
+  grid-column: 1;
+  width: calc(50% - 5px);
+  min-height: 76px;
+  box-sizing: border-box;
+  padding: 12px 14px !important;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  align-self: stretch;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1)::before {
+  content: "CLIENTE";
+  display: block;
+  margin-bottom: 4px;
+  color: #526174;
+  font-size: 9px;
+  font-weight: 800;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > select {
+  order: 4;
+  grid-column: 1;
+  width: calc(50% - 5px) !important;
+  justify-self: end;
+  margin-top: -88px;
+  min-height: 76px !important;
+  padding: 26px 12px 10px !important;
+  border: 1px solid #d9e0e8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #14243d !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) {
+  order: 5;
+  grid-column: 1;
+  min-height: 260px !important;
+  max-height: 310px !important;
+  padding: 39px 0 0 !important;
+  position: relative;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff !important;
+  overflow: auto !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2)::before {
+  content: "Produto                                      Qtd.        Valor unitário          Total";
+  position: absolute;
+  inset: 0 0 auto 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  box-sizing: border-box;
+  background: #062d57;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: pre;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(2) > div {
+  margin: 0 14px !important;
+  padding: 9px 0 !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid #e4e9ef !important;
+  background: transparent !important;
+  font-size: 11px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(3) {
+  order: 6;
+  grid-column: 1;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 1px solid #d9e0e8 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(3) > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-right: 1px solid #e4e9ef;
+  font-size: 10px;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(4) {
+  order: 2;
+  grid-column: 2;
+  min-height: 112px;
+  display: grid !important;
+  align-content: center;
+  padding: 38px 18px 14px !important;
+  position: relative;
+  border: 0 !important;
+  border-radius: 8px 8px 0 0 !important;
+  background: #062d57 !important;
+  color: #ffffff !important;
+  font-size: 38px !important;
+  font-weight: 900 !important;
+  text-align: right !important;
+  box-sizing: border-box;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(4)::before {
+  content: "TOTAL DA VENDA";
+  position: absolute;
+  top: 13px;
+  left: 16px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) {
+  order: 3;
+  grid-column: 2;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 7px !important;
+  padding: 34px 12px 12px !important;
+  position: relative;
+  border: 1px solid #d9e0e8;
+  border-top: 0;
+  background: #ffffff;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5)::before {
+  content: "FORMAS DE PAGAMENTO";
+  position: absolute;
+  top: 11px;
+  left: 12px;
+  color: #2d3d52;
+  font-size: 9px;
+  font-weight: 800;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) > button {
+  min-height: 34px !important;
+  justify-content: flex-start;
+  border-radius: 6px !important;
+  border: 1px solid #dce2e9 !important;
+  background: #ffffff !important;
+  color: #1f3048 !important;
+  font-size: 10px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) > button:first-child {
+  background: #0f4ea3 !important;
+  border-color: #0f4ea3 !important;
+  color: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(6) {
+  order: 4;
+  grid-column: 2;
+  margin-top: -12px;
+  border-radius: 0 !important;
+  border: 1px solid #d9e0e8 !important;
+  border-top: 0 !important;
+  background: #f8fafc !important;
+  color: #5c6d81 !important;
+  font-size: 8px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) {
+  order: 5;
+  grid-column: 2;
+  padding: 10px 12px !important;
+  border: 1px solid #d9e0e8;
+  border-top: 0;
+  background: #ffffff;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) > div {
+  padding: 9px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button {
+  order: 6;
+  grid-column: 2;
+  min-height: 36px !important;
+  margin-top: -12px;
+  border-radius: 0 !important;
+  border: 1px solid #d9e0e8 !important;
+  background: #ffffff !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-last-of-type(2) + button + label {
+  order: 7;
+  grid-column: 2;
+  margin-top: -12px;
+  padding: 9px 12px;
+  border: 1px solid #d9e0e8;
+  border-top: 0;
+  background: #ffffff;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type {
+  order: 8;
+  grid-column: 2;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 7px !important;
+  padding: 34px 12px 12px !important;
+  position: relative;
+  margin-top: -12px;
+  border: 1px solid #d9e0e8;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #ffffff;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type::before {
+  content: "ATALHOS";
+  position: absolute;
+  top: 11px;
+  left: 12px;
+  color: #2d3d52;
+  font-size: 9px;
+  font-weight: 800;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button {
+  min-height: 62px !important;
+  border-radius: 7px !important;
+  background: #0f4ea3 !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button:nth-child(4),
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button:nth-child(5) {
+  background: #ff5a45 !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > button:last-child {
+  order: 7;
+  grid-column: 1;
+  width: 220px;
+  justify-self: end;
+  min-height: 40px !important;
+  border: 1px solid #efb4ad !important;
+  border-radius: 7px !important;
+  background: #fffafa !important;
+  color: #c34c41 !important;
+  font-size: 10px !important;
+}
+[data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(3):not(:nth-last-child(2)) {
+  order: 4;
+  grid-column: 1;
+}
+@media (max-width: 980px) {
+  [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+    grid-template-columns: 1fr !important;
+  }
+  [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > * {
+    grid-column: 1 !important;
+  }
+}
+`;
 
 export function AppShell(props: AppShellProps) {
   const { title, nav, children, collapsible = true, sidebarPosition = "left", sidebarTitle = "Nexus Core", hideTitle = false } = props;
@@ -29,14 +427,15 @@ export function AppShell(props: AppShellProps) {
     : nav;
   const activePath = typeof window === "undefined" ? shellNav[0]?.path : (window.location.hash.replace(/^#/, "") || shellNav[0]?.path);
   const activeItem = shellNav.find((item) => item.path === activePath) ?? shellNav[0];
+  const activeKey = String(activeItem?.key ?? "");
   const effectiveSidebarPosition = isPdvShell ? "left" : sidebarPosition;
-  const expandedWidth = isPdvShell ? 248 : 240;
-  const collapsedWidth = isPdvShell ? 78 : 76;
+  const expandedWidth = isPdvShell ? 196 : 240;
+  const collapsedWidth = isPdvShell ? 68 : 76;
   const cssVars = isPdvShell ? ({
-    "--nexus-card-radius": "14px",
-    "--nexus-card-shadow": "0 8px 28px rgba(15, 35, 62, 0.07)",
+    "--nexus-card-radius": "10px",
+    "--nexus-card-shadow": "0 4px 16px rgba(15, 35, 62, 0.06)",
     "--nexus-card-border": "1px solid #dbe5f1",
-    "--nexus-card-title-size": "18px"
+    "--nexus-card-title-size": "17px"
   } as CSSProperties) : undefined;
 
   const pageStyle: CSSProperties = {
@@ -49,18 +448,24 @@ export function AppShell(props: AppShellProps) {
   };
 
   return (
-    <div style={pageStyle} data-shell={isPdvShell ? "pdv-nexus" : "nexus-core"}>
+    <div
+      style={pageStyle}
+      data-shell={isPdvShell ? "pdv-nexus" : "nexus-core"}
+      data-view={isPdvShell ? activeKey : undefined}
+      data-cashier-layout={isPdvShell && activePath === "/caixa" ? "reference-v1" : undefined}
+    >
+      {isPdvShell ? <style>{PDV_CASHIER_CSS}</style> : null}
       <aside
         style={{
           ...styles.sidebar,
           ...(isPdvShell ? styles.pdvSidebar : null),
           order: effectiveSidebarPosition === "right" ? 2 : 1,
-          paddingInline: collapsed ? "10px" : isPdvShell ? "14px" : "16px"
+          paddingInline: collapsed ? "9px" : isPdvShell ? "12px" : "16px"
         }}
       >
         {isPdvShell ? (
           <div style={styles.pdvBrandRow}>
-            <div style={styles.pdvBrandMark}>N</div>
+            <div style={styles.pdvBrandMark}>▦</div>
             {collapsed ? null : (
               <div style={styles.pdvBrandCopy}>
                 <strong style={styles.pdvBrandTitle}>PDV Nexus</strong>
@@ -120,7 +525,7 @@ export function AppShell(props: AppShellProps) {
       </aside>
 
       <main style={{ ...styles.main, ...(isPdvShell ? styles.pdvMain : null), order: effectiveSidebarPosition === "right" ? 1 : 2 }}>
-        {isPdvShell ? (
+        {isPdvShell && !(hideTitle && activePath === "/caixa") ? (
           <header style={styles.pdvTopbar}>
             <div>
               <p style={styles.pdvTopbarEyebrow}>PDV NEXUS / OPERAÇÃO LOCAL</p>
@@ -131,9 +536,9 @@ export function AppShell(props: AppShellProps) {
               <span style={styles.pdvUserBadge}>Administrador</span>
             </div>
           </header>
-        ) : hideTitle ? null : (
+        ) : !isPdvShell && !hideTitle ? (
           <header style={styles.header}><h1 style={styles.title}>{title}</h1></header>
-        )}
+        ) : null}
         <section>{children}</section>
       </main>
     </div>
@@ -195,10 +600,10 @@ const styles: Record<string, CSSProperties> = {
   pdvSidebar: {
     display: "flex",
     flexDirection: "column",
-    background: "linear-gradient(180deg, #071426 0%, #0b1b32 55%, #0d2340 100%)",
+    background: "#052a50",
     borderRight: "1px solid rgba(148, 163, 184, 0.14)",
-    boxShadow: "8px 0 30px rgba(15, 35, 62, 0.08)",
-    paddingBlock: "16px"
+    boxShadow: "5px 0 20px rgba(15, 35, 62, 0.08)",
+    paddingBlock: "14px"
   },
   sidebarHeader: {
     display: "flex",
@@ -216,40 +621,39 @@ const styles: Record<string, CSSProperties> = {
   pdvBrandRow: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
-    minHeight: "48px",
-    padding: "0 4px 14px",
-    borderBottom: "1px solid rgba(148, 163, 184, 0.14)",
-    marginBottom: "16px"
+    gap: "8px",
+    minHeight: "54px",
+    padding: "0 3px 13px",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.11)",
+    marginBottom: "14px"
   },
   pdvBrandMark: {
-    width: "38px",
-    minWidth: "38px",
-    height: "38px",
+    width: "34px",
+    minWidth: "34px",
+    height: "34px",
     display: "grid",
     placeItems: "center",
-    borderRadius: "10px",
-    background: "linear-gradient(145deg, #2563eb, #0ea5e9)",
-    boxShadow: "0 8px 22px rgba(37, 99, 235, 0.28)",
+    borderRadius: "7px",
+    background: "transparent",
     color: "#ffffff",
-    fontSize: "18px",
+    fontSize: "23px",
     fontWeight: 900
   },
   pdvBrandCopy: {
     minWidth: 0,
     display: "grid",
-    gap: "2px",
+    gap: "1px",
     flex: 1
   },
   pdvBrandTitle: {
     color: "#ffffff",
-    fontSize: "16px",
-    lineHeight: 1.1,
+    fontSize: "17px",
+    lineHeight: 1.05,
     whiteSpace: "nowrap"
   },
   pdvBrandSubtitle: {
-    color: "#8fa6c2",
-    fontSize: "11px",
+    color: "#93abc5",
+    fontSize: "9px",
     whiteSpace: "nowrap"
   },
   visuallyHidden: {
@@ -272,21 +676,21 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1
   },
   pdvCollapseButton: {
-    width: "30px",
-    minWidth: "30px",
-    height: "30px",
-    borderRadius: "8px",
-    border: "1px solid rgba(148, 163, 184, 0.22)",
+    width: "25px",
+    minWidth: "25px",
+    height: "25px",
+    borderRadius: "6px",
+    border: "1px solid rgba(255, 255, 255, 0.14)",
     background: "rgba(255, 255, 255, 0.05)",
-    color: "#afc2d9",
-    fontSize: "15px"
+    color: "#b9cade",
+    fontSize: "13px"
   },
   pdvNavSectionLabel: {
-    margin: "2px 10px 8px",
-    color: "#607b9a",
-    fontSize: "9px",
+    margin: "2px 8px 8px",
+    color: "#6e8ba8",
+    fontSize: "8px",
     fontWeight: 800,
-    letterSpacing: "0.16em"
+    letterSpacing: "0.15em"
   },
   nav: {
     display: "grid",
@@ -308,38 +712,38 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: "border-box"
   },
   pdvNavItem: {
-    minHeight: "44px",
-    padding: "7px 9px",
-    borderRadius: "10px",
+    minHeight: "43px",
+    padding: "7px 8px",
+    borderRadius: "7px",
     background: "transparent",
-    color: "#adc0d6",
+    color: "#d0dbea",
     border: "1px solid transparent"
   },
   pdvNavItemActive: {
     color: "#ffffff",
-    background: "linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%)",
-    border: "1px solid rgba(96, 165, 250, 0.34)",
-    boxShadow: "0 8px 20px rgba(29, 78, 216, 0.22)"
+    background: "#104c98",
+    border: "1px solid #1c60b6",
+    boxShadow: "0 5px 14px rgba(0, 0, 0, 0.14)"
   },
   pdvNavIcon: {
-    width: "29px",
-    minWidth: "29px",
-    height: "29px",
+    width: "27px",
+    minWidth: "27px",
+    height: "27px",
     display: "grid",
     placeItems: "center",
-    borderRadius: "8px",
-    background: "rgba(148, 163, 184, 0.08)",
-    color: "#8fa6c2",
-    fontSize: "9px",
+    borderRadius: "6px",
+    background: "rgba(255, 255, 255, 0.05)",
+    color: "#c3d3e4",
+    fontSize: "8px",
     fontWeight: 900,
-    letterSpacing: "0.04em"
+    letterSpacing: "0.03em"
   },
   pdvNavIconActive: {
-    background: "rgba(255, 255, 255, 0.14)",
+    background: "rgba(255, 255, 255, 0.12)",
     color: "#ffffff"
   },
   pdvNavLabel: {
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 650,
     whiteSpace: "nowrap"
   },
@@ -348,10 +752,10 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     gap: "9px",
     marginTop: "auto",
-    padding: "14px 10px 2px",
-    borderTop: "1px solid rgba(148, 163, 184, 0.14)",
-    color: "#9bb0c8",
-    fontSize: "10px"
+    padding: "13px 8px 1px",
+    borderTop: "1px solid rgba(255, 255, 255, 0.11)",
+    color: "#a5bad0",
+    fontSize: "9px"
   },
   pdvSidebarFooterCollapsed: {
     justifyContent: "center",
@@ -362,8 +766,8 @@ const styles: Record<string, CSSProperties> = {
     minWidth: "7px",
     height: "7px",
     borderRadius: "999px",
-    background: "#22c55e",
-    boxShadow: "0 0 0 3px rgba(34, 197, 94, 0.12)"
+    background: "#20ad64",
+    boxShadow: "0 0 0 3px rgba(32, 173, 100, 0.12)"
   },
   main: {
     minWidth: 0,
@@ -371,8 +775,8 @@ const styles: Record<string, CSSProperties> = {
   },
   pdvMain: {
     minWidth: 0,
-    padding: "0 24px 28px",
-    background: "linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%)"
+    padding: "0 22px 26px",
+    background: "#f4f7fb"
   },
   header: {
     marginBottom: "24px"
@@ -383,16 +787,16 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.1
   },
   pdvTopbar: {
-    minHeight: "78px",
+    minHeight: "72px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "18px",
-    margin: "0 -24px 20px",
-    padding: "0 28px",
-    background: "rgba(255, 255, 255, 0.94)",
-    borderBottom: "1px solid #dbe5f1",
-    boxShadow: "0 4px 18px rgba(15, 35, 62, 0.04)"
+    margin: "0 -22px 18px",
+    padding: "0 24px",
+    background: "#ffffff",
+    borderBottom: "1px solid #dbe2ea",
+    boxShadow: "0 3px 12px rgba(15, 35, 62, 0.04)"
   },
   pdvTopbarEyebrow: {
     margin: "0 0 4px",
@@ -404,7 +808,7 @@ const styles: Record<string, CSSProperties> = {
   pdvTopbarTitle: {
     margin: 0,
     color: "#10213a",
-    fontSize: "22px",
+    fontSize: "21px",
     lineHeight: 1.1,
     fontWeight: 750
   },
@@ -417,24 +821,24 @@ const styles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: "7px",
-    minHeight: "30px",
-    padding: "0 11px",
+    minHeight: "29px",
+    padding: "0 10px",
     borderRadius: "999px",
     border: "1px solid #d8e3ef",
     background: "#f7fafc",
     color: "#526a84",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 650
   },
   pdvUserBadge: {
     display: "inline-flex",
     alignItems: "center",
-    minHeight: "30px",
-    padding: "0 12px",
-    borderRadius: "9px",
-    background: "#0b1b32",
-    color: "#e7eef7",
-    fontSize: "11px",
+    minHeight: "29px",
+    padding: "0 11px",
+    borderRadius: "7px",
+    background: "#0b315a",
+    color: "#edf4fb",
+    fontSize: "10px",
     fontWeight: 650
   },
   card: {
