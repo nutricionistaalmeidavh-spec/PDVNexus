@@ -53,13 +53,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useHashRoute } from "../../meu-engenheiro/src/lib/useHashRoute";
 import { resolveReceiptStoreHeader } from "./storeReceiptSettings";
 import { buildReceiptPrintHtml, normalizeReceiptPaperFormat, receiptColumnsForFormat, type ReceiptPaperFormat } from "./receiptPrintFormat";
+import { calculateQuantityPrice, formatAppliedQuantityPrice, formatQuantityPriceRules, normalizeQuantityPriceRules, type QuantityPriceRule } from "./quantityPricing";
 
 type PaymentMethod = string;
 type PaymentOption = { name: string; feePercent: number; showsInCashflow: boolean; active?: boolean; kind?: "cash" | "pix" | "credit" | "debit" | "store-credit" | "check" | "other"; };
 type PaymentDraft = { method: PaymentMethod; amount: number };
-type CatalogProduct = ScaleProductRecord & { barcode: string; unitLabel: string; stock: number; minStock: number; category: string; active?: boolean; };
+type ProductComboDraft = { quantity: string; bundlePrice: string; };
+type ProductDraft = { code: string; barcode: string; name: string; category: string; type: "unit" | "weight"; price: string; stock: string; minimumStock: string; quantityPriceRules: ProductComboDraft[]; };
+type CatalogProduct = ScaleProductRecord & { barcode: string; unitLabel: string; stock: number; minStock: number; category: string; active?: boolean; quantityPriceRules?: QuantityPriceRule[]; };
 type Customer = { id: string; name: string; document: string; city: string; creditLimit: number; creditUsed: number; };
-type SaleItem = { id: string; productCode: string; productName: string; unitLabel: string; quantity: number; unitPrice: number; totalPrice: number; source: "catalog" | "scale"; };
+type SaleItem = { id: string; productCode: string; productName: string; unitLabel: string; quantity: number; unitPrice: number; totalPrice: number; source: "catalog" | "scale"; regularTotalPrice?: number; promotionDiscount?: number; pricingLabel?: string; };
 type SaleState = { number: string; openedAt: string; customerId: string; seller: string; discountPercent: number; items: SaleItem[]; payments: PaymentDraft[]; terminalId?: string; operatorId?: string; };
 type CompletedSale = SaleState & { finalizedAt: string; netTotal: number; paymentSummary: PdvPaymentSummary; status?: "completed" | "cancelled"; cancelledAt?: string; cancelReason?: string; cancelledById?: string; authorizedById?: string; };
 type CashSession = { openedAt: string; initialAmount: number; closedAt?: string; withdrawals: Array<{ amount: number; note: string; createdAt: string }>; };
@@ -109,10 +112,13 @@ const defaultStoreSettings: StoreSettings = { storeName: "PDV Nexus", document: 
 const defaultExtensions: PdvExtensions = { inventoryMovements: [], cashClosings: [], receiptPrinterConfig: defaultPrinterConfig, lastReceiptText: "", users: defaultUsers, currentOperatorId: "OP-001", auditLogs: [], cancelledSales: [], terminalConfig: defaultTerminalConfig, tefConfig: defaultTefConfig, tefTransactions: [], autoBackupConfig: defaultAutoBackupConfig, autoBackups: [], storeSettings: defaultStoreSettings };
 const defaultPdvStore: PdvStoreDefaults = { catalogProducts: seedProducts, registeredCustomers: seedCustomers, completedSales: [], cashSession: null, paymentOptions: defaultPaymentOptions, deviceConfig: defaultConfig, extensions: defaultExtensions };
 
+function createEmptyProductDraft(): ProductDraft {
+  return { code: "", barcode: "", name: "", category: "", type: "unit", price: "", stock: "", minimumStock: "", quantityPriceRules: [] };
+}
+
 export function PdvDemoApp() {
   const route = useHashRoute(defaultRoute);
   const [initialStore] = useState(loadInitialPdvStore);
-  // Do not overwrite the desktop database with the renderer's bootstrap state.
   const [persistenceState, setPersistenceState] = useState<"booting" | "ready" | "error">(
     () => getDesktopPdvStoreBridge() ? "booting" : "error"
   );
@@ -171,7 +177,7 @@ export function PdvDemoApp() {
   const [editingProductCode, setEditingProductCode] = useState("");
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState("");
-  const [productDraft, setProductDraft] = useState({ code: "", barcode: "", name: "", category: "", type: "unit" as "unit" | "weight", price: "", stock: "", minimumStock: "" });
+  const [productDraft, setProductDraft] = useState<ProductDraft>(createEmptyProductDraft);
   const [customerDraft, setCustomerDraft] = useState({ name: "", document: "", city: "", creditLimit: "" });
   const [barcode, setBarcode] = useState("2000015001251");
   const [serialFrame, setSerialFrame] = useState("\u0002300125\u0003");
@@ -208,8 +214,6 @@ export function PdvDemoApp() {
     const search = catalogSearch.trim().toLowerCase();
     return search ? catalogProducts.filter((product) => [product.productCode, product.barcode, product.productName, product.category].some((value) => value.toLowerCase().includes(search))) : catalogProducts;
   }, [catalogSearch, catalogProducts]);
-  // Esta é a mesma coleção que alimenta o seletor de Estoque. A busca apenas
-  // restringe a visualização; sem busca, todos os produtos aparecem na mesma ordem.
   const productList = filteredProducts;
   const checkoutCategories = useMemo(() => ["Todos", ...Array.from(new Set(catalogProducts.filter((product) => product.active !== false).map((product) => product.category || "Geral")))], [catalogProducts]);
   const checkoutProducts = useMemo(() => (selectedCategory === "Todos" ? filteredProducts : filteredProducts.filter((product) => (product.category || "Geral") === selectedCategory)).filter((product) => product.active !== false), [filteredProducts, selectedCategory]);
@@ -219,6 +223,7 @@ export function PdvDemoApp() {
   }, [checkoutCategories, selectedCategory]);
 
   const grossTotal = sale?.items.reduce((sum, item) => sum + item.totalPrice, 0) ?? 0;
+  const comboSavings = sale?.items.reduce((sum, item) => sum + (item.promotionDiscount ?? 0), 0) ?? 0;
   const itemCount = sale?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const discountValue = roundCurrency(grossTotal * ((sale?.discountPercent ?? 0) / 100));
   const netTotal = roundCurrency(grossTotal - discountValue);
@@ -398,9 +403,9 @@ export function PdvDemoApp() {
       setTerminalConfig(importedExtensions.terminalConfig);
       setTefConfig(importedExtensions.tefConfig);
       setTefTransactions(importedExtensions.tefTransactions);
-        setAutoBackupConfig(importedExtensions.autoBackupConfig);
-        setAutoBackups(importedExtensions.autoBackups);
-        setStoreSettings(importedExtensions.storeSettings);
+      setAutoBackupConfig(importedExtensions.autoBackupConfig);
+      setAutoBackups(importedExtensions.autoBackups);
+      setStoreSettings(importedExtensions.storeSettings);
       setTerminalDraft({ terminalId: importedExtensions.terminalConfig.terminalId, terminalName: importedExtensions.terminalConfig.terminalName, mode: importedExtensions.terminalConfig.mode, serverUrl: importedExtensions.terminalConfig.serverUrl ?? "" });
       setScaleBrand(imported.deviceConfig.scaleBrand);
       setBarcodeMode(imported.deviceConfig.barcodeMode);
@@ -473,10 +478,57 @@ export function PdvDemoApp() {
 
   const addCatalogProduct = (product: CatalogProduct, quantity = 1) => {
     if (product.active === false) return setLastEvent(`${product.productName} está excluído do catálogo de venda.`);
-    if (quantity > product.stock) return setLastEvent(`Estoque insuficiente para ${product.productName}. Disponivel: ${product.stock}.`);
-    addSaleItem({ id: `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, unitLabel: product.unitLabel, quantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * quantity), source: "catalog" });
+    const currentQuantity = sale?.items.filter((item) => item.source === "catalog" && item.productCode === product.productCode).reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+    const nextQuantity = roundStock(currentQuantity + quantity);
+    if (nextQuantity > product.stock) return setLastEvent(`Estoque insuficiente para ${product.productName}. Disponivel: ${product.stock}.`);
+
+    if (product.itemType !== "unit") {
+      addSaleItem({ id: `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, unitLabel: product.unitLabel, quantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * quantity), source: "catalog" });
+      return;
+    }
+
+    if (!Number.isInteger(nextQuantity)) return setLastEvent("Combos por quantidade aceitam apenas unidades inteiras.");
+    const pricing = calculateQuantityPrice(nextQuantity, product.unitPrice, product.quantityPriceRules);
+    const pricingLabel = pricing.savings > 0 ? formatAppliedQuantityPrice(pricing) : undefined;
+    const existingItem = sale?.items.find((item) => item.source === "catalog" && item.productCode === product.productCode);
+    const nextItem: SaleItem = {
+      id: existingItem?.id ?? `${product.productCode}-${Date.now()}`,
+      productCode: product.productCode,
+      productName: product.productName,
+      unitLabel: product.unitLabel,
+      quantity: nextQuantity,
+      unitPrice: product.unitPrice,
+      totalPrice: pricing.totalPrice,
+      source: "catalog",
+      regularTotalPrice: pricing.regularTotal,
+      promotionDiscount: pricing.savings,
+      pricingLabel
+    };
+
+    if (!sale) {
+      startNewSale([nextItem]);
+    } else {
+      setSale((current) => {
+        if (!current) return current;
+        let replaced = false;
+        const items = current.items.flatMap((item) => {
+          if (item.source === "catalog" && item.productCode === product.productCode) {
+            if (replaced) return [];
+            replaced = true;
+            return [nextItem];
+          }
+          return [item];
+        });
+        return { ...current, items: replaced ? items : [...items, nextItem] };
+      });
+    }
+    setLastEvent(pricingLabel ? `${product.productName}: ${pricingLabel}. Economia ${formatCurrency(pricing.savings)}.` : `${product.productName} adicionado ao caixa.`);
   };
   const addWeightedSaleItem = (item: { productCode: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; }) => addSaleItem({ id: `${item.productCode}-${Date.now()}`, productCode: item.productCode, productName: item.productName, unitLabel: "KG", quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice, source: "scale" });
+
+  const addQuantityPriceRuleDraft = () => setProductDraft((current) => ({ ...current, quantityPriceRules: [...current.quantityPriceRules, { quantity: "", bundlePrice: "" }] }));
+  const updateQuantityPriceRuleDraft = (index: number, patch: Partial<ProductComboDraft>) => setProductDraft((current) => ({ ...current, quantityPriceRules: current.quantityPriceRules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule) }));
+  const removeQuantityPriceRuleDraft = (index: number) => setProductDraft((current) => ({ ...current, quantityPriceRules: current.quantityPriceRules.filter((_, ruleIndex) => ruleIndex !== index) }));
 
   const saveProduct = () => {
     const rawCode = productDraft.code.trim();
@@ -488,17 +540,34 @@ export function PdvDemoApp() {
     if (!rawCode || !name || !productDraft.price.trim()) return setLastEvent("Preencha codigo, descricao e preco do produto.");
     if (!Number.isFinite(price) || !Number.isFinite(stock) || !Number.isFinite(minimumStock) || price <= 0 || stock < 0 || minimumStock < 0) return setLastEvent("Informe preco maior que zero e estoques validos.");
     if (catalogProducts.some((product) => (product.productCode === code || (productDraft.barcode && product.barcode === productDraft.barcode.trim())) && product.productCode !== editingProductCode)) return setLastEvent("Codigo ou codigo de barras ja cadastrado.");
+
+    const filledComboDrafts = productDraft.quantityPriceRules.filter((rule) => rule.quantity.trim() || rule.bundlePrice.trim());
+    const parsedRules: QuantityPriceRule[] = [];
+    if (productDraft.type === "unit") {
+      const seenQuantities = new Set<number>();
+      for (const rule of filledComboDrafts) {
+        if (!rule.quantity.trim() || !rule.bundlePrice.trim()) return setLastEvent("Preencha quantidade e preco em todas as faixas de combo ou remova a faixa vazia.");
+        const comboQuantity = Number(rule.quantity);
+        const bundlePrice = parsePdvDecimal(rule.bundlePrice);
+        if (!Number.isInteger(comboQuantity) || comboQuantity < 2 || !Number.isFinite(bundlePrice) || bundlePrice <= 0) return setLastEvent("Cada combo deve ter quantidade inteira a partir de 2 e preco maior que zero.");
+        if (seenQuantities.has(comboQuantity)) return setLastEvent(`Ja existe uma faixa para ${comboQuantity} unidades.`);
+        if (bundlePrice >= roundCurrency(price * comboQuantity)) return setLastEvent(`O combo de ${comboQuantity} unidades precisa custar menos que ${formatCurrency(roundCurrency(price * comboQuantity))}.`);
+        seenQuantities.add(comboQuantity);
+        parsedRules.push({ quantity: comboQuantity, bundlePrice });
+      }
+    }
+    const quantityPriceRules = productDraft.type === "unit" ? normalizeQuantityPriceRules(parsedRules) : [];
     const existingProduct = catalogProducts.find((item) => item.productCode === editingProductCode);
-    const product: CatalogProduct = { productCode: code, barcode: productDraft.barcode.trim() || createBarcodeFromProductCode(code), productName: name, unitPrice: price, itemType: productDraft.type, shelfLifeDays: 0, unitLabel: productDraft.type === "weight" ? "KG" : "UN", stock, minStock: minimumStock, category: normalizeProductCategory(productDraft.category), active: existingProduct?.active ?? true };
+    const product: CatalogProduct = { productCode: code, barcode: productDraft.barcode.trim() || createBarcodeFromProductCode(code), productName: name, unitPrice: price, itemType: productDraft.type, shelfLifeDays: 0, unitLabel: productDraft.type === "weight" ? "KG" : "UN", stock, minStock: minimumStock, category: normalizeProductCategory(productDraft.category), active: existingProduct?.active ?? true, quantityPriceRules };
     setCatalogProducts((current) => editingProductCode ? current.map((item) => item.productCode === editingProductCode ? product : item) : [...current, product]);
-    setProductDraft({ code: "", barcode: "", name: "", category: "", type: "unit", price: "", stock: "", minimumStock: "" });
+    setProductDraft(createEmptyProductDraft());
     setEditingProductCode("");
     setProductFormOpen(false);
     setLastEvent(editingProductCode ? `${name} atualizado no catalogo.` : `${name} cadastrado no catalogo.`);
   };
 
-  const editProduct = (product: CatalogProduct) => { setEditingProductCode(product.productCode); setProductFormOpen(true); setProductDraft({ code: product.productCode, barcode: product.barcode, name: product.productName, category: product.category, type: product.itemType, price: String(product.unitPrice), stock: String(product.stock), minimumStock: String(product.minStock) }); };
-  const cancelProductEdit = () => { setEditingProductCode(""); setProductFormOpen(false); setProductDraft({ code: "", barcode: "", name: "", category: "", type: "unit", price: "", stock: "", minimumStock: "" }); setLastEvent("Edição de produto cancelada."); };
+  const editProduct = (product: CatalogProduct) => { setEditingProductCode(product.productCode); setProductFormOpen(true); setProductDraft({ code: product.productCode, barcode: product.barcode, name: product.productName, category: product.category, type: product.itemType, price: String(product.unitPrice), stock: String(product.stock), minimumStock: String(product.minStock), quantityPriceRules: (product.quantityPriceRules ?? []).map((rule) => ({ quantity: String(rule.quantity), bundlePrice: String(rule.bundlePrice) })) }); };
+  const cancelProductEdit = () => { setEditingProductCode(""); setProductFormOpen(false); setProductDraft(createEmptyProductDraft()); setLastEvent("Edição de produto cancelada."); };
   const removeProduct = (product: CatalogProduct) => {
     if (sale?.items.some((item) => item.productCode === product.productCode)) return setLastEvent(`Remova ${product.productName} da venda em aberto antes de excluir.`);
     setCatalogProducts((current) => current.filter((item) => item.productCode !== product.productCode));
@@ -729,9 +798,9 @@ export function PdvDemoApp() {
       setTerminalConfig(importedExtensions.terminalConfig);
       setTefConfig(importedExtensions.tefConfig);
       setTefTransactions(importedExtensions.tefTransactions);
-        setAutoBackupConfig(importedExtensions.autoBackupConfig);
-        setAutoBackups(importedExtensions.autoBackups);
-        setStoreSettings(importedExtensions.storeSettings);
+      setAutoBackupConfig(importedExtensions.autoBackupConfig);
+      setAutoBackups(importedExtensions.autoBackups);
+      setStoreSettings(importedExtensions.storeSettings);
       setLastEvent("Snapshot recebido do servidor multi-caixa.");
     } catch (error) {
       setLastEvent(error instanceof Error ? error.message : "Falha ao receber snapshot do servidor.");
@@ -824,7 +893,24 @@ export function PdvDemoApp() {
   const removePayment = (index: number) => setSale((current) => current ? { ...current, payments: current.payments.filter((_, i) => i !== index) } : current);
   const fillPaymentRemaining = (index: number) => updatePayment(index, { amount: remainingTotal });
   const updateDiscountPercent = (value: number) => setSale((current) => current ? { ...current, discountPercent: value } : current);
-  const removeLastItem = () => { setSale((current) => current && current.items.length ? { ...current, items: current.items.slice(0, -1) } : current); setLastEvent("Ultimo item removido da venda."); };
+  const removeLastItem = () => {
+    setSale((current) => {
+      if (!current || !current.items.length) return current;
+      const lastItem = current.items[current.items.length - 1];
+      if (lastItem.source === "catalog" && lastItem.unitLabel === "UN" && lastItem.quantity > 1) {
+        const product = catalogProducts.find((item) => item.productCode === lastItem.productCode);
+        if (product) {
+          const nextQuantity = Math.floor(lastItem.quantity - 1);
+          const pricing = calculateQuantityPrice(nextQuantity, product.unitPrice, product.quantityPriceRules);
+          const pricingLabel = pricing.savings > 0 ? formatAppliedQuantityPrice(pricing) : undefined;
+          const nextItem: SaleItem = { ...lastItem, quantity: nextQuantity, totalPrice: pricing.totalPrice, regularTotalPrice: pricing.regularTotal, promotionDiscount: pricing.savings, pricingLabel };
+          return { ...current, items: [...current.items.slice(0, -1), nextItem] };
+        }
+      }
+      return { ...current, items: current.items.slice(0, -1) };
+    });
+    setLastEvent("Ultima unidade/item removido da venda e combos recalculados.");
+  };
 
   const refreshPorts = async () => {
     if (!serialBridge) return setLastEvent("Bridge serial disponivel apenas no app desktop Electron.");
@@ -925,6 +1011,7 @@ export function PdvDemoApp() {
               <strong>{product.productName}</strong>
               <small>{product.category} / Estoque {product.stock.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}</small>
               <span style={styles.productPrice}>{formatCurrency(product.unitPrice)}</span>
+              {product.itemType === "unit" && product.quantityPriceRules?.length ? <small style={styles.promoText}>{formatQuantityPriceRules(product.quantityPriceRules)}</small> : null}
             </button>)}
             {checkoutProducts.length ? null : <div style={styles.cashierEmptyState}>Nenhum produto encontrado para esse filtro.</div>}
           </div>
@@ -946,6 +1033,7 @@ export function PdvDemoApp() {
               <div>
                 <strong>{item.productName}</strong>
                 <span>{item.quantity.toFixed(item.unitLabel === "KG" ? 3 : 0)} {item.unitLabel} x {formatCurrency(item.unitPrice)}</span>
+                {item.pricingLabel ? <small style={styles.promoText}>{item.pricingLabel} · economia {formatCurrency(item.promotionDiscount ?? 0)}</small> : null}
               </div>
               <strong>{formatCurrency(item.totalPrice)}</strong>
             </div>)}
@@ -954,6 +1042,7 @@ export function PdvDemoApp() {
 
           <div style={styles.orderTotals}>
             <div><span>Subtotal</span><strong>{formatCurrency(grossTotal)}</strong></div>
+            {comboSavings > 0 ? <div><span>Economia em combos</span><strong>{formatCurrency(comboSavings)}</strong></div> : null}
             <div><span>Desconto</span><strong>{formatCurrency(discountValue)}</strong></div>
             <div><span>Pago</span><strong>{formatCurrency(paidTotal)}</strong></div>
             <div><span>Falta</span><strong>{formatCurrency(remainingTotal)}</strong></div>
@@ -989,9 +1078,9 @@ export function PdvDemoApp() {
 <SectionCard title="Produtos" subtitle={`${catalogProducts.length} produto(s) no mesmo cadastro do Estoque`}>
 <div style={styles.stack}>
   <div style={styles.toolbar}><button onClick={() => { setProductFormOpen((current) => !current); if (productFormOpen) cancelProductEdit(); }} style={styles.primaryButton}>{productFormOpen ? "Recolher cadastro" : "Novo produto"}</button></div>
-  {productFormOpen ? <div style={styles.stack}><p style={styles.infoBox}>Campos com <strong>*</strong> são obrigatórios. O código de barras é opcional e será gerado automaticamente após informar o código, caso fique vazio.</p><div style={styles.formRow}><input value={productDraft.code} onChange={(event) => setProductDraft((current) => ({ ...current, code: event.target.value }))} onBlur={() => setProductDraft((current) => current.code.trim() && !current.barcode.trim() ? { ...current, barcode: createBarcodeFromProductCode(current.code.trim()) } : current)} placeholder="Código *" style={styles.input} /><input value={productDraft.barcode} onChange={(event) => setProductDraft((current) => ({ ...current, barcode: event.target.value }))} placeholder="Código de barras (opcional)" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.name} onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Descrição *" style={styles.input} /><input value={productDraft.category} onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Categoria (opcional)" style={styles.input} /></div><div style={styles.formRow}><select value={productDraft.type} onChange={(event) => setProductDraft((current) => ({ ...current, type: event.target.value as "unit" | "weight" }))} style={styles.input}><option value="unit">Unidade</option><option value="weight">Peso</option></select><input value={productDraft.price} onChange={(event) => setProductDraft((current) => ({ ...current, price: event.target.value }))} placeholder="Preço de venda *" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.stock} onChange={(event) => setProductDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="Estoque inicial (opcional)" style={styles.input} /><input value={productDraft.minimumStock} onChange={(event) => setProductDraft((current) => ({ ...current, minimumStock: event.target.value }))} placeholder="Estoque mínimo (opcional)" style={styles.input} /></div><div style={styles.toolbar}><button onClick={saveProduct} style={styles.primaryButton}>{editingProductCode ? "Salvar alterações" : "Cadastrar produto"}</button><button onClick={cancelProductEdit} style={styles.secondaryButton}>Cancelar</button></div></div> : null}
+  {productFormOpen ? <div style={styles.stack}><p style={styles.infoBox}>Campos com <strong>*</strong> são obrigatórios. O código de barras é opcional e será gerado automaticamente após informar o código, caso fique vazio.</p><div style={styles.formRow}><input value={productDraft.code} onChange={(event) => setProductDraft((current) => ({ ...current, code: event.target.value }))} onBlur={() => setProductDraft((current) => current.code.trim() && !current.barcode.trim() ? { ...current, barcode: createBarcodeFromProductCode(current.code.trim()) } : current)} placeholder="Código *" style={styles.input} /><input value={productDraft.barcode} onChange={(event) => setProductDraft((current) => ({ ...current, barcode: event.target.value }))} placeholder="Código de barras (opcional)" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.name} onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Descrição *" style={styles.input} /><input value={productDraft.category} onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Categoria (opcional)" style={styles.input} /></div><div style={styles.formRow}><select value={productDraft.type} onChange={(event) => setProductDraft((current) => ({ ...current, type: event.target.value as "unit" | "weight", quantityPriceRules: event.target.value === "unit" ? current.quantityPriceRules : [] }))} style={styles.input}><option value="unit">Unidade</option><option value="weight">Peso</option></select><input value={productDraft.price} onChange={(event) => setProductDraft((current) => ({ ...current, price: event.target.value }))} placeholder="Preço de venda *" style={styles.input} /></div><div style={styles.formRow}><input value={productDraft.stock} onChange={(event) => setProductDraft((current) => ({ ...current, stock: event.target.value }))} placeholder="Estoque inicial (opcional)" style={styles.input} /><input value={productDraft.minimumStock} onChange={(event) => setProductDraft((current) => ({ ...current, minimumStock: event.target.value }))} placeholder="Estoque mínimo (opcional)" style={styles.input} /></div>{productDraft.type === "unit" ? <div style={styles.comboPanel}><div><strong>Combos por quantidade</strong><div style={styles.comboHint}>Opcional. Ex.: produto a R$ 3,99; cadastre 3 por R$ 10,00 e 6 por R$ 18,00. O caixa aplica automaticamente a combinação mais barata.</div></div>{productDraft.quantityPriceRules.map((rule, index) => <div key={`combo-${index}`} style={styles.comboRuleRow}><input type="number" min="2" step="1" value={rule.quantity} onChange={(event) => updateQuantityPriceRuleDraft(index, { quantity: event.target.value })} placeholder="Quantidade (ex.: 3)" style={styles.input} /><input value={rule.bundlePrice} onChange={(event) => updateQuantityPriceRuleDraft(index, { bundlePrice: event.target.value })} placeholder="Preço do combo (ex.: 10,00)" style={styles.input} /><button type="button" onClick={() => removeQuantityPriceRuleDraft(index)} style={styles.secondaryButton}>Remover</button></div>)}<button type="button" onClick={addQuantityPriceRuleDraft} style={styles.secondaryButton}>Adicionar faixa de combo</button></div> : null}<div style={styles.toolbar}><button onClick={saveProduct} style={styles.primaryButton}>{editingProductCode ? "Salvar alterações" : "Cadastrar produto"}</button><button onClick={cancelProductEdit} style={styles.secondaryButton}>Cancelar</button></div></div> : null}
   <input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Buscar por código, barras, descrição ou categoria" style={styles.input} />
-  <div style={styles.productTableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Código</th><th style={styles.th}>Produto</th><th style={styles.th}>Categoria</th><th style={styles.th}>Estoque</th><th style={styles.th}>Preço</th><th style={styles.th}></th></tr></thead><tbody>{productList.map((product) => <tr key={product.productCode}><td style={styles.td}>{product.productCode}</td><td style={styles.td}>{product.productName}</td><td style={styles.td}>{product.category}</td><td style={styles.td}>{product.stock.toFixed(product.itemType === "weight" ? 3 : 0)}</td><td style={styles.td}>{formatCurrency(product.unitPrice)}</td><td style={styles.td}><div style={styles.toolbar}><button onClick={() => addCatalogProduct(product)} style={styles.secondaryButton}>Lançar</button><button onClick={() => editProduct(product)} style={styles.secondaryButton}>Editar</button><button onClick={() => removeProduct(product)} style={styles.secondaryButton}>Excluir</button></div></td></tr>)}{productList.length ? null : <tr><td style={styles.emptyRow} colSpan={6}>Nenhum produto cadastrado para este filtro.</td></tr>}</tbody></table></div>
+  <div style={styles.productTableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Código</th><th style={styles.th}>Produto</th><th style={styles.th}>Categoria</th><th style={styles.th}>Estoque</th><th style={styles.th}>Preço</th><th style={styles.th}>Combos</th><th style={styles.th}></th></tr></thead><tbody>{productList.map((product) => <tr key={product.productCode}><td style={styles.td}>{product.productCode}</td><td style={styles.td}>{product.productName}</td><td style={styles.td}>{product.category}</td><td style={styles.td}>{product.stock.toFixed(product.itemType === "weight" ? 3 : 0)}</td><td style={styles.td}>{formatCurrency(product.unitPrice)}</td><td style={styles.td}>{product.itemType === "unit" && product.quantityPriceRules?.length ? formatQuantityPriceRules(product.quantityPriceRules) : "-"}</td><td style={styles.td}><div style={styles.toolbar}><button onClick={() => addCatalogProduct(product)} style={styles.secondaryButton}>Lançar</button><button onClick={() => editProduct(product)} style={styles.secondaryButton}>Editar</button><button onClick={() => removeProduct(product)} style={styles.secondaryButton}>Excluir</button></div></td></tr>)}{productList.length ? null : <tr><td style={styles.emptyRow} colSpan={7}>Nenhum produto cadastrado para este filtro.</td></tr>}</tbody></table></div>
 </div>
 </SectionCard>
 </section> : null}
@@ -1106,8 +1195,11 @@ function loadInitialPdvStore() {
 function parsePdvSnapshot(raw: string) {
   const value = JSON.parse(raw) as Partial<PdvStoreDefaults>;
   if (!value || typeof value !== "object") throw new Error("Snapshot do PDV invalido.");
+  const catalogProducts = Array.isArray(value.catalogProducts)
+    ? (value.catalogProducts as CatalogProduct[]).map((product) => ({ ...product, quantityPriceRules: product.itemType === "unit" ? normalizeQuantityPriceRules(product.quantityPriceRules) : [] }))
+    : defaultPdvStore.catalogProducts;
   return createDefaultPdvLocalStore({
-    catalogProducts: Array.isArray(value.catalogProducts) ? value.catalogProducts as CatalogProduct[] : defaultPdvStore.catalogProducts,
+    catalogProducts,
     registeredCustomers: Array.isArray(value.registeredCustomers) ? value.registeredCustomers as Customer[] : defaultPdvStore.registeredCustomers,
     completedSales: Array.isArray(value.completedSales) ? value.completedSales as CompletedSale[] : [],
     cashSession: value.cashSession && typeof value.cashSession === "object" ? value.cashSession as CashSession : null,
@@ -1226,7 +1318,7 @@ function renderReceiptForSale(sale: CompletedSale, customerName: string, width: 
       customerName,
       netTotal: sale.netTotal,
       paymentSummary: sale.paymentSummary,
-      items: sale.items,
+      items: sale.items.map((item) => ({ ...item, productName: item.pricingLabel ? `${item.productName} | ${item.pricingLabel}` : item.productName })),
       payments: sale.payments
     }
   });
@@ -1297,6 +1389,10 @@ const styles = {
   productTile: { position: "relative", minHeight: "82px", padding: "8px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#ffffff", color: "#0f172a", cursor: "pointer", display: "grid", gap: "3px", alignContent: "space-between", textAlign: "left", fontSize: "10px" },
   productBadge: { justifySelf: "start", padding: "2px 5px", borderRadius: "3px", background: "#f8fafc", color: "#64748b", fontSize: "8px", fontWeight: 800 },
   productPrice: { color: "#0f172a", fontSize: "12px", fontWeight: 900 },
+  promoText: { display: "block", color: "#047857", fontSize: "9px", fontWeight: 800 },
+  comboPanel: { display: "grid", gap: "10px", padding: "12px", borderRadius: "10px", background: "#f0fdf4", border: "1px solid #bbf7d0" },
+  comboHint: { marginTop: "4px", color: "#475569", fontSize: "12px" },
+  comboRuleRow: { display: "grid", gridTemplateColumns: "minmax(120px, 0.7fr) minmax(160px, 1fr) auto", gap: "8px", alignItems: "center" },
   cashierEmptyState: { padding: "24px 12px", borderRadius: "6px", background: "#f8fafc", color: "#94a3b8", textAlign: "center", fontSize: "11px", fontWeight: 600 },
   orderPanel: { position: "sticky", top: "12px", display: "grid", gap: "12px", padding: "12px", borderRadius: "6px", background: "#ffffff", border: "1px solid #e2e8f0", boxShadow: "0 8px 22px rgba(15, 23, 42, 0.04)" },
   orderHeader: { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" },
@@ -1342,17 +1438,3 @@ const styles = {
   table: { width: "100%", borderCollapse: "collapse" }, th: { textAlign: "left", padding: "10px", borderBottom: "1px solid #cbd5e1" }, td: { padding: "10px", borderBottom: "1px solid #e2e8f0" }, emptyRow: { padding: "18px 10px", textAlign: "center", color: "#64748b" }, pre: { margin: 0, padding: "12px", background: "#0f172a", color: "#e2e8f0", borderRadius: "6px", overflowX: "auto" },
   hiddenInput: { display: "none" }
 } as const;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
