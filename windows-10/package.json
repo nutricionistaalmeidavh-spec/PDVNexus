@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "docs:check": "node -e \"console.log('docs ok')\"",
-    "test:pdv-payments": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-payment.test.js .tmp-tests/tests/pdv-receipt-format.test.js",
+    "test:pdv-payments": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-payment.test.js .tmp-tests/tests/pdv-receipt-format.test.js .tmp-tests/tests/pdv-quantity-pricing.test.js",
     "test:e55-presentation": "node --test tests/pdv-e55-presentation.test.mjs",
     "tef:bridge-demo": "node scripts/tef-bridge-demo.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.base.json",
