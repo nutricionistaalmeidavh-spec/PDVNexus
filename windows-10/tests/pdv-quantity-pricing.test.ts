@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateQuantityPrice, normalizeQuantityPriceRules } from "../apps/pdv-demo/src/quantityPricing.js";
-import { calculateGroupedQuantityPrice, repricePromotionSaleItems, resolveEffectivePromotion, type PromotionCatalogProduct, type PromotionGroup } from "../apps/pdv-demo/src/catalogPromotions.js";
+import { calculateGroupedQuantityPrice, repricePromotionSaleItems, resolveEffectivePromotion, type PromotionCatalogProduct, type PromotionGroup, type PromotionSaleItem } from "../apps/pdv-demo/src/catalogPromotions.js";
 
 test("aplica a melhor combinacao entre preco unitario e multiplas faixas", () => {
   const rules = [{ quantity: 3, bundlePrice: 10 }, { quantity: 6, bundlePrice: 18 }];
@@ -44,7 +44,7 @@ const promotionProducts: PromotionCatalogProduct[] = [
   { productCode: "C", productName: "Refri C", itemType: "unit", unitPrice: 8, promotionGroupId: "REFRI" }
 ];
 const promotionGroups: PromotionGroup[] = [{ id: "REFRI", name: "Refrigerantes", quantityPriceRules: [{ quantity: 3, bundlePrice: 15 }] }];
-const saleItem = (productCode: string, quantity: number, unitPrice: number) => ({ id: productCode, productCode, productName: productCode, unitLabel: "UN", quantity, unitPrice, totalPrice: quantity * unitPrice, source: "catalog" });
+const saleItem = (productCode: string, quantity: number, unitPrice: number): PromotionSaleItem => ({ id: productCode, productCode, productName: productCode, unitLabel: "UN", quantity, unitPrice, totalPrice: quantity * unitPrice, source: "catalog" });
 
 test("soma sabores diferentes da mesma familia na promocao sem misturar os SKUs", () => {
   const result = repricePromotionSaleItems([saleItem("LAR", 1, 3.99), saleItem("UVA", 1, 3.99), saleItem("LIM", 1, 3.99)], promotionProducts, promotionGroups);
