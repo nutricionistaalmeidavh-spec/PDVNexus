@@ -1,4 +1,4 @@
-import { normalizeQuantityPriceRules, type QuantityPriceRule } from "./quantityPricing";
+import { normalizeQuantityPriceRules, type QuantityPriceRule } from "./quantityPricing.js";
 
 export type CatalogProductKind = "standard" | "parent" | "variant";
 
