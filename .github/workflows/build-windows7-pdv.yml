@@ -1,0 +1,59 @@
+name: Build Windows 7 PDV
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-windows7-pdv.yml"
+      - "windows-7/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows7:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-7
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-7/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test PDV payments and quantity pricing
+        run: npm run test:pdv-payments
+
+      - name: Build Windows 7 x64 installer
+        run: npm run desktop:dist:pdv:win7
+
+      - name: Verify installer and hash
+        run: |
+          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-7" -Filter "PDV-Nexus-Windows-7-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $exe) { throw "Windows 7 installer EXE not found" }
+          Write-Host "Installer: $($exe.FullName)"
+          Write-Host "Size: $($exe.Length) bytes"
+          Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Windows-7
+          path: windows-7/apps/nexus-desktop/dist-desktop/pdv-demo-windows-7/PDV-Nexus-Windows-7-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14

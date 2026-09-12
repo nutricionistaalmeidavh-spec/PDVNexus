@@ -112,6 +112,7 @@ export interface DesktopPdvBackupBridge {
 export interface DesktopReceiptPrintOptions {
   text: string;
   width?: number;
+  paperFormat?: "58mm" | "80mm" | "a4-half";
   printerName?: string;
 }
 
