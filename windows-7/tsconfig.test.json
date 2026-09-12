@@ -8,5 +8,5 @@
     "types": ["node"],
     "noEmit": false
   },
-  "include": ["tests/**/*.ts", "packages/database/src/pdv.ts"]
+  "include": ["tests/**/*.ts", "packages/database/src/pdv.ts", "apps/pdv-demo/src/quantityPricing.ts"]
 }
