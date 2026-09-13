@@ -7,6 +7,7 @@ import "./pdv-dense-v2.css";
 import "./pdv-dense-v2-grid.css";
 import "./pdv-cashier-v3.css";
 import "./pdv-e55.css";
+import "./lote-d-theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
