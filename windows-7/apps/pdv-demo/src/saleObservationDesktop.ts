@@ -1,4 +1,9 @@
-import { getDesktopPdvStoreBridge, getDesktopPrintingBridge, type DesktopPrintingBridge } from "@nexus-core/desktop-runtime";
+import {
+  getDesktopPdvStoreBridge,
+  getDesktopPrintingBridge,
+  type DesktopPdvStoreBridge,
+  type DesktopPrintingBridge
+} from "@nexus-core/desktop-runtime";
 import {
   decorateReceiptWithSaleObservation,
   mergeSaleObservationsIntoSnapshot,
@@ -11,6 +16,12 @@ const printingBridgeRegistry = new WeakMap<object, {
   refs: number;
   original: DesktopPrintingBridge["receipt"];
   wrapped: DesktopPrintingBridge["receipt"];
+}>();
+
+const storeBridgeRegistry = new WeakMap<object, {
+  refs: number;
+  original: DesktopPdvStoreBridge["save"];
+  wrapped: DesktopPdvStoreBridge["save"];
 }>();
 
 export async function reconcileSaleObservationsToStore() {
@@ -26,6 +37,42 @@ export async function reconcileSaleObservationsToStore() {
   } catch {
     // A observacao auxiliar nunca deve bloquear venda, persistencia ou impressao.
   }
+}
+
+export function installDesktopSaleObservationPersistence() {
+  const bridge = getDesktopPdvStoreBridge();
+  if (!bridge) return () => undefined;
+
+  const existing = storeBridgeRegistry.get(bridge);
+  if (existing) {
+    existing.refs += 1;
+    return () => {
+      existing.refs -= 1;
+      if (existing.refs <= 0 && bridge.save === existing.wrapped) {
+        bridge.save = existing.original;
+        storeBridgeRegistry.delete(bridge);
+      }
+    };
+  }
+
+  const original = bridge.save.bind(bridge);
+  const wrapped: DesktopPdvStoreBridge["save"] = (storeKey, snapshotJson) => {
+    if (storeKey !== PDV_STORE_KEY) return original(storeKey, snapshotJson);
+    const merged = mergeSaleObservationsIntoSnapshot(snapshotJson);
+    return original(storeKey, merged.snapshotJson);
+  };
+  bridge.save = wrapped;
+  storeBridgeRegistry.set(bridge, { refs: 1, original, wrapped });
+
+  return () => {
+    const entry = storeBridgeRegistry.get(bridge);
+    if (!entry) return;
+    entry.refs -= 1;
+    if (entry.refs <= 0 && bridge.save === entry.wrapped) {
+      bridge.save = entry.original;
+      storeBridgeRegistry.delete(bridge);
+    }
+  };
 }
 
 export function installDesktopSaleObservationPrinting() {
