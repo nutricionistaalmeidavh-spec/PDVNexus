@@ -39,6 +39,7 @@ const printingBridgeRegistry = new WeakMap<object, {
 }>();
 
 function safeLocalStorage() {
+  if (typeof window === "undefined") return null;
   try {
     return window.localStorage;
   } catch {
@@ -164,6 +165,17 @@ function hydrateObservationCache(snapshot: SnapshotLike) {
   if (changed) writeObservationMap(current);
 }
 
+function hydrateObservationCacheFromBrowserStore() {
+  const raw = safeLocalStorage()?.getItem(PDV_STORE_KEY);
+  if (!raw) return;
+  try {
+    const snapshot = JSON.parse(raw) as SnapshotLike;
+    if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) hydrateObservationCache(snapshot);
+  } catch {
+    // Snapshot invalido nao deve impedir a emissao do comprovante.
+  }
+}
+
 function mergeObservationsIntoSales(value: unknown, map: SaleObservationMap) {
   if (!Array.isArray(value)) return { value, changed: false };
   let changed = false;
@@ -264,6 +276,7 @@ function receiptSaleNumber(receipt: string) {
 
 export function decorateReceiptWithSaleObservation(receipt: string) {
   if (!receipt || receipt.includes(RECEIPT_SECTION_TITLE)) return receipt;
+  hydrateObservationCacheFromBrowserStore();
   const saleNumber = receiptSaleNumber(receipt);
   const record = getSaleObservation(saleNumber);
   if (!record?.printOnReceipt || !record.note.trim()) return receipt;
@@ -295,10 +308,13 @@ export function installDesktopSaleObservationPrinting() {
   }
 
   const original = bridge.receipt.bind(bridge);
-  const wrapped: DesktopPrintingBridge["receipt"] = (options) => original({
-    ...options,
-    text: decorateReceiptWithSaleObservation(options.text)
-  });
+  const wrapped: DesktopPrintingBridge["receipt"] = async (options) => {
+    await reconcileSaleObservationsToStore();
+    return original({
+      ...options,
+      text: decorateReceiptWithSaleObservation(options.text)
+    });
+  };
   bridge.receipt = wrapped;
   printingBridgeRegistry.set(bridge, { refs: 1, original, wrapped });
 
