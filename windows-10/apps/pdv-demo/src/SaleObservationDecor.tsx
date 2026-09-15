@@ -1,11 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import {
-  getSaleObservation,
-  installDesktopSaleObservationPrinting,
-  reconcileSaleObservationsToStore,
-  saveSaleObservationDraft
-} from "./saleObservation";
+import { getSaleObservation, saveSaleObservationDraft } from "./saleObservation";
+import { installDesktopSaleObservationPrinting, reconcileSaleObservationsToStore } from "./saleObservationDesktop";
 
 type SaleContext = {
   saleNumber: string;
