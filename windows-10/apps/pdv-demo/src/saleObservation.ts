@@ -1,6 +1,8 @@
 const OBSERVATIONS_STORAGE_KEY = "nexus-core:pdv-sale-observations:v1";
 const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
 const MAX_OBSERVATION_LENGTH = 500;
+export const MAX_RECEIPT_OBSERVATION_LENGTH = 120;
+export const MAX_RECEIPT_OBSERVATION_LINES = 4;
 const RECEIPT_SECTION_TITLE = "OBSERVACOES DA VENDA";
 
 export interface SaleObservationRecord {
@@ -244,8 +246,10 @@ function wrapLine(value: string, width: number) {
 
 function wrapObservation(note: string, width: number) {
   return note
+    .slice(0, MAX_RECEIPT_OBSERVATION_LENGTH)
     .split("\n")
     .flatMap((line) => wrapLine(line, width))
+    .slice(0, MAX_RECEIPT_OBSERVATION_LINES)
     .join("\n");
 }
 
@@ -263,7 +267,9 @@ export function decorateReceiptWithSaleObservation(receipt: string) {
 
   const width = resolveReceiptWidth(receipt);
   const divider = "-".repeat(width);
-  const section = `${divider}\n${RECEIPT_SECTION_TITLE}\n${wrapObservation(record.note, width)}\n${divider}`;
+  const printableObservation = wrapObservation(record.note, width);
+  if (!printableObservation) return receipt;
+  const section = `${divider}\n${RECEIPT_SECTION_TITLE}\n${printableObservation}\n${divider}`;
   const lines = receipt.trimEnd().split("\n");
   const thanksIndex = lines.findIndex((line) => /Obrigado pela preferencia/i.test(line));
   if (thanksIndex >= 0) lines.splice(thanksIndex, 0, section);

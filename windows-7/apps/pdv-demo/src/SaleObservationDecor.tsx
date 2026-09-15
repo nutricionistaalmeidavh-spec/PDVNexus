@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { getSaleObservation, saveSaleObservationDraft } from "./saleObservation";
+import { MAX_RECEIPT_OBSERVATION_LENGTH, getSaleObservation, saveSaleObservationDraft } from "./saleObservation";
 import {
   installDesktopSaleObservationPersistence,
   installDesktopSaleObservationPrinting,
@@ -14,6 +14,7 @@ type SaleContext = {
 };
 
 const EMPTY_CONTEXT: SaleContext = { saleNumber: "", customerId: "", customerName: "" };
+const MAX_INTERNAL_OBSERVATION_LENGTH = 500;
 
 function textOf(element: Element | null) {
   return element?.textContent?.trim() ?? "";
@@ -66,6 +67,8 @@ export function SaleObservationDecor() {
   const [printOnReceipt, setPrintOnReceipt] = useState(false);
 
   const saleActive = Boolean(context.saleNumber && context.saleNumber !== "------");
+  const activeLimit = printOnReceipt ? MAX_RECEIPT_OBSERVATION_LENGTH : MAX_INTERNAL_OBSERVATION_LENGTH;
+  const exceedsReceiptLimit = note.length > MAX_RECEIPT_OBSERVATION_LENGTH;
 
   useEffect(() => {
     const apply = () => {
@@ -138,16 +141,16 @@ export function SaleObservationDecor() {
           <strong style={styles.title}>Observação da venda</strong>
           <span style={styles.subtitle}>Fica vinculada à venda e ao cliente selecionado.</span>
         </div>
-        <span style={styles.counter}>{note.length}/500</span>
+        <span style={styles.counter}>{note.length}/{activeLimit}{printOnReceipt ? " no cupom" : " interno"}</span>
       </div>
       <textarea
         value={note}
         onChange={(event) => {
-          const value = event.target.value.slice(0, 500);
+          const value = event.target.value.slice(0, activeLimit);
           setNote(value);
           persist(value, printOnReceipt);
         }}
-        maxLength={500}
+        maxLength={activeLimit}
         rows={3}
         disabled={!saleActive}
         placeholder={saleActive ? "Ex.: separar 2 caixas; cliente retira amanhã às 10h." : "Inicie uma venda para adicionar observação."}
@@ -157,19 +160,22 @@ export function SaleObservationDecor() {
         <input
           type="checkbox"
           checked={printOnReceipt}
-          disabled={!saleActive}
+          disabled={!saleActive || (!printOnReceipt && exceedsReceiptLimit)}
           onChange={(event) => {
             const checked = event.target.checked;
+            if (checked && note.length > MAX_RECEIPT_OBSERVATION_LENGTH) return;
             setPrintOnReceipt(checked);
             persist(note, checked);
           }}
         />
-        <span>Imprimir esta observação no cupom não fiscal</span>
+        <span>Imprimir esta observação no cupom não fiscal (máx. 120 caracteres / 4 linhas)</span>
       </label>
       <div style={styles.hint}>
-        {printOnReceipt && note.trim()
-          ? "A observação será registrada e também impressa."
-          : "A observação fica somente no registro interno da venda."}
+        {!printOnReceipt && exceedsReceiptLimit
+          ? "Para imprimir no cupom, reduza a observação para até 120 caracteres. O registro interno aceita até 500."
+          : printOnReceipt && note.trim()
+            ? "A observação será registrada e impressa em no máximo 4 linhas."
+            : "A observação fica somente no registro interno da venda."}
       </div>
     </section>,
     portalTarget
