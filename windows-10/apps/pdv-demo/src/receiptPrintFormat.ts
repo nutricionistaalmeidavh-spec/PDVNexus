@@ -1,3 +1,5 @@
+import { decorateReceiptWithSaleObservation } from "./saleObservation";
+
 export type ReceiptPaperFormat = "58mm" | "80mm" | "a4-half";
 
 const RECEIPT_COLUMNS: Record<ReceiptPaperFormat, number> = {
@@ -18,7 +20,7 @@ export function normalizeReceiptPaperFormat(value: unknown, legacyWidth?: number
 }
 
 export function buildReceiptPrintHtml(receipt: string, format: ReceiptPaperFormat) {
-  const safeReceipt = escapeReceiptHtml(receipt);
+  const safeReceipt = escapeReceiptHtml(decorateReceiptWithSaleObservation(receipt));
   if (format !== "a4-half") {
     return `<pre style="font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;">${safeReceipt}</pre>`;
   }
