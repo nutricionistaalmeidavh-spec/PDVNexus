@@ -76,3 +76,24 @@ test("observacao marcada para impressao aparece uma vez no cupom nao fiscal", ()
   assert.equal(decorated.match(/OBSERVACOES DA VENDA/g)?.length, 1);
   assert.equal(decorateReceiptWithSaleObservation(decorated), decorated);
 });
+
+test("observacao impressa fica limitada a 120 caracteres e quatro linhas em bobina 58mm", () => {
+  installWindowStorage();
+  const separator58 = "-".repeat(32);
+  const receipt58 = receipt.replaceAll("-".repeat(42), separator58);
+  saveSaleObservationDraft({
+    saleNumber: "000321",
+    customerId: "CLI-321",
+    customerName: "Cliente Teste",
+    note: "X".repeat(500),
+    printOnReceipt: true
+  });
+
+  const decorated = decorateReceiptWithSaleObservation(receipt58);
+  const sectionBody = decorated.split("OBSERVACOES DA VENDA\n")[1]?.split(`\n${separator58}`)[0] ?? "";
+  const observationLines = sectionBody.trim().split("\n");
+
+  assert.equal(observationLines.length, 4);
+  assert.equal(observationLines.join("").length, 120);
+  assert.ok(observationLines.every((line) => line.length <= 32));
+});
