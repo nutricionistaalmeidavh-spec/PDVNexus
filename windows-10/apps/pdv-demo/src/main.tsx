@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { CashierReferenceDecor } from "./CashierReferenceDecor";
 import { CustomerPresentationDecor } from "./CustomerPresentationDecor";
 import { PdvDemoApp } from "./PdvDemoApp";
+import { SaleObservationDecor } from "./SaleObservationDecor";
 import "./pdv-dense-v2.css";
 import "./pdv-dense-v2-grid.css";
 import "./pdv-cashier-v3.css";
@@ -14,6 +15,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <div className="pdv-operation-title" role="heading" aria-level={1}>VENDA (PDV)</div>
       <CashierReferenceDecor />
       <CustomerPresentationDecor />
+      <SaleObservationDecor />
       <PdvDemoApp />
     </div>
   </React.StrictMode>
