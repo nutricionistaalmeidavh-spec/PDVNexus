@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
   getSaleObservation,
@@ -174,7 +174,7 @@ export function SaleObservationDecor() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   panel: {
     display: "grid",
     gap: 8,
