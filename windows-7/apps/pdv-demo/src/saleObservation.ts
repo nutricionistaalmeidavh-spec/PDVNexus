@@ -1,5 +1,3 @@
-import { getDesktopPdvStoreBridge, getDesktopPrintingBridge, type DesktopPrintingBridge } from "@nexus-core/desktop-runtime";
-
 const OBSERVATIONS_STORAGE_KEY = "nexus-core:pdv-sale-observations:v1";
 const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
 const MAX_OBSERVATION_LENGTH = 500;
@@ -31,12 +29,6 @@ type SnapshotLike = {
   };
   [key: string]: unknown;
 };
-
-const printingBridgeRegistry = new WeakMap<object, {
-  refs: number;
-  original: DesktopPrintingBridge["receipt"];
-  wrapped: DesktopPrintingBridge["receipt"];
-}>();
 
 function safeLocalStorage() {
   if (typeof window === "undefined") return null;
@@ -92,7 +84,7 @@ function writeObservationMap(map: SaleObservationMap) {
   try {
     safeLocalStorage()?.setItem(OBSERVATIONS_STORAGE_KEY, JSON.stringify(map));
   } catch {
-    // O caixa continua funcionando mesmo se o armazenamento do navegador estiver indisponivel.
+    // A venda continua funcionando se o armazenamento do navegador estiver indisponivel.
   }
 }
 
@@ -216,29 +208,17 @@ export function mergeSaleObservationsIntoSnapshot(snapshotJson: string) {
   }
 }
 
-export async function reconcileSaleObservationsToStore() {
+export function reconcileSaleObservationsToBrowserStore() {
   const storage = safeLocalStorage();
   const browserSnapshot = storage?.getItem(PDV_STORE_KEY);
-  if (browserSnapshot) {
-    const merged = mergeSaleObservationsIntoSnapshot(browserSnapshot);
-    if (merged.changed) {
-      try {
-        storage?.setItem(PDV_STORE_KEY, merged.snapshotJson);
-      } catch {
-        // O SQLite desktop continua sendo a persistencia principal quando disponivel.
-      }
-    }
-  }
-
-  const bridge = getDesktopPdvStoreBridge();
-  if (!bridge) return;
+  if (!browserSnapshot) return false;
+  const merged = mergeSaleObservationsIntoSnapshot(browserSnapshot);
+  if (!merged.changed) return false;
   try {
-    const row = await bridge.load(PDV_STORE_KEY);
-    if (!row?.snapshotJson) return;
-    const merged = mergeSaleObservationsIntoSnapshot(row.snapshotJson);
-    if (merged.changed) await bridge.save(PDV_STORE_KEY, merged.snapshotJson);
+    storage?.setItem(PDV_STORE_KEY, merged.snapshotJson);
+    return true;
   } catch {
-    // Nao interrompe venda ou impressao por falha de reconciliacao auxiliar.
+    return false;
   }
 }
 
@@ -289,42 +269,4 @@ export function decorateReceiptWithSaleObservation(receipt: string) {
   if (thanksIndex >= 0) lines.splice(thanksIndex, 0, section);
   else lines.push(section);
   return `${lines.join("\n")}\n`;
-}
-
-export function installDesktopSaleObservationPrinting() {
-  const bridge = getDesktopPrintingBridge();
-  if (!bridge) return () => undefined;
-
-  const existing = printingBridgeRegistry.get(bridge);
-  if (existing) {
-    existing.refs += 1;
-    return () => {
-      existing.refs -= 1;
-      if (existing.refs <= 0 && bridge.receipt === existing.wrapped) {
-        bridge.receipt = existing.original;
-        printingBridgeRegistry.delete(bridge);
-      }
-    };
-  }
-
-  const original = bridge.receipt.bind(bridge);
-  const wrapped: DesktopPrintingBridge["receipt"] = async (options) => {
-    await reconcileSaleObservationsToStore();
-    return original({
-      ...options,
-      text: decorateReceiptWithSaleObservation(options.text)
-    });
-  };
-  bridge.receipt = wrapped;
-  printingBridgeRegistry.set(bridge, { refs: 1, original, wrapped });
-
-  return () => {
-    const entry = printingBridgeRegistry.get(bridge);
-    if (!entry) return;
-    entry.refs -= 1;
-    if (entry.refs <= 0 && bridge.receipt === entry.wrapped) {
-      bridge.receipt = entry.original;
-      printingBridgeRegistry.delete(bridge);
-    }
-  };
 }
