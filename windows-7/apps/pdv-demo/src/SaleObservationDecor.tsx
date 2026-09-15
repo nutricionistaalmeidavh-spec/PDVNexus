@@ -1,7 +1,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { getSaleObservation, saveSaleObservationDraft } from "./saleObservation";
-import { installDesktopSaleObservationPrinting, reconcileSaleObservationsToStore } from "./saleObservationDesktop";
+import {
+  installDesktopSaleObservationPersistence,
+  installDesktopSaleObservationPrinting,
+  reconcileSaleObservationsToStore
+} from "./saleObservationDesktop";
 
 type SaleContext = {
   saleNumber: string;
@@ -102,12 +106,14 @@ export function SaleObservationDecor() {
   }, [context.saleNumber, saleActive]);
 
   useEffect(() => {
+    const uninstallPersistence = installDesktopSaleObservationPersistence();
     const uninstallPrinting = installDesktopSaleObservationPrinting();
     void reconcileSaleObservationsToStore();
     const timer = window.setInterval(() => void reconcileSaleObservationsToStore(), 1500);
     return () => {
       window.clearInterval(timer);
       uninstallPrinting();
+      uninstallPersistence();
     };
   }, []);
 
