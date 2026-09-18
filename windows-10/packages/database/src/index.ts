@@ -93,4 +93,4 @@ export const meuEngenheiroSeed: MeuEngenheiroSeed = {
     { id: "p3", question: "Como calcular a resistencia de uma viga de concreto armado?" }
   ]
 };
-export * from './pdv';
+export * from "./pdv.js";
