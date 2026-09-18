@@ -76,7 +76,7 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=pdv-v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if version already exists
+      - name: Inspect release state
         if: steps.gates.outputs.ready == 'true'
         id: existing
         env:
@@ -85,14 +85,38 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
+          set -euo pipefail
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            DRAFT="$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft')"
+            echo "draft=${DRAFT}" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check Drive synchronization credential
+        if: steps.gates.outputs.ready == 'true'
+        id: drive_auth
+        env:
+          PDV_GDRIVE_RCLONE_CONFIG: ${{ secrets.PDV_GDRIVE_RCLONE_CONFIG }}
+        shell: bash
+        run: |
+          if [[ -n "${PDV_GDRIVE_RCLONE_CONFIG:-}" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Protect new release when Drive credential is missing
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+        shell: bash
+        run: |
+          echo "::error::PDV_GDRIVE_RCLONE_CONFIG não configurado. A Release não será publicada sem sincronizar o Drive."
+          exit 1
+
       - name: Download installers from successful gate runs
-        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+        if: steps.gates.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -162,4 +186,100 @@ jobs:
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "Release automática do PDV Nexus. Publicada somente após W10, W7, W8 x86 e QA completos verdes no mesmo commit."
+            --notes "Release automática do PDV Nexus. Publicada somente após W10, W7, W8 x86, QA e sincronização do Drive completos." \
+            --draft
+
+      - name: Install rclone for Drive distribution
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rclone
+          rclone version
+
+      - name: Sync stable installers to Google Drive
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true'
+        env:
+          PDV_GDRIVE_RCLONE_CONFIG: ${{ secrets.PDV_GDRIVE_RCLONE_CONFIG }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT_ID="$(jq -r '.distribution.googleDrive.rootFolderId' pdv-release.json)"
+          PREVIOUS_FOLDER="$(jq -r '.distribution.googleDrive.previousFolderName' pdv-release.json)"
+          REMOTE="$(jq -r '.distribution.googleDrive.remoteName' pdv-release.json)"
+          test -n "$ROOT_ID" && test "$ROOT_ID" != "null"
+          test -n "$PREVIOUS_FOLDER" && test "$PREVIOUS_FOLDER" != "null"
+          test -n "$REMOTE" && test "$REMOTE" != "null"
+
+          RCLONE_CONFIG_PATH="${RUNNER_TEMP}/pdv-rclone.conf"
+          printf '%s' "$PDV_GDRIVE_RCLONE_CONFIG" > "$RCLONE_CONFIG_PATH"
+          chmod 600 "$RCLONE_CONFIG_PATH"
+          rclone listremotes --config "$RCLONE_CONFIG_PATH" | grep -Fx "${REMOTE}:"
+
+          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          test -n "$W10" && test -n "$W7" && test -n "$W8"
+          [[ "$(basename "$W10")" == *"${VERSION}"* ]]
+          [[ "$(basename "$W7")" == *"${VERSION}"* ]]
+          [[ "$(basename "$W8")" == *"${VERSION}"* ]]
+
+          DRIVE_W10="PDV-Nexus-Windows-10-Setup-${VERSION}.exe"
+          DRIVE_W7="PDV-Nexus-Windows-7-Setup-${VERSION}.exe"
+          DRIVE_W8="PDV-Nexus-Windows-8-32bit-Setup-${VERSION}.exe"
+          mkdir -p drive-assets
+          cp "$W10" "drive-assets/$DRIVE_W10"
+          cp "$W7" "drive-assets/$DRIVE_W7"
+          cp "$W8" "drive-assets/$DRIVE_W8"
+
+          RCLONE_FLAGS=(--config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ROOT_ID")
+          STAGE=".pdv-release-staging/${VERSION}-${GITHUB_RUN_ID}"
+
+          rclone lsf "${REMOTE}:" "${RCLONE_FLAGS[@]}" >/dev/null
+          rclone mkdir "${REMOTE}:${PREVIOUS_FOLDER}" "${RCLONE_FLAGS[@]}"
+          rclone copy drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --checksum
+          rclone check drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --one-way
+
+          rclone copy drive-assets "${REMOTE}:" "${RCLONE_FLAGS[@]}" --checksum
+          rclone check drive-assets "${REMOTE}:" "${RCLONE_FLAGS[@]}" --one-way
+
+          mapfile -t CURRENT_INSTALLERS < <(
+            rclone lsf "${REMOTE}:" "${RCLONE_FLAGS[@]}" --files-only --include 'PDV-Nexus*.exe'
+          )
+
+          for OLD_FILE in "${CURRENT_INSTALLERS[@]}"; do
+            case "$OLD_FILE" in
+              "$DRIVE_W10"|"$DRIVE_W7"|"$DRIVE_W8")
+                continue
+                ;;
+              PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe)
+                rclone moveto "${REMOTE}:${OLD_FILE}" "${REMOTE}:${PREVIOUS_FOLDER}/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                ;;
+            esac
+          done
+
+          rclone check drive-assets "${REMOTE}:" "${RCLONE_FLAGS[@]}" --one-way
+          rclone purge "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" || true
+
+          {
+            echo "### Google Drive"
+            echo "- Versão sincronizada: ${VERSION}"
+            echo "- W10: ${DRIVE_W10}"
+            echo "- W7: ${DRIVE_W7}"
+            echo "- W8 32-bit: ${DRIVE_W8}"
+            echo "- Versões anteriores: ${PREVIOUS_FOLDER}/"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub Release after Drive sync
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --repo "$REPO" --draft=false
