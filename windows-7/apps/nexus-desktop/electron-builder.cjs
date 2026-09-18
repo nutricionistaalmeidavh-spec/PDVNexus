@@ -42,7 +42,9 @@ module.exports = {
     output: `dist-desktop/${selectedKey}`
   },
   files: [
+    "bootstrap.cjs",
     "main.cjs",
+    "pdv-lifecycle.cjs",
     "preload.cjs",
     "package.json",
     {
