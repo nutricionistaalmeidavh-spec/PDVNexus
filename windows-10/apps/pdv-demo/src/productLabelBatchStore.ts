@@ -1,4 +1,5 @@
 import { getDesktopPdvStoreBridge } from "@nexus-core/desktop-runtime";
+import { applyBatchStockEntryToSnapshot, type BatchStockEntryDraft } from "./batchInventory";
 import {
   normalizeCatalogProductIdentity,
   normalizeProductBatchStore,
@@ -11,8 +12,16 @@ import { reconcileProductBatchFefoSnapshot } from "./productBatchFefo";
 const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
 export const PRODUCT_LABEL_BATCH_STORE_KEY = "nexus-core:pdv-label-batches:v1";
 
+export type ProductLabelBatchCatalogProduct = LabelCatalogProduct & {
+  barcodeType: "internal" | "gtin" | "manual";
+  stock: number;
+  unitLabel: string;
+  itemType: "unit" | "weight";
+  productKind?: "standard" | "parent" | "variant";
+};
+
 export type ProductLabelBatchContext = {
-  products: Array<LabelCatalogProduct & { barcodeType: "internal" | "gtin" | "manual" }>;
+  products: ProductLabelBatchCatalogProduct[];
   store: ProductLabelBatchStore;
 };
 
@@ -25,7 +34,7 @@ export async function loadProductLabelBatchContext(): Promise<ProductLabelBatchC
   const normalizedProducts = products.map((product) => normalizeCatalogProductIdentity({
     ...product,
     barcodeType: identityByCode.get(product.productCode)?.barcodeType
-  }));
+  })) as ProductLabelBatchCatalogProduct[];
   const store = { ...stored, version: 2 as const, updatedAt: now, productIdentities: identities };
   await saveProductLabelBatchStore(store);
   return { products: normalizedProducts, store };
@@ -40,23 +49,46 @@ export async function reconcileProductBatchFefoFromCurrentSnapshot() {
   return result;
 }
 
+export async function commitBatchStockEntry(draft: BatchStockEntryDraft) {
+  const originalSnapshotJson = await loadMainPdvSnapshot();
+  const originalStore = await loadProductLabelBatchStore();
+  const nowIso = new Date().toISOString();
+  const result = applyBatchStockEntryToSnapshot({
+    snapshotValue: parseJson(originalSnapshotJson, {}),
+    store: originalStore,
+    draft,
+    nowIso,
+    createdAt: new Date().toLocaleString("pt-BR")
+  });
+
+  await saveMainPdvSnapshot(result.snapshot);
+  try {
+    const store = await saveProductLabelBatchStore(result.store);
+    return { ...result, store };
+  } catch (error) {
+    try { await saveMainPdvSnapshot(originalSnapshotJson); } catch { /* rollback best effort; erro original continua sendo reportado */ }
+    throw error;
+  }
+}
+
+export async function saveMainPdvSnapshot(snapshot: unknown) {
+  const serialized = typeof snapshot === "string" ? snapshot : JSON.stringify(snapshot);
+  const desktop = getDesktopPdvStoreBridge();
+  if (desktop) await desktop.save(PDV_STORE_KEY, serialized);
+  writeLocal(PDV_STORE_KEY, serialized);
+  return serialized;
+}
+
 export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) {
   const normalized = normalizeProductBatchStore({ ...store, version: 2, updatedAt: new Date().toISOString() });
   const serialized = JSON.stringify(normalized);
-  writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
-
   const bridge = typeof window !== "undefined" ? window.nexusDesktop?.store : undefined;
-  if (bridge) {
-    try {
-      await bridge.save(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
-    } catch {
-      // Windows legados podem não expor SQLite genérico; o fallback local já foi persistido.
-    }
-  }
+  if (bridge) await bridge.save(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
+  writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
   return normalized;
 }
 
-async function loadCatalogProducts(): Promise<LabelCatalogProduct[]> {
+async function loadCatalogProducts(): Promise<ProductLabelBatchCatalogProduct[]> {
   const raw = await loadMainPdvSnapshot();
   const parsed = parseJson(raw, {});
   const candidates = parsed && typeof parsed === "object" && Array.isArray((parsed as { catalogProducts?: unknown[] }).catalogProducts)
@@ -69,13 +101,20 @@ async function loadCatalogProducts(): Promise<LabelCatalogProduct[]> {
     const productCode = String(product.productCode ?? "").trim();
     const productName = String(product.productName ?? "").trim();
     if (!productCode || !productName) return [];
+    const itemType = product.itemType === "weight" ? "weight" : "unit";
+    const rawKind = String(product.productKind ?? "standard");
+    const productKind = rawKind === "parent" || rawKind === "variant" ? rawKind : "standard";
     return [{
       productCode,
       productName,
       barcode: String(product.barcode ?? "").trim(),
       unitPrice: Number(product.unitPrice) || 0,
-      barcodeType: typeof product.barcodeType === "string" ? product.barcodeType as LabelCatalogProduct["barcodeType"] : undefined
-    }];
+      stock: Number(product.stock) || 0,
+      unitLabel: String(product.unitLabel ?? (itemType === "weight" ? "KG" : "UN")),
+      itemType,
+      productKind,
+      barcodeType: typeof product.barcodeType === "string" ? product.barcodeType as ProductLabelBatchCatalogProduct["barcodeType"] : undefined
+    } as ProductLabelBatchCatalogProduct];
   });
 }
 
@@ -99,7 +138,7 @@ export async function loadProductLabelBatchStore() {
       const row = await bridge.load(PRODUCT_LABEL_BATCH_STORE_KEY);
       if (row?.snapshotJson) return normalizeProductBatchStore(parseJson(row.snapshotJson, {}));
     } catch {
-      // Windows legados continuam pelo armazenamento local.
+      // Windows legados continuam pelo armazenamento local quando o bridge não puder ler.
     }
   }
   return normalizeProductBatchStore(parseJson(readLocal(PRODUCT_LABEL_BATCH_STORE_KEY) ?? "{}", {}));
@@ -112,7 +151,7 @@ function readLocal(key: string) {
 
 function writeLocal(key: string, value: string) {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(key, value); } catch { /* armazenamento desktop continua como segunda camada */ }
+  try { window.localStorage.setItem(key, value); } catch { /* SQLite desktop permanece como camada principal */ }
 }
 
 function parseJson(value: string, fallback: unknown) {
