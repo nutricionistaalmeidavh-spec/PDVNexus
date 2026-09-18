@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { CashierReferenceDecor } from "./CashierReferenceDecor";
 import { CustomerPresentationDecor } from "./CustomerPresentationDecor";
+import { LabelBatchTools } from "./LabelBatchTools";
 import { PdvDemoApp } from "./PdvDemoApp";
 import { SaleObservationDecor } from "./SaleObservationDecor";
 import "./pdv-dense-v2.css";
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <CashierReferenceDecor />
       <CustomerPresentationDecor />
       <SaleObservationDecor />
+      <LabelBatchTools />
       <PdvDemoApp />
     </div>
   </React.StrictMode>
