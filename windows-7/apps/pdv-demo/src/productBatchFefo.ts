@@ -159,7 +159,7 @@ export function parseSnapshotTimestamp(value: string) {
   const brazilian = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (brazilian) {
     const [, day, month, year, hour = "0", minute = "0", second = "0"] = brazilian;
-    return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)).getTime();
+    return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour) + 3, Number(minute), Number(second));
   }
   return Date.parse(normalized);
 }
