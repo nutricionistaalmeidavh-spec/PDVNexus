@@ -2,6 +2,8 @@ import path from 'node:path';
 import { resolveSecret, stepLabel } from './helpers.js';
 
 const MAIN_PDV_STORE_KEY = 'nexus-core:pdv-store:v1';
+const DEFAULT_ASSERT_TIMEOUT_MS = 5000;
+const DEFAULT_POLL_MS = 100;
 
 function locator(page, step) {
   if (step.testId) return page.getByTestId(step.testId);
@@ -12,15 +14,29 @@ function locator(page, step) {
   throw new Error(`Step ${step.action} requires selector, testId, role, text or label`);
 }
 
-async function clickTarget(page, step) {
+async function resolveClickable(page, step) {
   if (step.text && !step.selector && !step.testId && !step.role && !step.label) {
     const button = page.getByRole('button', { name: step.text, exact: step.exact ?? false });
-    if (await button.count() === 1) {
-      await button.click();
-      return;
-    }
+    if (await button.count() === 1) return button;
   }
-  await locator(page, step).click();
+  return locator(page, step);
+}
+
+async function clickTarget(page, step) {
+  const target = await resolveClickable(page, step);
+  await target.click(step.force ? { force: true } : undefined);
+}
+
+async function loadDesktopStoreRaw(page, key) {
+  return page.evaluate(async ({ key, mainPdvStoreKey }) => {
+    const desktop = window.nexusDesktop;
+    const bridge = key === mainPdvStoreKey ? desktop?.pdvStore : desktop?.store;
+    if (bridge?.load) {
+      const row = await bridge.load(key);
+      if (row?.snapshotJson != null) return row.snapshotJson;
+    }
+    return window.localStorage.getItem(key);
+  }, { key, mainPdvStoreKey: MAIN_PDV_STORE_KEY });
 }
 
 export async function executeStep({ page, step, index, screenshotsDir, baseURL, env = process.env, adapter = null, runtimeContext = null }) {
@@ -34,8 +50,8 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     }
     case 'click': await clickTarget(page, step); break;
     case 'clickIfVisible': {
-      const target = locator(page, step);
-      if (await target.isVisible()) await target.click();
+      const target = await resolveClickable(page, step);
+      if (await target.isVisible()) await target.click(step.force ? { force: true } : undefined);
       break;
     }
     case 'fill': await locator(page, step).fill(resolveSecret(step, env)); break;
@@ -48,12 +64,30 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     case 'waitFor': await locator(page, step).waitFor({ state: step.state || 'visible', timeout: step.timeoutMs }); break;
     case 'waitForTimeout': await page.waitForTimeout(step.timeoutMs ?? 250); break;
     case 'expectVisible': {
-      if (!(await locator(page, step).isVisible())) throw new Error(`${label}: expected locator to be visible`);
+      try {
+        await locator(page, step).waitFor({ state: 'visible', timeout: step.timeoutMs ?? DEFAULT_ASSERT_TIMEOUT_MS });
+      } catch {
+        throw new Error(`${label}: expected locator to be visible`);
+      }
       break;
     }
     case 'expectText': {
-      const actual = (await locator(page, step).textContent()) ?? '';
-      if (!actual.includes(step.expected ?? '')) throw new Error(`${label}: expected text ${JSON.stringify(step.expected)}, got ${JSON.stringify(actual)}`);
+      const target = locator(page, step);
+      const timeoutMs = step.timeoutMs ?? DEFAULT_ASSERT_TIMEOUT_MS;
+      const expected = step.expected ?? '';
+      try {
+        await target.waitFor({ state: 'visible', timeout: timeoutMs });
+      } catch {
+        throw new Error(`${label}: expected locator to be visible before checking text`);
+      }
+      const startedAt = Date.now();
+      let actual = '';
+      while (Date.now() - startedAt <= timeoutMs) {
+        actual = (await target.textContent()) ?? '';
+        if (actual.includes(expected)) break;
+        await page.waitForTimeout(DEFAULT_POLL_MS);
+      }
+      if (!actual.includes(expected)) throw new Error(`${label}: expected text ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
       break;
     }
     case 'expectURL': {
@@ -85,23 +119,26 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     case 'expectDesktopStoreJson': {
       if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires key`);
       if (!step.path || typeof step.path !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires path`);
-      const raw = await page.evaluate(async ({ key, mainPdvStoreKey }) => {
-        const desktop = window.nexusDesktop;
-        const bridge = key === mainPdvStoreKey ? desktop?.pdvStore : desktop?.store;
-        if (bridge?.load) {
-          const row = await bridge.load(key);
-          if (row?.snapshotJson) return row.snapshotJson;
-        }
-        return window.localStorage.getItem(key);
-      }, { key: step.key, mainPdvStoreKey: MAIN_PDV_STORE_KEY });
-      if (!raw) throw new Error(`${label}: store ${step.key} is empty`);
-      const parsed = JSON.parse(raw);
-      const actual = readJsonPath(parsed, step.path);
+      const timeoutMs = step.timeoutMs ?? DEFAULT_ASSERT_TIMEOUT_MS;
       const expected = resolveRuntimeTokens(step.expected);
-      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-        throw new Error(`${label}: expected ${step.path}=${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      const startedAt = Date.now();
+      let lastActual;
+      let lastRaw = null;
+      while (Date.now() - startedAt <= timeoutMs) {
+        lastRaw = await loadDesktopStoreRaw(page, step.key);
+        if (lastRaw) {
+          try {
+            const parsed = JSON.parse(lastRaw);
+            lastActual = readJsonPath(parsed, step.path);
+            if (JSON.stringify(lastActual) === JSON.stringify(expected)) return label;
+          } catch {
+            // O snapshot pode estar entre duas gravacoes; tente novamente ate o timeout.
+          }
+        }
+        await page.waitForTimeout(DEFAULT_POLL_MS);
       }
-      break;
+      if (!lastRaw) throw new Error(`${label}: store ${step.key} is empty`);
+      throw new Error(`${label}: expected ${step.path}=${JSON.stringify(expected)}, got ${JSON.stringify(lastActual)}`);
     }
     case 'screenshot': {
       await page.screenshot({ path: path.join(screenshotsDir, `${label}.png`), fullPage: step.fullPage ?? false });

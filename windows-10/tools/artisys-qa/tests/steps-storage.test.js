@@ -6,6 +6,7 @@ function createPageHarness() {
   const storage = new Map();
   const desktopStore = new Map();
   const pdvStore = new Map();
+  let pdvLoadOverride = null;
   const page = {
     evaluate: async (fn, arg) => {
       const previousWindow = globalThis.window;
@@ -21,7 +22,7 @@ function createPageHarness() {
           },
           pdvStore: {
             save: async (key, snapshotJson) => { pdvStore.set(key, { snapshotJson }); },
-            load: async (key) => pdvStore.get(key) ?? null
+            load: async (key) => pdvLoadOverride ? pdvLoadOverride(key) : (pdvStore.get(key) ?? null)
           }
         }
       };
@@ -30,7 +31,7 @@ function createPageHarness() {
     },
     waitForTimeout: async () => {}
   };
-  return { page, storage, desktopStore, pdvStore };
+  return { page, storage, desktopStore, pdvStore, setPdvLoadOverride: (fn) => { pdvLoadOverride = fn; } };
 }
 
 const base = { index: 0, screenshotsDir: '.', baseURL: '', env: {}, adapter: null, runtimeContext: null };
@@ -84,12 +85,28 @@ test('expectDesktopStoreJson valida caminhos com indices de array', async () => 
   });
 });
 
+test('expectDesktopStoreJson aguarda gravacao assincrona antes de falhar', async () => {
+  const harness = createPageHarness();
+  const key = 'nexus-core:pdv-store:v1';
+  let reads = 0;
+  harness.setPdvLoadOverride(async () => {
+    reads += 1;
+    return { snapshotJson: JSON.stringify(reads < 3 ? { completedSales: [] } : { completedSales: [{ number: '000777' }] }) };
+  });
+  await executeStep({
+    ...base,
+    page: harness.page,
+    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000777', timeoutMs: 1000 }
+  });
+  assert.ok(reads >= 3);
+});
+
 test('expectDesktopStoreJson falha quando o estado real diverge', async () => {
   const harness = createPageHarness();
   harness.desktopStore.set('qa:test', { snapshotJson: JSON.stringify({ batches: [{ remainingQuantity: 3 }] }) });
   await assert.rejects(() => executeStep({
     ...base,
     page: harness.page,
-    step: { action: 'expectDesktopStoreJson', key: 'qa:test', path: 'batches.0.remainingQuantity', expected: 4 }
+    step: { action: 'expectDesktopStoreJson', key: 'qa:test', path: 'batches.0.remainingQuantity', expected: 4, timeoutMs: 1 }
   }), /expected batches\.0\.remainingQuantity=4, got 3/);
 });
