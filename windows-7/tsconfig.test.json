@@ -8,5 +8,15 @@
     "types": ["node"],
     "noEmit": false
   },
-  "include": ["tests/**/*.ts", "packages/database/src/pdv.ts", "apps/pdv-demo/src/receiptPrintFormat.ts", "apps/pdv-demo/src/quantityPricing.ts", "apps/pdv-demo/src/productLabels.ts"]
+  "include": [
+    "tests/**/*.ts",
+    "packages/database/src/pdv.ts",
+    "apps/pdv-demo/src/receiptPrintFormat.ts",
+    "apps/pdv-demo/src/quantityPricing.ts",
+    "apps/pdv-demo/src/productLabels.ts",
+    "apps/pdv-demo/src/batchInventory.ts",
+    "apps/pdv-demo/src/batchPhysicalTracking.ts",
+    "apps/pdv-demo/src/productBatchFefo.ts",
+    "apps/pdv-demo/src/labelPrinting.ts"
+  ]
 }

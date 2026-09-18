@@ -25,6 +25,7 @@
     }
   },
   "flows": {
-    "ui-review": "flows/ui-review.json"
+    "ui-review": "flows/ui-review.json",
+    "batch-physical-tracking": "flows/batch-physical-tracking.json"
   }
 }

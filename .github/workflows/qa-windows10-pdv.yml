@@ -23,7 +23,7 @@ permissions:
 jobs:
   artisys-qa-pdv:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     defaults:
       run:
         shell: pwsh
@@ -48,6 +48,9 @@ jobs:
       - name: Install ArtiSys QA dependencies
         run: npm ci --prefix tools/artisys-qa
 
+      - name: Test ArtiSys QA runtime extensions
+        run: npm test --prefix tools/artisys-qa
+
       - name: Validate ArtiSys QA manifests
         run: |
           node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
@@ -59,7 +62,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test PDV payments
+      - name: Test PDV domain and integration flows
         run: npm run test:pdv-payments
 
       - name: Build PDV renderer
@@ -79,6 +82,9 @@ jobs:
       - name: Run checkout demo with ArtiSys QA
         run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo checkout-flow --output qa-demo-artifacts
 
+      - name: Run physical batch tracking user journey
+        run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow batch-physical-tracking --output qa-batch-tracking-artifacts
+
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,5 +100,14 @@ jobs:
         with:
           name: PDV-Nexus-ArtiSys-QA-Demo
           path: windows-10/qa-demo-artifacts
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload physical batch tracking QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA-Batch-Tracking
+          path: windows-10/qa-batch-tracking-artifacts
           if-no-files-found: warn
           retention-days: 3

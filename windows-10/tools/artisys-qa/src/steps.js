@@ -20,6 +20,11 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
       break;
     }
     case 'click': await locator(page, step).click(); break;
+    case 'clickIfVisible': {
+      const target = locator(page, step);
+      if (await target.isVisible()) await target.click();
+      break;
+    }
     case 'fill': await locator(page, step).fill(resolveSecret(step, env)); break;
     case 'press': await locator(page, step).press(step.key || 'Enter'); break;
     case 'check': await locator(page, step).check(); break;
@@ -44,6 +49,45 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
       if (step.includes && !actual.includes(step.includes)) throw new Error(`${label}: URL does not include ${step.includes}: ${actual}`);
       break;
     }
+    case 'desktopStoreSet': {
+      if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: desktopStoreSet requires key`);
+      const value = resolveRuntimeTokens(step.value);
+      await page.evaluate(async ({ key, value }) => {
+        const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+        window.localStorage.setItem(key, serialized);
+        const bridge = window.nexusDesktop?.store;
+        if (bridge?.save) await bridge.save(key, serialized);
+      }, { key: step.key, value });
+      break;
+    }
+    case 'storageSet': {
+      if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: storageSet requires key`);
+      const value = resolveRuntimeTokens(step.value);
+      await page.evaluate(({ key, value }) => {
+        window.localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      }, { key: step.key, value });
+      break;
+    }
+    case 'expectDesktopStoreJson': {
+      if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires key`);
+      if (!step.path || typeof step.path !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires path`);
+      const raw = await page.evaluate(async (key) => {
+        const bridge = window.nexusDesktop?.store;
+        if (bridge?.load) {
+          const row = await bridge.load(key);
+          if (row?.snapshotJson) return row.snapshotJson;
+        }
+        return window.localStorage.getItem(key);
+      }, step.key);
+      if (!raw) throw new Error(`${label}: store ${step.key} is empty`);
+      const parsed = JSON.parse(raw);
+      const actual = readJsonPath(parsed, step.path);
+      const expected = resolveRuntimeTokens(step.expected);
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+        throw new Error(`${label}: expected ${step.path}=${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      }
+      break;
+    }
     case 'screenshot': {
       await page.screenshot({ path: path.join(screenshotsDir, `${label}.png`), fullPage: step.fullPage ?? false });
       break;
@@ -62,4 +106,22 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     if (step.holdMs > 0) await page.waitForTimeout(step.holdMs);
   }
   return label;
+}
+
+function resolveRuntimeTokens(value) {
+  if (typeof value === 'string') return value.replaceAll('{{NOW_ISO}}', new Date().toISOString());
+  if (Array.isArray(value)) return value.map(resolveRuntimeTokens);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolveRuntimeTokens(item)]));
+  return value;
+}
+
+function readJsonPath(value, pathExpression) {
+  const parts = String(pathExpression).split('.').filter(Boolean);
+  let current = value;
+  for (const part of parts) {
+    if (current == null) return undefined;
+    const key = /^\d+$/.test(part) ? Number(part) : part;
+    current = current[key];
+  }
+  return current;
 }

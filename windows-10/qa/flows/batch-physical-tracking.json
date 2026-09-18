@@ -1,0 +1,79 @@
+{
+  "id": "pdv-batch-physical-tracking",
+  "steps": [
+    { "action": "waitFor", "selector": "input[placeholder*=\"Bipe\"]", "name": "caixa-pronto", "timeoutMs": 20000 },
+    { "action": "clickIfVisible", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa-se-necessario", "holdMs": 400 },
+    { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda-rastreio", "holdMs": 500 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "venda-vazia" },
+
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-lote-vencido", "value": {
+      "version": 2,
+      "updatedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "{{NOW_ISO}}",
+      "productIdentities": [],
+      "batches": [
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2026-09-17", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
+      ],
+      "saleAllocations": []
+    } },
+    { "action": "storageSet", "key": "nexus-core:pdv-batch-physical-scans:v1", "name": "limpar-ledger", "value": { "version": 1, "updatedAt": "{{NOW_ISO}}", "records": [], "ambiguousSaleProducts": [] } },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "NXL1:LOT-QA-B", "name": "scan-lote-vencido" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-lote-vencido", "holdMs": 350 },
+    { "action": "expectText", "selector": "[data-batch-tracking-status=\"error\"]", "expected": "vencido", "name": "bloqueia-lote-vencido" },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "vencido-nao-entrou-no-carrinho" },
+
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-lote-esgotado", "value": {
+      "version": 2,
+      "updatedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "{{NOW_ISO}}",
+      "productIdentities": [],
+      "batches": [
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2027-06-30", "quantity": 5, "remainingQuantity": 0, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
+      ],
+      "saleAllocations": []
+    } },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "NXL1:LOT-QA-B", "name": "scan-lote-esgotado" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-lote-esgotado", "holdMs": 350 },
+    { "action": "expectText", "selector": "[data-batch-tracking-status=\"error\"]", "expected": "sem saldo", "name": "bloqueia-lote-esgotado" },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "esgotado-nao-entrou-no-carrinho" },
+
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-dois-lotes-validos", "value": {
+      "version": 2,
+      "updatedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "{{NOW_ISO}}",
+      "productIdentities": [],
+      "batches": [
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2027-06-30", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
+      ],
+      "saleAllocations": []
+    } },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "NXL1:LOT-QA-B", "name": "scan-fisico-lote-b" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-fisico-lote-b", "holdMs": 600 },
+    { "action": "expectText", "selector": "[data-batch-tracking-status=\"ok\"]", "expected": "Lote QA-LONGO confirmado fisicamente", "name": "lote-b-confirmado" },
+    { "action": "expectVisible", "text": "1 UN x R$ 12,00", "exact": true, "name": "produto-fisico-no-carrinho" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagar-venda-fisica", "holdMs": 350 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda-fisica", "holdMs": 900 },
+    { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "comprovante-fisico" },
+    { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante-fisico", "holdMs": 300 },
+    { "action": "waitForTimeout", "timeoutMs": 1800, "name": "aguardar-reconciliacao-fisica" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "batches.0.remainingQuantity", "expected": 5, "name": "lote-a-nao-baixou" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "batches.1.remainingQuantity", "expected": 4, "name": "lote-b-baixou-exato" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "saleAllocations.0.trackingMode", "expected": "confirmed", "name": "rastreio-confirmado" },
+
+    { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda-ean", "holdMs": 350 },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "7894900011110", "name": "scan-ean-generico" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-ean-generico", "holdMs": 450 },
+    { "action": "expectVisible", "text": "1 UN x R$ 12,00", "exact": true, "name": "produto-ean-no-carrinho" },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagar-venda-ean", "holdMs": 350 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda-ean", "holdMs": 900 },
+    { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante-ean", "holdMs": 300 },
+    { "action": "waitForTimeout", "timeoutMs": 1800, "name": "aguardar-fefo-generico" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "batches.0.remainingQuantity", "expected": 4, "name": "ean-baixa-lote-a-fefo" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "batches.1.remainingQuantity", "expected": 4, "name": "ean-nao-baixa-lote-b" },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "saleAllocations.1.trackingMode", "expected": "presumed-fefo", "name": "ean-fefo-presumido" },
+    { "action": "screenshot", "name": "rastreio-fisico-versus-fefo" }
+  ]
+}
