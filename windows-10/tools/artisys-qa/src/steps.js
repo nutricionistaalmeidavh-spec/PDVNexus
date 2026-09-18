@@ -1,9 +1,11 @@
 import path from 'node:path';
 import { resolveSecret, stepLabel } from './helpers.js';
 
+const MAIN_PDV_STORE_KEY = 'nexus-core:pdv-store:v1';
+
 function locator(page, step) {
   if (step.testId) return page.getByTestId(step.testId);
-  if (step.role) return page.getByRole(step.role, step.name ? { name: step.name } : undefined);
+  if (step.role) return page.getByRole(step.role, step.roleName ? { name: step.roleName, exact: step.exact ?? false } : step.name ? { name: step.name } : undefined);
   if (step.text) return page.getByText(step.text, { exact: step.exact ?? false });
   if (step.label) return page.getByLabel(step.label, { exact: step.exact ?? false });
   if (step.selector) return page.locator(step.selector);
@@ -52,12 +54,13 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     case 'desktopStoreSet': {
       if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: desktopStoreSet requires key`);
       const value = resolveRuntimeTokens(step.value);
-      await page.evaluate(async ({ key, value }) => {
+      await page.evaluate(async ({ key, value, mainPdvStoreKey }) => {
         const serialized = typeof value === 'string' ? value : JSON.stringify(value);
         window.localStorage.setItem(key, serialized);
-        const bridge = window.nexusDesktop?.store;
+        const desktop = window.nexusDesktop;
+        const bridge = key === mainPdvStoreKey ? desktop?.pdvStore : desktop?.store;
         if (bridge?.save) await bridge.save(key, serialized);
-      }, { key: step.key, value });
+      }, { key: step.key, value, mainPdvStoreKey: MAIN_PDV_STORE_KEY });
       break;
     }
     case 'storageSet': {
@@ -71,14 +74,15 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     case 'expectDesktopStoreJson': {
       if (!step.key || typeof step.key !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires key`);
       if (!step.path || typeof step.path !== 'string') throw new Error(`${label}: expectDesktopStoreJson requires path`);
-      const raw = await page.evaluate(async (key) => {
-        const bridge = window.nexusDesktop?.store;
+      const raw = await page.evaluate(async ({ key, mainPdvStoreKey }) => {
+        const desktop = window.nexusDesktop;
+        const bridge = key === mainPdvStoreKey ? desktop?.pdvStore : desktop?.store;
         if (bridge?.load) {
           const row = await bridge.load(key);
           if (row?.snapshotJson) return row.snapshotJson;
         }
         return window.localStorage.getItem(key);
-      }, step.key);
+      }, { key: step.key, mainPdvStoreKey: MAIN_PDV_STORE_KEY });
       if (!raw) throw new Error(`${label}: store ${step.key} is empty`);
       const parsed = JSON.parse(raw);
       const actual = readJsonPath(parsed, step.path);
