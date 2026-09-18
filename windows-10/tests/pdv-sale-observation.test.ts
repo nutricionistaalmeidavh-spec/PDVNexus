@@ -18,9 +18,11 @@ class MemoryStorage {
 
 function installWindowStorage() {
   const storage = new MemoryStorage();
-  (globalThis as typeof globalThis & { window: { localStorage: Storage } }).window = {
-    localStorage: storage as unknown as Storage
-  };
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    writable: true,
+    value: { localStorage: storage as unknown as Storage }
+  });
   return storage;
 }
 
