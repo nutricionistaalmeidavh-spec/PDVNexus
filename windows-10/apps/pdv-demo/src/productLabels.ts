@@ -1,4 +1,5 @@
 export type ProductBarcodeType = "internal" | "gtin" | "manual";
+export type ProductBarcodeSymbology = "ean8" | "ean13" | "code128";
 
 export type LabelCatalogProduct = {
   productCode: string;
@@ -37,11 +38,31 @@ export type ProductBatchDraft = {
   remainingQuantity?: number;
 };
 
+export type ProductBatchAllocationItem = {
+  batchId: string;
+  lotNumber: string;
+  quantity: number;
+  expiresAt?: string;
+};
+
+export type ProductSaleBatchAllocation = {
+  saleNumber: string;
+  finalizedAt: string;
+  productCode: string;
+  requestedQuantity: number;
+  allocatedQuantity: number;
+  untrackedQuantity: number;
+  allocations: ProductBatchAllocationItem[];
+  restoredAt?: string;
+};
+
 export type ProductLabelBatchStore = {
-  version: 1;
+  version: 2;
   updatedAt: string;
+  fefoStartedAt: string;
   productIdentities: ProductIdentityMetadata[];
   batches: ProductBatch[];
+  saleAllocations: ProductSaleBatchAllocation[];
 };
 
 export type ProductLabelSizePreset = "40x25" | "50x30" | "60x40" | "custom";
@@ -73,7 +94,39 @@ export type ProductLabelPreview = {
   heightMm: number;
 };
 
+export type ProductBarcodeBar = {
+  x: number;
+  width: number;
+};
+
+export type ProductBarcodeRenderModel = {
+  value: string;
+  humanReadable: string;
+  symbology: ProductBarcodeSymbology;
+  moduleCount: number;
+  bars: ProductBarcodeBar[];
+};
+
+export type ProductBatchExpiryStatus = "expired" | "expiring" | "valid" | "no-expiry";
+
 const BARCODE_TYPES = new Set<ProductBarcodeType>(["internal", "gtin", "manual"]);
+const EAN_L = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
+const EAN_G = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"];
+const EAN_R = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"];
+const EAN13_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
+const CODE128_PATTERNS = [
+  "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
+  "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
+  "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
+  "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
+  "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
+  "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111",
+  "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214",
+  "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111",
+  "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141",
+  "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141",
+  "114131", "311141", "411131", "211412", "211214", "211232", "2331112"
+];
 
 export function createInternalBarcodeFromProductCode(productCode: string) {
   const base = `789${String(productCode ?? "").replace(/\D/g, "").padStart(9, "0").slice(-9)}`;
@@ -126,14 +179,28 @@ export function reconcileProductIdentities(
 }
 
 export function normalizeProductBatchStore(value: unknown, updatedAt = new Date().toISOString()): ProductLabelBatchStore {
-  const source = value && typeof value === "object" ? value as Partial<ProductLabelBatchStore> : {};
+  const source = value && typeof value === "object" ? value as Partial<ProductLabelBatchStore> & { version?: number } : {};
   const identities = Array.isArray(source.productIdentities)
     ? source.productIdentities.filter(isProductIdentityMetadata).map((identity) => ({ ...identity }))
     : [];
   const batches = Array.isArray(source.batches)
     ? source.batches.filter(isProductBatch).map((batch) => ({ ...batch }))
     : [];
-  return { version: 1, updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : updatedAt, productIdentities: identities, batches };
+  const saleAllocations = Array.isArray(source.saleAllocations)
+    ? source.saleAllocations.filter(isProductSaleBatchAllocation).map((allocation) => ({
+      ...allocation,
+      allocations: allocation.allocations.map((item) => ({ ...item }))
+    }))
+    : [];
+  const migratedFromV1 = Number(source.version ?? 1) < 2;
+  return {
+    version: 2,
+    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : updatedAt,
+    fefoStartedAt: !migratedFromV1 && typeof source.fefoStartedAt === "string" ? source.fefoStartedAt : updatedAt,
+    productIdentities: identities,
+    batches,
+    saleAllocations
+  };
 }
 
 export function upsertProductBatch(
@@ -202,6 +269,96 @@ export function buildProductLabelPreview(
   };
 }
 
+export function buildProductBarcodeRenderModel(product: Pick<LabelCatalogProduct, "productCode" | "barcode" | "barcodeType">): ProductBarcodeRenderModel {
+  const barcodeType = inferBarcodeType(product.productCode, product.barcode, product.barcodeType);
+  const rawBarcode = String(product.barcode ?? "").trim();
+  const value = rawBarcode || createInternalBarcodeFromProductCode(product.productCode);
+  const symbology: ProductBarcodeSymbology = barcodeType !== "manual" && isValidGtin(value)
+    ? value.length === 8 ? "ean8" : "ean13"
+    : "code128";
+  const bits = symbology === "ean13"
+    ? encodeEan13(value)
+    : symbology === "ean8"
+      ? encodeEan8(value)
+      : encodeCode128B(value);
+  return {
+    value,
+    humanReadable: value,
+    symbology,
+    moduleCount: bits.length,
+    bars: bitsToBars(bits)
+  };
+}
+
+export function allocateProductBatchesFefo(
+  batches: ProductBatch[],
+  productCode: string,
+  requestedQuantity: number,
+  today = new Date().toISOString().slice(0, 10),
+  updatedAt = new Date().toISOString()
+) {
+  const requested = roundQuantity(Math.max(0, Number(requestedQuantity) || 0));
+  let remaining = requested;
+  const candidates = batches
+    .filter((batch) => batch.productCode === productCode && batch.remainingQuantity > 0 && !isBatchExpired(batch, today))
+    .sort(compareBatchesForFefo);
+  const allocated = new Map<string, number>();
+  const allocations: ProductBatchAllocationItem[] = [];
+
+  for (const batch of candidates) {
+    if (remaining <= 0) break;
+    const quantity = roundQuantity(Math.min(batch.remainingQuantity, remaining));
+    if (quantity <= 0) continue;
+    allocated.set(batch.id, quantity);
+    allocations.push({ batchId: batch.id, lotNumber: batch.lotNumber, quantity, expiresAt: batch.expiresAt });
+    remaining = roundQuantity(Math.max(0, remaining - quantity));
+  }
+
+  const nextBatches = batches.map((batch) => {
+    const quantity = allocated.get(batch.id);
+    if (!quantity) return batch;
+    return { ...batch, remainingQuantity: roundQuantity(Math.max(0, batch.remainingQuantity - quantity)), updatedAt };
+  });
+  const allocatedQuantity = roundQuantity(requested - remaining);
+  return { batches: nextBatches, allocations, allocatedQuantity, untrackedQuantity: remaining };
+}
+
+export function restoreProductBatchAllocation(
+  batches: ProductBatch[],
+  allocations: ProductBatchAllocationItem[],
+  updatedAt = new Date().toISOString()
+) {
+  const byId = new Map(allocations.map((item) => [item.batchId, Number(item.quantity) || 0]));
+  return batches.map((batch) => {
+    const restore = byId.get(batch.id);
+    if (!restore) return batch;
+    return {
+      ...batch,
+      remainingQuantity: roundQuantity(Math.min(batch.quantity, batch.remainingQuantity + restore)),
+      updatedAt
+    };
+  });
+}
+
+export function isBatchExpired(batch: Pick<ProductBatch, "expiresAt">, today = new Date().toISOString().slice(0, 10)) {
+  return Boolean(batch.expiresAt && batch.expiresAt < today);
+}
+
+export function getBatchExpiryStatus(
+  batch: Pick<ProductBatch, "expiresAt">,
+  today = new Date().toISOString().slice(0, 10),
+  warningDays = 30
+): ProductBatchExpiryStatus {
+  if (!batch.expiresAt) return "no-expiry";
+  if (batch.expiresAt < today) return "expired";
+  const diffDays = Math.ceil((Date.parse(`${batch.expiresAt}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+  return diffDays <= warningDays ? "expiring" : "valid";
+}
+
+export function sortBatchesForFefo(batches: ProductBatch[]) {
+  return [...batches].sort(compareBatchesForFefo);
+}
+
 export function resolveProductLabelSize(
   preset: ProductLabelSizePreset,
   customWidthMm?: number,
@@ -227,6 +384,78 @@ export function formatDateForLabel(value: string) {
   return `${day}/${month}/${year}`;
 }
 
+function encodeEan13(value: string) {
+  if (!/^\d{13}$/.test(value) || !isValidGtin(value)) throw new Error("EAN-13 inválido para a etiqueta.");
+  const first = Number(value[0]);
+  const parity = EAN13_PARITY[first];
+  let bits = "101";
+  for (let index = 1; index <= 6; index += 1) {
+    const digit = Number(value[index]);
+    bits += parity[index - 1] === "G" ? EAN_G[digit] : EAN_L[digit];
+  }
+  bits += "01010";
+  for (let index = 7; index <= 12; index += 1) bits += EAN_R[Number(value[index])];
+  return `${bits}101`;
+}
+
+function encodeEan8(value: string) {
+  if (!/^\d{8}$/.test(value) || !isValidGtin(value)) throw new Error("EAN-8 inválido para a etiqueta.");
+  let bits = "101";
+  for (let index = 0; index < 4; index += 1) bits += EAN_L[Number(value[index])];
+  bits += "01010";
+  for (let index = 4; index < 8; index += 1) bits += EAN_R[Number(value[index])];
+  return `${bits}101`;
+}
+
+function encodeCode128B(input: string) {
+  const normalized = String(input ?? "").trim();
+  if (!normalized) throw new Error("Informe um código para gerar a etiqueta.");
+  const values = Array.from(normalized).map((character) => {
+    const code = character.charCodeAt(0);
+    if (code < 32 || code > 126) throw new Error("Code 128 aceita caracteres ASCII imprimíveis neste PDV.");
+    return code - 32;
+  });
+  const startCode = 104;
+  const checksum = (startCode + values.reduce((sum, code, index) => sum + code * (index + 1), 0)) % 103;
+  const sequence = [startCode, ...values, checksum, 106];
+  let bits = "";
+  for (const code of sequence) {
+    const pattern = CODE128_PATTERNS[code];
+    let black = true;
+    for (const widthText of pattern) {
+      bits += (black ? "1" : "0").repeat(Number(widthText));
+      black = !black;
+    }
+  }
+  return bits;
+}
+
+function bitsToBars(bits: string) {
+  const bars: ProductBarcodeBar[] = [];
+  let index = 0;
+  while (index < bits.length) {
+    if (bits[index] !== "1") {
+      index += 1;
+      continue;
+    }
+    const start = index;
+    while (index < bits.length && bits[index] === "1") index += 1;
+    bars.push({ x: start, width: index - start });
+  }
+  return bars;
+}
+
+function compareBatchesForFefo(left: ProductBatch, right: ProductBatch) {
+  const leftExpiry = left.expiresAt || "9999-12-31";
+  const rightExpiry = right.expiresAt || "9999-12-31";
+  if (leftExpiry !== rightExpiry) return leftExpiry.localeCompare(rightExpiry);
+  const leftManufactured = left.manufacturedAt || "9999-12-31";
+  const rightManufactured = right.manufacturedAt || "9999-12-31";
+  if (leftManufactured !== rightManufactured) return leftManufactured.localeCompare(rightManufactured);
+  if (left.createdAt !== right.createdAt) return left.createdAt.localeCompare(right.createdAt);
+  return left.lotNumber.localeCompare(right.lotNumber, "pt-BR");
+}
+
 function isProductIdentityMetadata(value: unknown): value is ProductIdentityMetadata {
   if (!value || typeof value !== "object") return false;
   const item = value as ProductIdentityMetadata;
@@ -244,6 +473,17 @@ function isProductBatch(value: unknown): value is ProductBatch {
     && Number(item.quantity) > 0
     && Number.isFinite(Number(item.remainingQuantity))
     && Number(item.remainingQuantity) >= 0
+  );
+}
+
+function isProductSaleBatchAllocation(value: unknown): value is ProductSaleBatchAllocation {
+  if (!value || typeof value !== "object") return false;
+  const item = value as ProductSaleBatchAllocation;
+  return Boolean(
+    item.saleNumber
+    && item.productCode
+    && Number.isFinite(Number(item.requestedQuantity))
+    && Array.isArray(item.allocations)
   );
 }
 
