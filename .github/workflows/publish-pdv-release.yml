@@ -1,0 +1,165 @@
+name: Publish PDV Release
+
+on:
+  workflow_run:
+    workflows:
+      - Build Windows 10 PDV
+      - Build Windows 7 PDV
+      - Build Windows 8 x86 PDV
+      - QA Windows 10 PDV UI
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pdv-release-${{ github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Confirm all release gates for the same commit
+        id: gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          find_successful_run() {
+            local workflow="$1"
+            gh api --method GET "repos/${REPO}/actions/workflows/${workflow}/runs" \
+              -f head_sha="${SHA}" \
+              -f branch="main" \
+              -f status="completed" \
+              -f per_page=20 \
+              --jq '.workflow_runs | map(select(.conclusion == "success")) | first | .id // empty'
+          }
+
+          RUN_W10="$(find_successful_run build-windows10-pdv.yml)"
+          RUN_W7="$(find_successful_run build-windows7-pdv.yml)"
+          RUN_W8="$(find_successful_run build-windows8-x86-pdv.yml)"
+          RUN_QA="$(find_successful_run qa-windows10-pdv.yml)"
+
+          if [[ -z "${RUN_W10}" || -z "${RUN_W7}" || -z "${RUN_W8}" || -z "${RUN_QA}" ]]; then
+            echo "Nem todos os gates do commit ${SHA} estão verdes ainda."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "run_w10=${RUN_W10}" >> "$GITHUB_OUTPUT"
+          echo "run_w7=${RUN_W7}" >> "$GITHUB_OUTPUT"
+          echo "run_w8=${RUN_W8}" >> "$GITHUB_OUTPUT"
+          echo "run_qa=${RUN_QA}" >> "$GITHUB_OUTPUT"
+
+      - name: Read release version
+        if: steps.gates.outputs.ready == 'true'
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(jq -r '.version' pdv-release.json)"
+          test -n "$VERSION"
+          test "$VERSION" != "null"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=pdv-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if version already exists
+        if: steps.gates.outputs.ready == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download installers from successful gate runs
+        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets/w10 release-assets/w7 release-assets/w8
+          gh run download "${{ steps.gates.outputs.run_w10 }}" --repo "$REPO" -n PDV-Nexus-Windows-10 -D release-assets/w10
+          gh run download "${{ steps.gates.outputs.run_w7 }}" --repo "$REPO" -n PDV-Nexus-Windows-7 -D release-assets/w7
+          gh run download "${{ steps.gates.outputs.run_w8 }}" --repo "$REPO" -n PDV-Nexus-Windows-8-32bit -D release-assets/w8
+
+      - name: Generate update manifest
+        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          test -n "$W10" && test -n "$W7" && test -n "$W8"
+
+          W10_FILE="$(basename "$W10")"
+          W7_FILE="$(basename "$W7")"
+          W8_FILE="$(basename "$W8")"
+          [[ "$W10_FILE" == *"${VERSION}"* ]]
+          [[ "$W7_FILE" == *"${VERSION}"* ]]
+          [[ "$W8_FILE" == *"${VERSION}"* ]]
+
+          W10_SHA="$(sha256sum "$W10" | awk '{print $1}')"
+          W7_SHA="$(sha256sum "$W7" | awk '{print $1}')"
+          W8_SHA="$(sha256sum "$W8" | awk '{print $1}')"
+          BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            --arg commit "$SHA" \
+            --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg w10File "$W10_FILE" --arg w10Url "${BASE_URL}/${W10_FILE}" --arg w10Sha "$W10_SHA" \
+            --arg w7File "$W7_FILE" --arg w7Url "${BASE_URL}/${W7_FILE}" --arg w7Sha "$W7_SHA" \
+            --arg w8File "$W8_FILE" --arg w8Url "${BASE_URL}/${W8_FILE}" --arg w8Sha "$W8_SHA" \
+            '{schemaVersion:1, version:$version, tag:$tag, commit:$commit, publishedAt:$publishedAt, artifacts:{"windows10-x64":{file:$w10File,url:$w10Url,sha256:$w10Sha,arch:"x64"},"windows7-x64":{file:$w7File,url:$w7Url,sha256:$w7Sha,arch:"x64"},"windows8-x86":{file:$w8File,url:$w8Url,sha256:$w8Sha,arch:"ia32"}}}' \
+            > release-assets/latest.json
+
+          cp "$W10" "release-assets/$W10_FILE"
+          cp "$W7" "release-assets/$W7_FILE"
+          cp "$W8" "release-assets/$W8_FILE"
+
+      - name: Create GitHub Release
+        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            release-assets/*.exe release-assets/latest.json \
+            --repo "$REPO" \
+            --target "$SHA" \
+            --title "PDV Nexus ${VERSION}" \
+            --notes "Release automática do PDV Nexus. Publicada somente após W10, W7, W8 x86 e QA completos verdes no mesmo commit."
