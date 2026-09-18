@@ -73,7 +73,12 @@ export function CashierReferenceDecor() {
   if (!portalTarget) return null;
 
   return createPortal(
-    <section className="cashier-reference-footer" data-cashier-footer="sale-actions" aria-label="Resumo e ações da venda">
+    <section
+      className="cashier-reference-footer"
+      data-cashier-footer="sale-actions"
+      aria-label="Resumo e ações da venda"
+      style={{ position: "relative", zIndex: 5, pointerEvents: "auto", isolation: "isolate" }}
+    >
       <div className="cashier-reference-metric">
         <span>Itens</span>
         <strong>{metrics.items}</strong>
