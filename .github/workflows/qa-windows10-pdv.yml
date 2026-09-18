@@ -5,11 +5,13 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/qa-windows10-pdv.yml"
+      - "pdv-release.json"
       - "windows-10/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/qa-windows10-pdv.yml"
+      - "pdv-release.json"
       - "windows-10/**"
   workflow_dispatch:
 
@@ -67,6 +69,9 @@ jobs:
 
       - name: Test PDV domain and integration flows
         run: npm run test:pdv-payments
+
+      - name: Test safe 0.1.16 to 0.1.17 upgrade
+        run: npm run test:pdv-upgrade
 
       - name: Build PDV renderer
         run: npm run build:pdv-demo
