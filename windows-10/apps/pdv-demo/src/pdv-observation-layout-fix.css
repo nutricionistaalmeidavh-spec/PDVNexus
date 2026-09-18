@@ -107,24 +107,25 @@
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(5) {
   grid-row: 2 !important;
   grid-column: 2 !important;
-  min-height: 92px !important;
-  height: auto !important;
-  max-height: none !important;
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  align-content: center !important;
+  min-height: 62px !important;
+  height: 62px !important;
+  max-height: 62px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   align-self: stretch !important;
   gap: 0 !important;
-  padding: 31px 12px 10px !important;
+  padding: 14px 12px 0 !important;
   position: relative !important;
   border: 0 !important;
   border-radius: 4px 4px 0 0 !important;
   background: #062d57 !important;
   color: #ffffff !important;
-  font-size: 31px !important;
+  font-size: 28px !important;
   font-weight: 900 !important;
+  line-height: 1 !important;
   letter-spacing: -.02em !important;
-  text-align: right !important;
+  text-align: center !important;
   box-sizing: border-box !important;
   overflow: visible !important;
 }
@@ -132,10 +133,10 @@
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(5)::before {
   content: "TOTAL DA VENDA" !important;
   position: absolute !important;
-  top: 11px !important;
-  left: 14px !important;
+  top: 7px !important;
+  left: 12px !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 9px !important;
   font-weight: 800 !important;
 }
 
