@@ -6,6 +6,7 @@ import {
   type LabelCatalogProduct,
   type ProductLabelBatchStore
 } from "./productLabels";
+import { reconcileProductBatchFefoSnapshot } from "./productBatchFefo";
 
 const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
 export const PRODUCT_LABEL_BATCH_STORE_KEY = "nexus-core:pdv-label-batches:v1";
@@ -25,13 +26,22 @@ export async function loadProductLabelBatchContext(): Promise<ProductLabelBatchC
     ...product,
     barcodeType: identityByCode.get(product.productCode)?.barcodeType
   }));
-  const store = { ...stored, version: 1 as const, updatedAt: now, productIdentities: identities };
+  const store = { ...stored, version: 2 as const, updatedAt: now, productIdentities: identities };
   await saveProductLabelBatchStore(store);
   return { products: normalizedProducts, store };
 }
 
+export async function reconcileProductBatchFefoFromCurrentSnapshot() {
+  const snapshotJson = await loadMainPdvSnapshot();
+  const snapshot = parseJson(snapshotJson, {});
+  const store = await loadProductLabelBatchStore();
+  const result = reconcileProductBatchFefoSnapshot(snapshot, store);
+  if (result.changed) await saveProductLabelBatchStore(result.store);
+  return result;
+}
+
 export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) {
-  const normalized = normalizeProductBatchStore({ ...store, version: 1, updatedAt: new Date().toISOString() });
+  const normalized = normalizeProductBatchStore({ ...store, version: 2, updatedAt: new Date().toISOString() });
   const serialized = JSON.stringify(normalized);
   writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
 
@@ -69,7 +79,7 @@ async function loadCatalogProducts(): Promise<LabelCatalogProduct[]> {
   });
 }
 
-async function loadMainPdvSnapshot() {
+export async function loadMainPdvSnapshot() {
   const desktop = getDesktopPdvStoreBridge();
   if (desktop) {
     try {
@@ -82,7 +92,7 @@ async function loadMainPdvSnapshot() {
   return readLocal(PDV_STORE_KEY) ?? "{}";
 }
 
-async function loadProductLabelBatchStore() {
+export async function loadProductLabelBatchStore() {
   const bridge = typeof window !== "undefined" ? window.nexusDesktop?.store : undefined;
   if (bridge) {
     try {
