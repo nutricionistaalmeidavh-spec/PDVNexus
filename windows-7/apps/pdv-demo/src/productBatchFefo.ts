@@ -53,14 +53,14 @@ export function reconcileProductBatchFefoSnapshot(
     changed = true;
   }
 
-  const startedAtMs = Date.parse(currentStore.fefoStartedAt);
+  const startedAtMs = parseSnapshotTimestamp(currentStore.fefoStartedAt);
   const existingKeys = new Set(allocations.map(allocationKey));
 
   for (const sale of sales) {
     const saleNumber = String(sale.number ?? "").trim();
     const finalizedAt = String(sale.finalizedAt ?? "").trim();
     if (!saleNumber || !finalizedAt || cancelledNumbers.has(saleNumber)) continue;
-    const finalizedAtMs = Date.parse(finalizedAt);
+    const finalizedAtMs = parseSnapshotTimestamp(finalizedAt);
     if (Number.isFinite(startedAtMs) && Number.isFinite(finalizedAtMs) && finalizedAtMs < startedAtMs) continue;
 
     const quantities = aggregateSaleQuantities(sale.items);
@@ -68,7 +68,7 @@ export function reconcileProductBatchFefoSnapshot(
       if (!batches.some((batch) => batch.productCode === productCode)) continue;
       const key = `${saleNumber}\u0000${productCode}`;
       if (existingKeys.has(key)) continue;
-      const allocationResult = allocateProductBatchesFefo(batches, productCode, requestedQuantity, finalizedAt.slice(0, 10), now);
+      const allocationResult = allocateProductBatchesFefo(batches, productCode, requestedQuantity, snapshotDateOnly(finalizedAt, now), now);
       batches = allocationResult.batches;
       const allocation: ProductSaleBatchAllocation = {
         saleNumber,
@@ -92,6 +92,30 @@ export function reconcileProductBatchFefoSnapshot(
     allocatedSales: [...allocatedSales],
     restoredSales: [...restoredSales]
   };
+}
+
+export function parseSnapshotTimestamp(value: string) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return Number.NaN;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return Date.parse(normalized);
+  const brazilian = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (brazilian) {
+    const [, day, month, year, hour = "0", minute = "0", second = "0"] = brazilian;
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)).getTime();
+  }
+  return Date.parse(normalized);
+}
+
+function snapshotDateOnly(value: string, fallbackIso: string) {
+  const normalized = String(value ?? "").trim();
+  const isoDate = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoDate) return isoDate[1];
+  const brazilian = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (brazilian) {
+    const [, day, month, year] = brazilian;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  return String(fallbackIso || new Date().toISOString()).slice(0, 10);
 }
 
 function aggregateSaleQuantities(itemsValue: unknown) {
