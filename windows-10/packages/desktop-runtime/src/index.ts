@@ -142,6 +142,10 @@ declare global {
 
 const memoryFallback = new Map<string, string>();
 const STORAGE_PREFIX = "nexus-core:";
+let pdvStoreBridgeSource: DesktopPdvStoreBridge | undefined;
+let pdvStoreBridgeFacade: DesktopPdvStoreBridge | undefined;
+let printingBridgeSource: DesktopPrintingBridge | undefined;
+let printingBridgeFacade: DesktopPrintingBridge | undefined;
 
 class BrowserSecretStore implements UserSecretStore {
   async get(key: string): Promise<string> {
@@ -196,11 +200,25 @@ export function getDesktopSerialBridge(): DesktopSerialBridge | undefined {
 }
 
 export function getDesktopPdvStoreBridge(): DesktopPdvStoreBridge | undefined {
-  return window.nexusDesktop?.pdvStore;
+  const source = window.nexusDesktop?.pdvStore;
+  if (!source) {
+    pdvStoreBridgeSource = undefined;
+    pdvStoreBridgeFacade = undefined;
+    return undefined;
+  }
+  if (source !== pdvStoreBridgeSource || !pdvStoreBridgeFacade) {
+    pdvStoreBridgeSource = source;
+    pdvStoreBridgeFacade = {
+      status: source.status.bind(source),
+      load: source.load.bind(source),
+      save: source.save.bind(source)
+    };
+  }
+  return pdvStoreBridgeFacade;
 }
 
 export function getDesktopStoreBridge(): DesktopStoreBridge | undefined {
-  return window.nexusDesktop?.store ?? window.nexusDesktop?.pdvStore;
+  return window.nexusDesktop?.store ?? getDesktopPdvStoreBridge();
 }
 
 export function getDesktopBackupBridge(): DesktopBackupBridge | undefined {
@@ -216,7 +234,19 @@ export function getDesktopPdvBackupBridge(): DesktopPdvBackupBridge | undefined 
 }
 
 export function getDesktopPrintingBridge(): DesktopPrintingBridge | undefined {
-  return window.nexusDesktop?.printing;
+  const source = window.nexusDesktop?.printing;
+  if (!source) {
+    printingBridgeSource = undefined;
+    printingBridgeFacade = undefined;
+    return undefined;
+  }
+  if (source !== printingBridgeSource || !printingBridgeFacade) {
+    printingBridgeSource = source;
+    printingBridgeFacade = {
+      receipt: source.receipt.bind(source)
+    };
+  }
+  return printingBridgeFacade;
 }
 
 export async function isDesktopSecretEncryptionAvailable() {
