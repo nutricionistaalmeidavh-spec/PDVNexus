@@ -7,6 +7,7 @@ const root = resolve(import.meta.dirname, "..");
 const mainPath = resolve(root, "apps/pdv-demo/src/main.tsx");
 const decorPath = resolve(root, "apps/pdv-demo/src/CustomerPresentationDecor.tsx");
 const cssPath = resolve(root, "apps/pdv-demo/src/pdv-e55.css");
+const cashierCssPath = resolve(root, "apps/pdv-demo/src/pdv-cashier-v3.css");
 const observationFixCssPath = resolve(root, "apps/pdv-demo/src/pdv-observation-layout-fix.css");
 const demoFlowPath = resolve(root, "qa/flows/pdv-demo.json");
 
@@ -70,4 +71,15 @@ test("cashier summary strip remains high-contrast when sale observation inserts 
   assert.match(css, /div:nth-of-type\(4\) strong[\s\S]*?color:\s*#102642\s*!important/);
   assert.match(css, /aside:has\(> div\[data-sale-observation-anchor="true"\]\) > div:nth-of-type\(5\)[\s\S]*?background:\s*#062d57\s*!important/);
   assert.match(css, /div:nth-of-type\(5\)::before[\s\S]*?color:\s*#ffffff\s*!important/);
+});
+
+test("cashier total card is one-third shorter, centered, and shortcut area receives the freed vertical space", () => {
+  const cashierCss = read(cashierCssPath);
+  const observationCss = read(observationFixCssPath);
+
+  assert.match(cashierCss, /grid-template-rows:\s*52px\s+62px\s+56px\s+210px\s+40px\s+52px\s+52px\s+30px\s+38px\s+134px\s*!important/);
+  assert.match(cashierCss, /aside\s*>\s*div:last-of-type\s*\{[\s\S]*?min-height:\s*134px\s*!important[\s\S]*?height:\s*134px\s*!important/);
+
+  assert.match(observationCss, /div:nth-of-type\(5\)\s*\{[\s\S]*?min-height:\s*62px\s*!important[\s\S]*?height:\s*62px\s*!important/);
+  assert.match(observationCss, /div:nth-of-type\(5\)\s*\{[\s\S]*?display:\s*flex\s*!important[\s\S]*?align-items:\s*center\s*!important[\s\S]*?justify-content:\s*center\s*!important[\s\S]*?text-align:\s*center\s*!important/);
 });
