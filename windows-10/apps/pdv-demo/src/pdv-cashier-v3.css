@@ -36,7 +36,7 @@
 
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
   grid-template-columns: minmax(0, 1fr) 304px !important;
-  grid-template-rows: 52px 92px 56px 210px 40px 52px 52px 30px 38px 104px !important;
+  grid-template-rows: 52px 62px 56px 210px 40px 52px 52px 30px 38px 134px !important;
   gap: 6px !important;
   max-width: none !important;
 }
@@ -207,19 +207,27 @@
 
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type {
   grid-row: 10 !important;
+  min-height: 134px !important;
+  height: 134px !important;
   padding: 25px 8px 8px !important;
   gap: 5px !important;
 }
 
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button {
-  min-height: 45px !important;
+  min-height: 58px !important;
 }
 
 /* Slightly tighter total/payment column. */
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(4) {
-  min-height: 92px !important;
-  padding: 31px 12px 10px !important;
-  font-size: 31px !important;
+  min-height: 62px !important;
+  height: 62px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 14px 12px 0 !important;
+  font-size: 28px !important;
+  line-height: 1 !important;
+  text-align: center !important;
 }
 
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(5) {
