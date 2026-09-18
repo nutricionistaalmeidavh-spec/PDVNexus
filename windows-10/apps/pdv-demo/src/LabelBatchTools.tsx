@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  buildProductBarcodeRenderModel,
   buildProductLabelPreview,
   formatDateForLabel,
+  getBatchExpiryStatus,
+  sortBatchesForFefo,
   upsertProductBatch,
   type ProductBatch,
   type ProductLabelBatchStore,
   type ProductLabelSizePreset
 } from "./productLabels";
+import { printProductLabels } from "./labelPrinting";
 import { loadProductLabelBatchContext, saveProductLabelBatchStore } from "./productLabelBatchStore";
 import "./pdv-label-batches.css";
 
@@ -32,7 +36,14 @@ type LabelUiDraft = {
   showExpiry: boolean;
 };
 
-const EMPTY_STORE: ProductLabelBatchStore = { version: 1, updatedAt: "", productIdentities: [], batches: [] };
+const EMPTY_STORE: ProductLabelBatchStore = {
+  version: 2,
+  updatedAt: "",
+  fefoStartedAt: "",
+  productIdentities: [],
+  batches: [],
+  saleAllocations: []
+};
 
 function emptyBatchDraft(): BatchUiDraft {
   return { id: "", lotNumber: "", manufacturedAt: "", expiresAt: "", quantity: "", remainingQuantity: "" };
@@ -57,6 +68,7 @@ export function LabelBatchTools() {
   const [route, setRoute] = useState(readRoute);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [products, setProducts] = useState<Awaited<ReturnType<typeof loadProductLabelBatchContext>>["products"]>([]);
   const [store, setStore] = useState<ProductLabelBatchStore>(EMPTY_STORE);
   const [selectedProductCode, setSelectedProductCode] = useState("");
@@ -86,10 +98,11 @@ export function LabelBatchTools() {
     [products, selectedProductCode]
   );
   const productBatches = useMemo(
-    () => store.batches.filter((batch) => batch.productCode === selectedProduct?.productCode),
+    () => sortBatchesForFefo(store.batches.filter((batch) => batch.productCode === selectedProduct?.productCode)),
     [store.batches, selectedProduct?.productCode]
   );
   const selectedBatch = productBatches.find((batch) => batch.id === labelDraft.batchId);
+  const nextFefoBatch = productBatches.find((batch) => batch.remainingQuantity > 0 && getBatchExpiryStatus(batch) !== "expired");
   const preview = selectedProduct ? buildProductLabelPreview(selectedProduct, {
     productCode: selectedProduct.productCode,
     batchId: labelDraft.batchId || undefined,
@@ -103,6 +116,10 @@ export function LabelBatchTools() {
     showLot: labelDraft.showLot,
     showExpiry: labelDraft.showExpiry
   }, selectedBatch) : null;
+  const barcodeModel = useMemo(
+    () => selectedProduct ? buildProductBarcodeRenderModel(selectedProduct) : null,
+    [selectedProduct]
+  );
 
   if (route !== "/produtos") return null;
 
@@ -153,6 +170,20 @@ export function LabelBatchTools() {
     }
   }
 
+  async function printLabels() {
+    if (!selectedProduct || !preview) return;
+    setPrinting(true);
+    setMessage("");
+    try {
+      await printProductLabels({ product: selectedProduct, preview });
+      setMessage(`${preview.copies} ${preview.copies === 1 ? "etiqueta enviada" : "etiquetas enviadas"} para o diálogo de impressão do Windows.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível abrir a impressão de etiquetas.");
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   function editBatch(batch: ProductBatch) {
     setBatchDraft({
       id: batch.id,
@@ -186,8 +217,8 @@ export function LabelBatchTools() {
           <section className="pdv-label-tools-dialog" role="dialog" aria-modal="true" aria-label="Etiquetas e lotes">
             <header className="pdv-label-tools-header">
               <div>
-                <strong>Etiquetas e lotes</strong>
-                <span>Validade por lote e preparação de etiquetas por produto.</span>
+                <strong>Etiquetas, lotes e FEFO</strong>
+                <span>Código escaneável, validade por lote, impressão física e baixa automática pelo vencimento.</span>
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
             </header>
@@ -204,11 +235,11 @@ export function LabelBatchTools() {
                   ))}
                 </select>
               </label>
-              {selectedProduct ? (
+              {selectedProduct && barcodeModel ? (
                 <div className="pdv-label-tools-identity">
                   <span>Código de barras</span>
-                  <strong>{selectedProduct.barcode || "Não informado"}</strong>
-                  <small>{barcodeTypeLabel(selectedProduct.barcodeType)}</small>
+                  <strong>{barcodeModel.humanReadable}</strong>
+                  <small>{barcodeTypeLabel(selectedProduct.barcodeType)} · {barcodeModel.symbology.toUpperCase()}</small>
                 </div>
               ) : null}
             </div>
@@ -221,10 +252,18 @@ export function LabelBatchTools() {
                   <div className="pdv-label-tools-panel-title">
                     <div>
                       <strong>Lotes e validade</strong>
-                      <span>Um produto pode ter vários lotes e datas diferentes.</span>
+                      <span>FEFO usa primeiro o lote válido com vencimento mais próximo.</span>
                     </div>
                     {batchDraft.id ? <button type="button" onClick={() => setBatchDraft(emptyBatchDraft())}>Novo lote</button> : null}
                   </div>
+
+                  {nextFefoBatch ? (
+                    <div className="pdv-fefo-summary">
+                      <span>Próximo FEFO</span>
+                      <strong>{nextFefoBatch.lotNumber}</strong>
+                      <small>{nextFefoBatch.expiresAt ? `vence ${formatDateForLabel(nextFefoBatch.expiresAt)}` : "sem validade informada"} · saldo {nextFefoBatch.remainingQuantity}</small>
+                    </div>
+                  ) : productBatches.length ? <div className="pdv-fefo-summary pdv-fefo-summary--warning">Sem lote válido com saldo para baixa FEFO.</div> : null}
 
                   <div className="pdv-label-tools-grid">
                     <label>Lote<input value={batchDraft.lotNumber} onChange={(event) => setBatchDraft({ ...batchDraft, lotNumber: event.target.value })} placeholder="Ex.: LT-2026-09" /></label>
@@ -233,25 +272,29 @@ export function LabelBatchTools() {
                     <label>Validade<input type="date" value={batchDraft.expiresAt} onChange={(event) => setBatchDraft({ ...batchDraft, expiresAt: event.target.value })} /></label>
                   </div>
                   <button className="pdv-label-tools-primary" type="button" onClick={() => void saveBatch()}>{batchDraft.id ? "Atualizar lote" : "Salvar lote"}</button>
-                  <small className="pdv-label-tools-help">Validade é opcional. Produtos sem validade continuam funcionando normalmente.</small>
+                  <small className="pdv-label-tools-help">Validade é opcional. Lotes vencidos nunca são consumidos automaticamente.</small>
 
                   <div className="pdv-label-tools-batches">
-                    {productBatches.length ? productBatches.map((batch) => (
-                      <article key={batch.id}>
-                        <div><strong>{batch.lotNumber}</strong><span>Saldo: {batch.remainingQuantity} / {batch.quantity}</span></div>
-                        <div><span>Fabricação: {batch.manufacturedAt ? formatDateForLabel(batch.manufacturedAt) : "—"}</span><span>Validade: {batch.expiresAt ? formatDateForLabel(batch.expiresAt) : "Sem validade"}</span></div>
-                        <div className="pdv-label-tools-actions">
-                          <button type="button" onClick={() => editBatch(batch)}>Editar</button>
-                          <button type="button" onClick={() => chooseBatchForLabel(batch)}>Usar na etiqueta</button>
-                        </div>
-                      </article>
-                    )) : <p>Nenhum lote cadastrado para este produto.</p>}
+                    {productBatches.length ? productBatches.map((batch, index) => {
+                      const status = getBatchExpiryStatus(batch);
+                      return (
+                        <article key={batch.id} className={`pdv-batch-status-${status}`}>
+                          <div><strong>{batch.lotNumber}</strong><span>Saldo: {batch.remainingQuantity} / {batch.quantity}</span></div>
+                          <div><span>Fabricação: {batch.manufacturedAt ? formatDateForLabel(batch.manufacturedAt) : "—"}</span><span>Validade: {batch.expiresAt ? formatDateForLabel(batch.expiresAt) : "Sem validade"}</span></div>
+                          <div className="pdv-label-tools-actions">
+                            <span className="pdv-batch-badge">{batchStatusLabel(status, index === 0)}</span>
+                            <button type="button" onClick={() => editBatch(batch)}>Editar</button>
+                            <button type="button" onClick={() => chooseBatchForLabel(batch)}>Usar na etiqueta</button>
+                          </div>
+                        </article>
+                      );
+                    }) : <p>Nenhum lote cadastrado para este produto. O estoque segue no modo legado.</p>}
                   </div>
                 </div>
 
                 <div className="pdv-label-tools-panel">
                   <div className="pdv-label-tools-panel-title">
-                    <div><strong>Preparar etiqueta</strong><span>Defina os dados e confira a prévia antes da impressão.</span></div>
+                    <div><strong>Etiqueta física</strong><span>Prévia usa o mesmo barcode e tamanho enviados para impressão.</span></div>
                   </div>
 
                   <div className="pdv-label-tools-grid">
@@ -269,15 +312,25 @@ export function LabelBatchTools() {
                     <label><input type="checkbox" checked={labelDraft.showExpiry} onChange={(event) => setLabelDraft({ ...labelDraft, showExpiry: event.target.checked })} />Validade</label>
                   </div>
 
-                  {preview ? (
+                  {preview && barcodeModel ? (
                     <div className="pdv-label-preview-wrap">
                       <div className="pdv-label-preview" style={{ aspectRatio: `${preview.widthMm} / ${preview.heightMm}` }}>
                         <strong>{preview.productName}</strong>
-                        {preview.priceText ? <b>{preview.priceText}</b> : null}
-                        <div className="pdv-label-preview-barcode"><span>CÓDIGO DE BARRAS</span><code>{preview.barcode || "SEM CÓDIGO"}</code></div>
-                        <div className="pdv-label-preview-meta">{preview.lotText ? <span>LOTE: {preview.lotText}</span> : null}{preview.expiryText ? <span>VAL: {preview.expiryText}</span> : null}</div>
+                        <svg className="pdv-label-preview-svg" viewBox={`0 0 ${barcodeModel.moduleCount + 20} 78`} preserveAspectRatio="none" aria-label={`Código ${barcodeModel.humanReadable}`}>
+                          <g fill="currentColor">
+                            {barcodeModel.bars.map((bar, index) => <rect key={`${bar.x}-${index}`} x={bar.x + 10} y="0" width={bar.width} height="62" />)}
+                          </g>
+                          <text x={(barcodeModel.moduleCount + 20) / 2} y="75" textAnchor="middle" fontSize="9" fill="currentColor">{barcodeModel.humanReadable}</text>
+                        </svg>
+                        <div className="pdv-label-preview-meta">
+                          {preview.priceText ? <b>{preview.priceText}</b> : null}
+                          {preview.lotText ? <span>LOTE: {preview.lotText}</span> : null}
+                          {preview.expiryText ? <span>VAL: {preview.expiryText}</span> : null}
+                        </div>
                       </div>
-                      <small>{preview.widthMm} × {preview.heightMm} mm · {preview.copies} {preview.copies === 1 ? "etiqueta" : "etiquetas"}</small>
+                      <small>{preview.widthMm} × {preview.heightMm} mm · {barcodeModel.symbology.toUpperCase()} · {preview.copies} {preview.copies === 1 ? "etiqueta" : "etiquetas"}</small>
+                      <button className="pdv-label-tools-primary" type="button" disabled={printing} onClick={() => void printLabels()}>{printing ? "Abrindo impressão..." : "Imprimir etiquetas"}</button>
+                      <small className="pdv-label-tools-help">A impressora é escolhida no diálogo do Windows. Funciona com impressoras instaladas por driver, como Zebra, Argox e Elgin, sem SDK proprietário.</small>
                     </div>
                   ) : null}
                 </div>
@@ -308,4 +361,11 @@ function barcodeTypeLabel(value: "internal" | "gtin" | "manual") {
   if (value === "internal") return "Código interno do PDV";
   if (value === "gtin") return "GTIN/EAN informado";
   return "Código manual";
+}
+
+function batchStatusLabel(status: ReturnType<typeof getBatchExpiryStatus>, first: boolean) {
+  if (status === "expired") return "Vencido — fora do FEFO";
+  if (status === "expiring") return first ? "Próximo FEFO · vence em breve" : "Vence em breve";
+  if (status === "no-expiry") return first ? "Próximo FEFO · sem validade" : "Sem validade";
+  return first ? "Próximo FEFO" : "Válido";
 }
