@@ -12,6 +12,17 @@ function locator(page, step) {
   throw new Error(`Step ${step.action} requires selector, testId, role, text or label`);
 }
 
+async function clickTarget(page, step) {
+  if (step.text && !step.selector && !step.testId && !step.role && !step.label) {
+    const button = page.getByRole('button', { name: step.text, exact: step.exact ?? false });
+    if (await button.count() === 1) {
+      await button.click();
+      return;
+    }
+  }
+  await locator(page, step).click();
+}
+
 export async function executeStep({ page, step, index, screenshotsDir, baseURL, env = process.env, adapter = null, runtimeContext = null }) {
   const label = stepLabel(step, index);
   switch (step.action) {
@@ -21,7 +32,7 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
       await page.goto(target, { waitUntil: step.waitUntil || 'domcontentloaded' });
       break;
     }
-    case 'click': await locator(page, step).click(); break;
+    case 'click': await clickTarget(page, step); break;
     case 'clickIfVisible': {
       const target = locator(page, step);
       if (await target.isVisible()) await target.click();
