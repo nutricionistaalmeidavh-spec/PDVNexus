@@ -133,37 +133,68 @@ test("P7 painel ignora lote sem saldo e ordena pela validade", () => {
 });
 
 test("P8 FEFO consome lotes por vencimento, não duplica reconciliação e restaura no cancelamento", () => {
-  const now = "2026-09-18T12:00:00.000Z";
+  const now = new Date(2026, 8, 18, 9, 0, 0).toISOString();
   let batches = upsertProductBatch([], { productCode: "00101", lotNumber: "L1", expiresAt: "2026-09-20", quantity: 2 }, now).batches;
-  batches = upsertProductBatch(batches, { productCode: "00101", lotNumber: "L2", expiresAt: "2026-10-01", quantity: 5 }, "2026-09-18T12:01:00.000Z").batches;
+  batches = upsertProductBatch(batches, { productCode: "00101", lotNumber: "L2", expiresAt: "2026-10-01", quantity: 5 }, new Date(2026, 8, 18, 9, 1, 0).toISOString()).batches;
   const store = normalizeProductBatchStore({ version: 2, updatedAt: now, fefoStartedAt: now, productIdentities: [], batches, saleAllocations: [] }, now);
   const sale = { number: "000010", finalizedAt: "18/09/2026, 09:05:00", items: [{ productCode: "00101", quantity: 3 }] };
 
-  const consumed = reconcileProductBatchFefoSnapshot({ completedSales: [sale], extensions: { cancelledSales: [] } }, store, "2026-09-18T12:06:00.000Z");
+  const consumed = reconcileProductBatchFefoSnapshot({ completedSales: [sale], extensions: { cancelledSales: [] } }, store, new Date(2026, 8, 18, 9, 6, 0).toISOString());
   assert.deepEqual(consumed.store.saleAllocations[0]?.allocations.map((item) => [item.lotNumber, item.quantity]), [["L1", 2], ["L2", 1]]);
   assert.equal(consumed.store.batches.find((batch) => batch.lotNumber === "L1")?.remainingQuantity, 0);
   assert.equal(consumed.store.batches.find((batch) => batch.lotNumber === "L2")?.remainingQuantity, 4);
 
-  const repeated = reconcileProductBatchFefoSnapshot({ completedSales: [sale], extensions: { cancelledSales: [] } }, consumed.store, "2026-09-18T12:07:00.000Z");
+  const repeated = reconcileProductBatchFefoSnapshot({ completedSales: [sale], extensions: { cancelledSales: [] } }, consumed.store, new Date(2026, 8, 18, 9, 7, 0).toISOString());
   assert.equal(repeated.changed, false);
   assert.equal(repeated.store.saleAllocations.length, 1);
 
-  const cancelled = reconcileProductBatchFefoSnapshot({ completedSales: [], extensions: { cancelledSales: [{ number: "000010" }] } }, repeated.store, "2026-09-18T12:08:00.000Z");
+  const cancelled = reconcileProductBatchFefoSnapshot({ completedSales: [], extensions: { cancelledSales: [{ number: "000010" }] } }, repeated.store, new Date(2026, 8, 18, 9, 8, 0).toISOString());
   assert.equal(cancelled.store.batches.find((batch) => batch.lotNumber === "L1")?.remainingQuantity, 2);
   assert.equal(cancelled.store.batches.find((batch) => batch.lotNumber === "L2")?.remainingQuantity, 5);
   assert.ok(cancelled.store.saleAllocations[0]?.restoredAt);
 });
 
 test("P8 mantém estoques de variantes separados pelo productCode", () => {
-  const now = "2026-09-18T12:00:00.000Z";
+  const now = new Date(2026, 8, 18, 9, 0, 0).toISOString();
   let batches = upsertProductBatch([], { productCode: "VAR-A", lotNumber: "A1", expiresAt: "2026-10-01", quantity: 5 }, now).batches;
   batches = upsertProductBatch(batches, { productCode: "VAR-B", lotNumber: "B1", expiresAt: "2026-09-25", quantity: 5 }, now).batches;
   const store = normalizeProductBatchStore({ version: 2, updatedAt: now, fefoStartedAt: now, productIdentities: [], batches, saleAllocations: [] }, now);
   const result = reconcileProductBatchFefoSnapshot({
     completedSales: [{ number: "V-1", finalizedAt: "18/09/2026, 09:05:00", items: [{ productCode: "VAR-A", quantity: 2 }] }],
     extensions: { cancelledSales: [] }
-  }, store, "2026-09-18T12:06:00.000Z");
+  }, store, new Date(2026, 8, 18, 9, 6, 0).toISOString());
 
   assert.equal(result.store.batches.find((batch) => batch.productCode === "VAR-A")?.remainingQuantity, 3);
   assert.equal(result.store.batches.find((batch) => batch.productCode === "VAR-B")?.remainingQuantity, 5);
+});
+
+test("P8 ignora venda pt-BR anterior ao inicio FEFO usando horario local do desktop", () => {
+  const startedAt = new Date(2026, 8, 18, 18, 15, 41).toISOString();
+  const batch = upsertProductBatch([], {
+    productCode: "00103",
+    lotNumber: "QA-PRIMEIRO",
+    expiresAt: "2026-09-25",
+    quantity: 5
+  }, startedAt).batch;
+  const store = normalizeProductBatchStore({
+    version: 2,
+    updatedAt: startedAt,
+    fefoStartedAt: startedAt,
+    productIdentities: [],
+    batches: [batch],
+    saleAllocations: []
+  }, startedAt);
+
+  const result = reconcileProductBatchFefoSnapshot({
+    completedSales: [{
+      number: "000002",
+      finalizedAt: "18/09/2026, 18:15:24",
+      items: [{ productCode: "00103", quantity: 1 }]
+    }],
+    extensions: { cancelledSales: [] }
+  }, store, new Date(2026, 8, 18, 18, 16, 0).toISOString());
+
+  assert.equal(result.changed, false);
+  assert.equal(result.store.batches[0]?.remainingQuantity, 5);
+  assert.equal(result.store.saleAllocations.length, 0);
 });
