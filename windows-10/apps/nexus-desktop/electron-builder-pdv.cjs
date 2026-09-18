@@ -1,2 +1,13 @@
 process.env.NEXUS_APP = "pdv-demo";
-module.exports = require("./electron-builder.cjs");
+const release = require("../../../pdv-release.json");
+const base = require("./electron-builder.cjs");
+
+module.exports = {
+  ...base,
+  extraMetadata: {
+    ...(base.extraMetadata || {}),
+    version: release.version,
+    pdvUpdateChannel: "windows10-x64",
+    pdvUpdateManifestUrl: release.manifestUrl
+  }
+};
