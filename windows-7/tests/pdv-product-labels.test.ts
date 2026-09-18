@@ -13,7 +13,7 @@ import {
   upsertProductBatch
 } from "../apps/pdv-demo/src/productLabels.js";
 import { buildProductLabelPrintHtml } from "../apps/pdv-demo/src/labelPrinting.js";
-import { reconcileProductBatchFefoSnapshot } from "../apps/pdv-demo/src/productBatchFefo.js";
+import { parseSnapshotTimestamp, reconcileProductBatchFefoSnapshot } from "../apps/pdv-demo/src/productBatchFefo.js";
 
 test("classifica codigo gerado pelo PDV como interno", () => {
   const barcode = createInternalBarcodeFromProductCode("00123");
@@ -192,7 +192,29 @@ test("P5 reconcilia venda nova e restaura os mesmos lotes ao cancelar", () => {
   assert.equal(consumed.store.batches[0]?.remainingQuantity, 7);
   assert.equal(consumed.store.saleAllocations[0]?.allocatedQuantity, 3);
 
-  const cancelled = reconcileProductBatchFefoSnapshot({ completedSales: [sale], extensions: { cancelledSales: [{ number: "000001" }] } }, consumed.store, "2026-09-18T12:07:00.000Z");
+  const cancelled = reconcileProductBatchFefoSnapshot({ completedSales: [], extensions: { cancelledSales: [{ number: "000001" }] } }, consumed.store, "2026-09-18T12:07:00.000Z");
   assert.equal(cancelled.store.batches[0]?.remainingQuantity, 10);
   assert.ok(cancelled.store.saleAllocations[0]?.restoredAt);
+});
+
+test("P5 entende finalizedAt no formato pt-BR usado pelo desktop", () => {
+  const before = parseSnapshotTimestamp("18/09/2026, 12:04:59");
+  const after = parseSnapshotTimestamp("18/09/2026, 12:05:01");
+  assert.ok(Number.isFinite(before));
+  assert.ok(after > before);
+
+  const batch = upsertProductBatch([], { productCode: "A", lotNumber: "L1", expiresAt: "2026-10-01", quantity: 5 }, "2026-09-18T12:00:00.000Z").batch;
+  const store = normalizeProductBatchStore({
+    version: 2,
+    updatedAt: "2026-09-18T12:05:00.000Z",
+    fefoStartedAt: new Date(parseSnapshotTimestamp("18/09/2026, 12:05:00")).toISOString(),
+    productIdentities: [],
+    batches: [batch],
+    saleAllocations: []
+  });
+  const result = reconcileProductBatchFefoSnapshot({
+    completedSales: [{ number: "BR-1", finalizedAt: "18/09/2026, 12:05:01", items: [{ productCode: "A", quantity: 2 }] }],
+    extensions: { cancelledSales: [] }
+  }, store, "2026-09-18T12:06:00.000Z");
+  assert.equal(result.store.batches[0]?.remainingQuantity, 3);
 });
