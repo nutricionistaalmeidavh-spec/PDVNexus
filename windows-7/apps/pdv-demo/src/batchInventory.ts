@@ -1,6 +1,5 @@
 import { applyPdvStockMovement, type PdvStockMovement } from "../../../packages/database/src/pdv.js";
 import {
-  normalizeProductBatchStore,
   upsertProductBatch,
   type ProductBatch,
   type ProductLabelBatchStore
@@ -35,13 +34,7 @@ export type ProductExpiryRow = {
   bucket: ProductExpiryBucket;
 };
 
-export type ProductExpirySummary = {
-  expired: number;
-  today: number;
-  sevenDays: number;
-  fifteenDays: number;
-  thirtyDays: number;
-};
+export type ProductExpirySummary = Record<ProductExpiryBucket, number>;
 
 type SnapshotCatalogProduct = {
   productCode: string;
@@ -134,6 +127,13 @@ export function applyBatchStockEntryToSnapshot(input: {
   };
 }
 
+export function getExpiryBucket(
+  expiresAt: string,
+  today = new Date().toISOString().slice(0, 10)
+): ProductExpiryBucket {
+  return expiryBucket(dateDifferenceDays(today, expiresAt));
+}
+
 export function buildProductExpiryRows(
   batches: ProductBatch[],
   products: Array<{ productCode: string; productName: string }>,
@@ -153,7 +153,7 @@ export function buildProductExpiryRows(
         expiresAt,
         remainingQuantity: batch.remainingQuantity,
         daysUntilExpiry,
-        bucket: expiryBucket(daysUntilExpiry)
+        bucket: getExpiryBucket(expiresAt, today)
       };
     })
     .sort((left, right) => left.expiresAt.localeCompare(right.expiresAt) || left.productName.localeCompare(right.productName, "pt-BR"));
@@ -161,13 +161,9 @@ export function buildProductExpiryRows(
 
 export function summarizeProductExpiry(rows: ProductExpiryRow[]): ProductExpirySummary {
   return rows.reduce<ProductExpirySummary>((summary, row) => {
-    if (row.daysUntilExpiry < 0) summary.expired += 1;
-    if (row.daysUntilExpiry === 0) summary.today += 1;
-    if (row.daysUntilExpiry >= 0 && row.daysUntilExpiry <= 7) summary.sevenDays += 1;
-    if (row.daysUntilExpiry >= 0 && row.daysUntilExpiry <= 15) summary.fifteenDays += 1;
-    if (row.daysUntilExpiry >= 0 && row.daysUntilExpiry <= 30) summary.thirtyDays += 1;
+    summary[row.bucket] += 1;
     return summary;
-  }, { expired: 0, today: 0, sevenDays: 0, fifteenDays: 0, thirtyDays: 0 });
+  }, { expired: 0, today: 0, "7d": 0, "15d": 0, "30d": 0, later: 0 });
 }
 
 function normalizeSnapshot(value: unknown): SnapshotValue {
