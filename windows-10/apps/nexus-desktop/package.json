@@ -3,7 +3,7 @@
     "private": true,
     "version": "0.1.16",
     "description": "Shell desktop Electron do Nexus Core.",
-    "main": "main.cjs",
+    "main": "bootstrap.cjs",
     "scripts": {
         "start": "electron .",
         "start:pdv": "set NEXUS_APP=pdv-demo&& electron .",
