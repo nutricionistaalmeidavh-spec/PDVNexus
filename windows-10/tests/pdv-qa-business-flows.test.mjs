@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { hydratePdvBusinessFlowSteps, PDV_BUSINESS_BASELINE } from "../qa/pdv-business-baseline.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const suitePath = resolve(root, "qa/business-flows.json");
@@ -37,4 +38,31 @@ test("cada jornada tem acao real de usuario e assercao", () => {
 
 test("runner da suite de jornadas existe", () => {
   assert.ok(existsSync(runnerPath), "qa/run-business-flows.mjs ausente");
+});
+
+test("baseline E2E reproduz catalogo, clientes e pagamentos iniciais do PDV", () => {
+  assert.equal(PDV_BUSINESS_BASELINE.catalogProducts.length, 5);
+  assert.equal(PDV_BUSINESS_BASELINE.registeredCustomers.length, 3);
+  assert.equal(PDV_BUSINESS_BASELINE.paymentOptions.length, 7);
+  assert.equal(PDV_BUSINESS_BASELINE.catalogProducts[2].productCode, "00101");
+  assert.equal(PDV_BUSINESS_BASELINE.registeredCustomers[1].id, "CLI-002");
+});
+
+test("reset vazio de jornada vira baseline completo antes de chegar ao SQLite", () => {
+  const [step] = hydratePdvBusinessFlowSteps([{ action: "desktopStoreSet", key: "nexus-core:pdv-store:v1", value: {} }]);
+  assert.equal(step.value.catalogProducts.length, 5);
+  assert.equal(step.value.registeredCustomers.length, 3);
+  assert.equal(step.value.paymentOptions.length, 7);
+  assert.deepEqual(step.value.completedSales, []);
+});
+
+test("seed parcial substitui somente o dominio informado e preserva o restante do baseline", () => {
+  const [step] = hydratePdvBusinessFlowSteps([{ action: "desktopStoreSet", key: "nexus-core:pdv-store:v1", value: { registeredCustomers: [{ id: "CLI-QA", name: "QA", document: "QA", city: "QA", creditLimit: 10, creditUsed: 0 }], extensions: { users: [{ id: "GER-QA", name: "Gerente QA", role: "manager", active: true }] } } }]);
+  assert.equal(step.value.registeredCustomers.length, 1);
+  assert.equal(step.value.registeredCustomers[0].id, "CLI-QA");
+  assert.equal(step.value.catalogProducts.length, 5);
+  assert.equal(step.value.paymentOptions.length, 7);
+  assert.equal(step.value.extensions.users.length, 1);
+  assert.equal(step.value.extensions.storeSettings.storeName, "PDV Nexus");
+  assert.deepEqual(step.value.extensions.inventoryMovements, []);
 });

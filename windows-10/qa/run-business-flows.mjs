@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { loadQaManifest, resolveEnvironment, resolveViewport } from "../tools/artisys-qa/src/manifest.js";
 import { runQaFlow } from "../tools/artisys-qa/src/runner.js";
+import { hydratePdvBusinessFlowSteps } from "./pdv-business-baseline.mjs";
 
 function parseArgs(argv) {
   const args = {};
@@ -37,7 +38,8 @@ const failures = [];
 try {
   for (const flow of suite.flows) {
     const flowFile = path.join(tempDir, `${flow.id}.json`);
-    await writeFile(flowFile, `${JSON.stringify({ id: `pdv-${flow.id}`, steps: flow.steps }, null, 2)}\n`, "utf8");
+    const steps = hydratePdvBusinessFlowSteps(flow.steps);
+    await writeFile(flowFile, `${JSON.stringify({ id: `pdv-${flow.id}`, steps }, null, 2)}\n`, "utf8");
     const startedAt = Date.now();
     try {
       const result = await runQaFlow({
