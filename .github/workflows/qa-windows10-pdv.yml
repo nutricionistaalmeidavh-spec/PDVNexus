@@ -2,9 +2,7 @@ name: QA Windows 10 PDV UI
 
 on:
   push:
-    branches:
-      - main
-      - "qa/**"
+    branches: ["**"]
     paths:
       - ".github/workflows/qa-windows10-pdv.yml"
       - "windows-10/**"
@@ -15,12 +13,17 @@ on:
       - "windows-10/**"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   artisys-qa-pdv:
     runs-on: windows-latest
+    timeout-minutes: 35
     defaults:
       run:
         shell: pwsh
@@ -83,7 +86,7 @@ jobs:
           name: PDV-Nexus-ArtiSys-QA
           path: windows-10/qa-artifacts
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
       - name: Upload QA demo evidence
         if: always()
@@ -92,4 +95,4 @@ jobs:
           name: PDV-Nexus-ArtiSys-QA-Demo
           path: windows-10/qa-demo-artifacts
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3

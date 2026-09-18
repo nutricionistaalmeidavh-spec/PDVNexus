@@ -2,11 +2,20 @@ name: Build Windows 10 PDV
 
 on:
   push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/build-windows10-pdv.yml"
+      - "windows-10/**"
+  pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build-windows10-pdv.yml"
       - "windows-10/**"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,6 +23,7 @@ permissions:
 jobs:
   build-windows10:
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -51,9 +61,10 @@ jobs:
           Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
 
       - name: Upload installer artifact
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Windows-10
           path: windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Setup-*.exe
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7

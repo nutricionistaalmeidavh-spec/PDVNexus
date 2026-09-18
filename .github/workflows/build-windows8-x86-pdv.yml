@@ -2,11 +2,20 @@ name: Build Windows 8 x86 PDV
 
 on:
   push:
-    branches: ["build/win8-x86"]
+    branches: ["**"]
+    paths:
+      - ".github/workflows/build-windows8-x86-pdv.yml"
+      - "windows-7/**"
+  pull_request:
+    branches: [main]
     paths:
       - ".github/workflows/build-windows8-x86-pdv.yml"
       - "windows-7/**"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,6 +23,7 @@ permissions:
 jobs:
   build-windows8-x86:
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -57,9 +67,10 @@ jobs:
           Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
 
       - name: Upload installer artifact
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Windows-8-32bit
           path: windows-7/apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86/PDV-Nexus-Windows-8-32bit-Setup-*.exe
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
