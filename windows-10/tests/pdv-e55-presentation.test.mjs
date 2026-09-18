@@ -7,6 +7,7 @@ const root = resolve(import.meta.dirname, "..");
 const mainPath = resolve(root, "apps/pdv-demo/src/main.tsx");
 const decorPath = resolve(root, "apps/pdv-demo/src/CustomerPresentationDecor.tsx");
 const cssPath = resolve(root, "apps/pdv-demo/src/pdv-e55.css");
+const observationFixCssPath = resolve(root, "apps/pdv-demo/src/pdv-observation-layout-fix.css");
 const demoFlowPath = resolve(root, "qa/flows/pdv-demo.json");
 
 function read(path) {
@@ -52,4 +53,21 @@ test("E55 demo flow captures a realistic multi-item retail sale", () => {
   assert.match(flow, /00034/);
   assert.match(flow, /00103/);
   assert.match(flow, /100,89/);
+});
+
+test("cashier observation layout fix loads after presentation layers", () => {
+  assert.ok(existsSync(observationFixCssPath), "pdv-observation-layout-fix.css must exist");
+  const main = read(mainPath);
+  const e55Import = main.indexOf('import "./pdv-e55.css"');
+  const fixImport = main.indexOf('import "./pdv-observation-layout-fix.css"');
+  assert.ok(e55Import >= 0, "pdv-e55.css import must exist");
+  assert.ok(fixImport > e55Import, "observation layout fix must load last");
+});
+
+test("cashier summary strip remains high-contrast when sale observation inserts its anchor", () => {
+  const css = read(observationFixCssPath);
+  assert.match(css, /aside:has\(> div\[data-sale-observation-anchor="true"\]\) > div:nth-of-type\(4\)[\s\S]*?background:\s*#ffffff\s*!important/);
+  assert.match(css, /div:nth-of-type\(4\) strong[\s\S]*?color:\s*#102642\s*!important/);
+  assert.match(css, /aside:has\(> div\[data-sale-observation-anchor="true"\]\) > div:nth-of-type\(5\)[\s\S]*?background:\s*#062d57\s*!important/);
+  assert.match(css, /div:nth-of-type\(5\)::before[\s\S]*?color:\s*#ffffff\s*!important/);
 });
