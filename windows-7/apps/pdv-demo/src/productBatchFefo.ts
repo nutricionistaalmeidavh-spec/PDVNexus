@@ -1,9 +1,17 @@
 import {
   allocateProductBatchesFefo,
   restoreProductBatchAllocation,
+  type ProductBatchAllocationItem,
   type ProductLabelBatchStore,
   type ProductSaleBatchAllocation
 } from "./productLabels";
+import {
+  allocateProductBatchExact,
+  getBatchPhysicalScansForSaleProduct,
+  isBatchPhysicalSaleProductAmbiguous,
+  normalizeBatchPhysicalScanLedger,
+  type BatchPhysicalScanLedger
+} from "./batchPhysicalTracking";
 
 type SnapshotSaleItem = {
   productCode?: unknown;
@@ -21,6 +29,13 @@ type PdvSnapshot = {
   extensions?: unknown;
 };
 
+export type ProductBatchTrackingMode = "confirmed" | "mixed" | "presumed-fefo" | "exception";
+export type TrackedProductSaleBatchAllocation = ProductSaleBatchAllocation & {
+  trackingMode: ProductBatchTrackingMode;
+  physicallyTrackedQuantity: number;
+  trackingExceptionQuantity: number;
+};
+
 export type ProductBatchFefoReconcileResult = {
   store: ProductLabelBatchStore;
   changed: boolean;
@@ -31,9 +46,11 @@ export type ProductBatchFefoReconcileResult = {
 export function reconcileProductBatchFefoSnapshot(
   snapshotValue: unknown,
   currentStore: ProductLabelBatchStore,
-  now = new Date().toISOString()
+  now = new Date().toISOString(),
+  physicalLedgerValue?: BatchPhysicalScanLedger | unknown
 ): ProductBatchFefoReconcileResult {
   const snapshot = snapshotValue && typeof snapshotValue === "object" ? snapshotValue as PdvSnapshot : {};
+  const physicalLedger = physicalLedgerValue == null ? undefined : normalizeBatchPhysicalScanLedger(physicalLedgerValue, now);
   const sales = Array.isArray(snapshot.completedSales) ? snapshot.completedSales.filter(isSnapshotSale) : [];
   const extensions = snapshot.extensions && typeof snapshot.extensions === "object" ? snapshot.extensions as { cancelledSales?: unknown } : {};
   const cancelledSales = Array.isArray(extensions.cancelledSales) ? extensions.cancelledSales.filter(isSnapshotSale) : [];
@@ -68,16 +85,57 @@ export function reconcileProductBatchFefoSnapshot(
       if (!batches.some((batch) => batch.productCode === productCode)) continue;
       const key = `${saleNumber}\u0000${productCode}`;
       if (existingKeys.has(key)) continue;
-      const allocationResult = allocateProductBatchesFefo(batches, productCode, requestedQuantity, snapshotDateOnly(finalizedAt, now), now);
-      batches = allocationResult.batches;
-      const allocation: ProductSaleBatchAllocation = {
+
+      const ambiguous = isBatchPhysicalSaleProductAmbiguous(physicalLedger, saleNumber, productCode);
+      const scans = ambiguous ? [] : getBatchPhysicalScansForSaleProduct(physicalLedger, saleNumber, productCode).slice(0, Math.ceil(requestedQuantity));
+      const exactRequestedQuantity = Math.min(scans.length, requestedQuantity);
+      const groupedScans = groupPhysicalScans(scans.slice(0, exactRequestedQuantity));
+      const exactAllocations: ProductBatchAllocationItem[] = [];
+      let physicallyTrackedQuantity = 0;
+      let trackingExceptionQuantity = 0;
+
+      for (const [batchId, quantity] of groupedScans) {
+        const exactBatch = batches.find((batch) => batch.id === batchId);
+        if (!exactBatch || exactBatch.productCode !== productCode) {
+          trackingExceptionQuantity = roundQuantity(trackingExceptionQuantity + quantity);
+          continue;
+        }
+        const exactResult = allocateProductBatchExact(batches, batchId, quantity, now);
+        batches = exactResult.batches;
+        exactAllocations.push(...exactResult.allocations);
+        physicallyTrackedQuantity = roundQuantity(physicallyTrackedQuantity + exactResult.allocatedQuantity);
+        trackingExceptionQuantity = roundQuantity(trackingExceptionQuantity + exactResult.untrackedQuantity);
+      }
+
+      const genericRequestedQuantity = roundQuantity(Math.max(0, requestedQuantity - exactRequestedQuantity));
+      const fefoResult = allocateProductBatchesFefo(
+        batches,
+        productCode,
+        genericRequestedQuantity,
+        snapshotDateOnly(finalizedAt, now),
+        now
+      );
+      batches = fefoResult.batches;
+      const allAllocations = mergeAllocationItems([...exactAllocations, ...fefoResult.allocations]);
+      const allocatedQuantity = roundQuantity(physicallyTrackedQuantity + fefoResult.allocatedQuantity);
+      const untrackedQuantity = roundQuantity(trackingExceptionQuantity + fefoResult.untrackedQuantity);
+      const trackingMode = resolveTrackingMode({
+        ambiguous,
+        exactRequestedQuantity,
+        genericRequestedQuantity,
+        trackingExceptionQuantity
+      });
+      const allocation: TrackedProductSaleBatchAllocation = {
         saleNumber,
         finalizedAt,
         productCode,
         requestedQuantity,
-        allocatedQuantity: allocationResult.allocatedQuantity,
-        untrackedQuantity: allocationResult.untrackedQuantity,
-        allocations: allocationResult.allocations
+        allocatedQuantity,
+        untrackedQuantity,
+        allocations: allAllocations,
+        trackingMode,
+        physicallyTrackedQuantity,
+        trackingExceptionQuantity
       };
       allocations.push(allocation);
       existingKeys.add(key);
@@ -104,6 +162,33 @@ export function parseSnapshotTimestamp(value: string) {
     return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)).getTime();
   }
   return Date.parse(normalized);
+}
+
+function resolveTrackingMode(input: {
+  ambiguous: boolean;
+  exactRequestedQuantity: number;
+  genericRequestedQuantity: number;
+  trackingExceptionQuantity: number;
+}): ProductBatchTrackingMode {
+  if (input.trackingExceptionQuantity > 0) return "exception";
+  if (input.ambiguous || input.exactRequestedQuantity <= 0) return "presumed-fefo";
+  if (input.genericRequestedQuantity > 0) return "mixed";
+  return "confirmed";
+}
+
+function groupPhysicalScans(scans: Array<{ batchId: string }>) {
+  const grouped = new Map<string, number>();
+  for (const scan of scans) grouped.set(scan.batchId, roundQuantity((grouped.get(scan.batchId) ?? 0) + 1));
+  return grouped;
+}
+
+function mergeAllocationItems(items: ProductBatchAllocationItem[]) {
+  const merged = new Map<string, ProductBatchAllocationItem>();
+  for (const item of items) {
+    const previous = merged.get(item.batchId);
+    merged.set(item.batchId, previous ? { ...previous, quantity: roundQuantity(previous.quantity + item.quantity) } : { ...item });
+  }
+  return [...merged.values()];
 }
 
 function snapshotDateOnly(value: string, fallbackIso: string) {

@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BatchPhysicalTrackingDecor } from "./BatchPhysicalTrackingDecor";
 import { CashierReferenceDecor } from "./CashierReferenceDecor";
 import { CustomerPresentationDecor } from "./CustomerPresentationDecor";
 import { LabelBatchTools } from "./LabelBatchTools";
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <CashierReferenceDecor />
       <CustomerPresentationDecor />
       <SaleObservationDecor />
+      <BatchPhysicalTrackingDecor />
       <ProductBatchFefoSync />
       <LabelBatchTools />
       <PdvDemoApp />

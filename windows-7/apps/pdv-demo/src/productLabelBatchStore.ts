@@ -1,6 +1,13 @@
 import { getDesktopPdvStoreBridge } from "@nexus-core/desktop-runtime";
 import { applyBatchStockEntryToSnapshot, type BatchStockEntryDraft } from "./batchInventory";
 import {
+  loadBatchPhysicalScanLedger,
+  normalizeBatchPhysicalScanLedger,
+  PRODUCT_BATCH_PHYSICAL_SCAN_STORE_KEY,
+  saveBatchPhysicalScanLedger,
+  type BatchPhysicalScanLedger
+} from "./batchPhysicalTracking";
+import {
   normalizeCatalogProductIdentity,
   normalizeProductBatchStore,
   reconcileProductIdentities,
@@ -44,7 +51,8 @@ export async function reconcileProductBatchFefoFromCurrentSnapshot() {
   const snapshotJson = await loadMainPdvSnapshot();
   const snapshot = parseJson(snapshotJson, {});
   const store = await loadProductLabelBatchStore();
-  const result = reconcileProductBatchFefoSnapshot(snapshot, store);
+  const ledger = loadProductBatchPhysicalScanLedger();
+  const result = reconcileProductBatchFefoSnapshot(snapshot, store, new Date().toISOString(), ledger);
   if (result.changed) await saveProductLabelBatchStore(result.store);
   return result;
 }
@@ -85,6 +93,18 @@ export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) 
   const bridge = typeof window !== "undefined" ? window.nexusDesktop?.store : undefined;
   if (bridge) await bridge.save(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
   writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
+  return normalized;
+}
+
+export function loadProductBatchPhysicalScanLedger(): BatchPhysicalScanLedger {
+  if (typeof window === "undefined") return normalizeBatchPhysicalScanLedger({});
+  return loadBatchPhysicalScanLedger(window.localStorage);
+}
+
+export function saveProductBatchPhysicalScanLedger(ledger: BatchPhysicalScanLedger) {
+  if (typeof window === "undefined") return normalizeBatchPhysicalScanLedger(ledger);
+  const normalized = saveBatchPhysicalScanLedger(ledger, window.localStorage);
+  writeLocal(PRODUCT_BATCH_PHYSICAL_SCAN_STORE_KEY, JSON.stringify(normalized));
   return normalized;
 }
 

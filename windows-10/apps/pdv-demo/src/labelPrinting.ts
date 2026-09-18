@@ -1,14 +1,20 @@
 import {
   buildProductBarcodeRenderModel,
+  normalizeProductBatchStore,
   type LabelCatalogProduct,
+  type ProductBatch,
   type ProductLabelPreview,
   type ProductBarcodeRenderModel
 } from "./productLabels";
+import { createProductBatchTrackingBarcode } from "./batchPhysicalTracking";
 
 export type ProductLabelPrintPayload = {
   product: LabelCatalogProduct;
   preview: ProductLabelPreview;
+  batch?: ProductBatch;
 };
+
+const PRODUCT_LABEL_BATCH_STORE_KEY = "nexus-core:pdv-label-batches:v1";
 
 export function buildProductBarcodeSvgMarkup(model: ProductBarcodeRenderModel) {
   const quietZone = 10;
@@ -21,10 +27,16 @@ export function buildProductBarcodeSvgMarkup(model: ProductBarcodeRenderModel) {
 
 export function buildProductLabelPrintHtml(payload: ProductLabelPrintPayload) {
   const { product, preview } = payload;
-  const barcode = buildProductBarcodeRenderModel(product);
+  const barcode = payload.batch
+    ? buildProductBarcodeRenderModel({
+      productCode: product.productCode,
+      barcode: createProductBatchTrackingBarcode(payload.batch.id),
+      barcodeType: "manual"
+    })
+    : buildProductBarcodeRenderModel(product);
   const barcodeSvg = buildProductBarcodeSvgMarkup(barcode);
   const copies = Math.max(1, Math.min(999, Math.floor(preview.copies || 1)));
-  const label = buildSingleLabelMarkup(preview, barcodeSvg);
+  const label = buildSingleLabelMarkup(preview, barcodeSvg, Boolean(payload.batch));
   const pages = Array.from({ length: copies }, () => `<section class="label-page">${label}</section>`).join("");
   return `<!doctype html>
 <html lang="pt-BR">
@@ -41,6 +53,7 @@ html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: 
 .pdv-label-barcode { width: 100%; height: min(12mm, 48%); display: block; }
 .label-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.8mm 2mm; font-size: 7.5pt; line-height: 1; }
 .label-meta strong { font-size: 9pt; }
+.tracking-note { font-size: 5.8pt; line-height: 1; text-align: center; font-weight: 700; }
 </style>
 </head>
 <body>${pages}</body>
@@ -49,7 +62,8 @@ html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: 
 
 export async function printProductLabels(payload: ProductLabelPrintPayload) {
   if (typeof document === "undefined") throw new Error("A impressão de etiquetas requer a interface desktop.");
-  const html = buildProductLabelPrintHtml(payload);
+  const effectiveBatch = payload.batch ?? resolveBatchFromBrowserStore(payload.product.productCode, payload.preview.lotText);
+  const html = buildProductLabelPrintHtml({ ...payload, batch: effectiveBatch });
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
@@ -72,18 +86,34 @@ export async function printProductLabels(payload: ProductLabelPrintPayload) {
     await new Promise<void>((resolve) => setTimeout(resolve, 80));
     frameWindow.focus();
     frameWindow.print();
-    return { success: true, copies: payload.preview.copies };
+    return {
+      success: true,
+      copies: payload.preview.copies,
+      trackingBarcode: effectiveBatch ? createProductBatchTrackingBarcode(effectiveBatch.id) : undefined
+    };
   } finally {
     setTimeout(() => iframe.remove(), 1500);
   }
 }
 
-function buildSingleLabelMarkup(preview: ProductLabelPreview, barcodeSvg: string) {
+function resolveBatchFromBrowserStore(productCode: string, lotNumber?: string) {
+  if (typeof window === "undefined" || !lotNumber) return undefined;
+  try {
+    const raw = window.localStorage.getItem(PRODUCT_LABEL_BATCH_STORE_KEY);
+    if (!raw) return undefined;
+    const store = normalizeProductBatchStore(JSON.parse(raw));
+    return store.batches.find((batch) => batch.productCode === productCode && batch.lotNumber === lotNumber);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildSingleLabelMarkup(preview: ProductLabelPreview, barcodeSvg: string, physicallyTracked: boolean) {
   const meta: string[] = [];
   if (preview.priceText) meta.push(`<strong>${escapeHtml(preview.priceText)}</strong>`);
   if (preview.lotText) meta.push(`<span>Lote: ${escapeHtml(preview.lotText)}</span>`);
   if (preview.expiryText) meta.push(`<span>Val.: ${escapeHtml(preview.expiryText)}</span>`);
-  return `<div class="product-name">${escapeHtml(preview.productName)}</div>${barcodeSvg}<div class="label-meta">${meta.join("")}</div>`;
+  return `<div class="product-name">${escapeHtml(preview.productName)}</div>${barcodeSvg}${physicallyTracked ? `<div class="tracking-note">RASTREIO FÍSICO DO LOTE</div>` : ""}<div class="label-meta">${meta.join("")}</div>`;
 }
 
 function escapeHtml(value: unknown) {
