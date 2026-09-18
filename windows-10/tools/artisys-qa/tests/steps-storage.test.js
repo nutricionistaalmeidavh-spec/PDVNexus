@@ -5,6 +5,7 @@ import { executeStep } from '../src/steps.js';
 function createPageHarness() {
   const storage = new Map();
   const desktopStore = new Map();
+  const pdvStore = new Map();
   const page = {
     evaluate: async (fn, arg) => {
       const previousWindow = globalThis.window;
@@ -17,6 +18,10 @@ function createPageHarness() {
           store: {
             save: async (key, snapshotJson) => { desktopStore.set(key, { snapshotJson }); },
             load: async (key) => desktopStore.get(key) ?? null
+          },
+          pdvStore: {
+            save: async (key, snapshotJson) => { pdvStore.set(key, { snapshotJson }); },
+            load: async (key) => pdvStore.get(key) ?? null
           }
         }
       };
@@ -25,12 +30,12 @@ function createPageHarness() {
     },
     waitForTimeout: async () => {}
   };
-  return { page, storage, desktopStore };
+  return { page, storage, desktopStore, pdvStore };
 }
 
 const base = { index: 0, screenshotsDir: '.', baseURL: '', env: {}, adapter: null, runtimeContext: null };
 
-test('desktopStoreSet grava bridge e localStorage substituindo NOW_ISO', async () => {
+test('desktopStoreSet grava bridge generica e localStorage substituindo NOW_ISO', async () => {
   const harness = createPageHarness();
   await executeStep({
     ...base,
@@ -44,6 +49,24 @@ test('desktopStoreSet grava bridge e localStorage substituindo NOW_ISO', async (
   assert.equal(parsed.nested.ok, true);
   assert.match(parsed.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(harness.storage.get('qa:test'), row.snapshotJson);
+  assert.equal(harness.pdvStore.has('qa:test'), false);
+});
+
+test('snapshot principal do PDV usa bridge SQLite pdvStore', async () => {
+  const harness = createPageHarness();
+  const key = 'nexus-core:pdv-store:v1';
+  await executeStep({
+    ...base,
+    page: harness.page,
+    step: { action: 'desktopStoreSet', key, value: { completedSales: [{ number: '000001' }] } }
+  });
+  assert.equal(harness.desktopStore.has(key), false);
+  assert.deepEqual(JSON.parse(harness.pdvStore.get(key).snapshotJson), { completedSales: [{ number: '000001' }] });
+  await executeStep({
+    ...base,
+    page: harness.page,
+    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000001' }
+  });
 });
 
 test('expectDesktopStoreJson valida caminhos com indices de array', async () => {
