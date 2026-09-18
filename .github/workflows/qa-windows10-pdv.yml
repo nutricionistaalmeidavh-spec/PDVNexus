@@ -5,12 +5,14 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/qa-windows10-pdv.yml"
+      - ".github/workflows/publish-pdv-release.yml"
       - "pdv-release.json"
       - "windows-10/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/qa-windows10-pdv.yml"
+      - ".github/workflows/publish-pdv-release.yml"
       - "pdv-release.json"
       - "windows-10/**"
   workflow_dispatch:
@@ -60,6 +62,9 @@ jobs:
 
       - name: Validate business journey coverage
         run: node --test tests/pdv-qa-business-flows.test.mjs
+
+      - name: Validate release and Drive sync contract
+        run: node --test tests/pdv-release-drive-sync.test.mjs
 
       - name: E55 presentation requirements
         run: npm run test:e55-presentation
