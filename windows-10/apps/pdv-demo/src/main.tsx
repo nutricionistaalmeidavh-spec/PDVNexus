@@ -4,6 +4,7 @@ import { CashierReferenceDecor } from "./CashierReferenceDecor";
 import { CustomerPresentationDecor } from "./CustomerPresentationDecor";
 import { LabelBatchTools } from "./LabelBatchTools";
 import { PdvDemoApp } from "./PdvDemoApp";
+import { ProductBatchFefoSync } from "./ProductBatchFefoSync";
 import { SaleObservationDecor } from "./SaleObservationDecor";
 import "./pdv-dense-v2.css";
 import "./pdv-dense-v2-grid.css";
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <CashierReferenceDecor />
       <CustomerPresentationDecor />
       <SaleObservationDecor />
+      <ProductBatchFefoSync />
       <LabelBatchTools />
       <PdvDemoApp />
     </div>
