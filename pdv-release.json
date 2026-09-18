@@ -1,5 +1,11 @@
 {
   "schemaVersion": 1,
   "version": "0.1.17",
-  "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json"
+  "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
+  "distribution": {
+    "googleDrive": {
+      "rootFolderId": "1M0_SfF1h_zUqEM-Ns1HJ8ZtCMMcbHnFr",
+      "previousFolderName": "anterior"
+    }
+  }
 }
