@@ -5,11 +5,13 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/build-windows7-pdv.yml"
+      - "pdv-release.json"
       - "windows-7/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build-windows7-pdv.yml"
+      - "pdv-release.json"
       - "windows-7/**"
   workflow_dispatch:
 
@@ -49,13 +51,18 @@ jobs:
       - name: Test PDV payments and quantity pricing
         run: npm run test:pdv-payments
 
+      - name: Test safe PDV upgrade
+        run: npm run test:pdv-upgrade
+
       - name: Build Windows 7 x64 installer
         run: npm run desktop:dist:pdv:win7
 
       - name: Verify installer and hash
         run: |
+          $version = (Get-Content ../pdv-release.json | ConvertFrom-Json).version
           $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-7" -Filter "PDV-Nexus-Windows-7-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $exe) { throw "Windows 7 installer EXE not found" }
+          if ($exe.Name -notmatch [regex]::Escape($version)) { throw "Installer version mismatch: expected $version, got $($exe.Name)" }
           Write-Host "Installer: $($exe.FullName)"
           Write-Host "Size: $($exe.Length) bytes"
           Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
