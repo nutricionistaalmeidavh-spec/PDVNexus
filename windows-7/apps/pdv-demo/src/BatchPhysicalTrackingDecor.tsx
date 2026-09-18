@@ -150,13 +150,19 @@ function readCurrentSaleNumber() {
 }
 
 function readCartProductQuantity(productName: string) {
-  const aside = document.querySelector("aside");
-  if (!aside) return 0;
-  const productStrong = Array.from(aside.querySelectorAll("strong")).find((element) => element.textContent?.trim() === productName);
-  const line = productStrong?.parentElement?.querySelector("span")?.textContent?.trim() ?? "";
-  const match = line.match(/^([\d.,]+)/);
-  if (!match) return 0;
-  return Number(match[1].replace(/\./g, "").replace(",", ".")) || 0;
+  const productLabels = Array.from(document.querySelectorAll("strong"))
+    .filter((element) => element.textContent?.replace(/\s+/g, " ").trim() === productName);
+  for (const label of productLabels) {
+    let row: Element | null = label.parentElement;
+    for (let depth = 0; row && depth < 4; depth += 1, row = row.parentElement) {
+      const text = row.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      if (!text.includes(productName)) continue;
+      const match = text.match(/([\d.,]+)\s*(?:UN|KG)\s*x\s*R\$/i);
+      if (!match) continue;
+      return Number(match[1].replace(/\./g, "").replace(",", ".")) || 0;
+    }
+  }
+  return 0;
 }
 
 async function waitForCartIncrease(productName: string, before: number, timeoutMs: number) {
