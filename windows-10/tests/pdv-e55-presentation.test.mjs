@@ -9,6 +9,7 @@ const decorPath = resolve(root, "apps/pdv-demo/src/CustomerPresentationDecor.tsx
 const cssPath = resolve(root, "apps/pdv-demo/src/pdv-e55.css");
 const cashierCssPath = resolve(root, "apps/pdv-demo/src/pdv-cashier-v3.css");
 const observationFixCssPath = resolve(root, "apps/pdv-demo/src/pdv-observation-layout-fix.css");
+const legibilityCssPath = resolve(root, "apps/pdv-demo/src/pdv-cashier-legibility-fix.css");
 const demoFlowPath = resolve(root, "qa/flows/pdv-demo.json");
 
 function read(path) {
@@ -62,7 +63,7 @@ test("cashier observation layout fix loads after presentation layers", () => {
   const e55Import = main.indexOf('import "./pdv-e55.css"');
   const fixImport = main.indexOf('import "./pdv-observation-layout-fix.css"');
   assert.ok(e55Import >= 0, "pdv-e55.css import must exist");
-  assert.ok(fixImport > e55Import, "observation layout fix must load last");
+  assert.ok(fixImport > e55Import, "observation layout fix must load after E55");
 });
 
 test("cashier summary strip remains high-contrast when sale observation inserts its anchor", () => {
@@ -82,4 +83,25 @@ test("cashier total card is one-third shorter, centered, and shortcut area recei
 
   assert.match(observationCss, /div:nth-of-type\(5\)\s*\{[\s\S]*?min-height:\s*62px\s*!important[\s\S]*?height:\s*62px\s*!important/);
   assert.match(observationCss, /div:nth-of-type\(5\)\s*\{[\s\S]*?display:\s*flex\s*!important[\s\S]*?align-items:\s*center\s*!important[\s\S]*?justify-content:\s*center\s*!important[\s\S]*?text-align:\s*center\s*!important/);
+});
+
+test("cashier legibility layer loads last and isolates the sale observation from the product list grid cell", () => {
+  assert.ok(existsSync(legibilityCssPath), "pdv-cashier-legibility-fix.css must exist");
+  const main = read(mainPath);
+  const observationImport = main.indexOf('import "./pdv-observation-layout-fix.css"');
+  const legibilityImport = main.indexOf('import "./pdv-cashier-legibility-fix.css"');
+  assert.ok(observationImport >= 0, "observation fix import must exist");
+  assert.ok(legibilityImport > observationImport, "legibility fix must load last");
+
+  const css = read(legibilityCssPath);
+  assert.match(css, /> div\[data-sale-observation-anchor="true"\]\s*\{[\s\S]*?grid-row:\s*7\s*\/\s*11\s*!important[\s\S]*?grid-column:\s*1\s*!important/);
+  assert.match(css, /> div\[data-sale-observation-anchor="true"\]\s*\{[\s\S]*?height:\s*auto\s*!important[\s\S]*?border:\s*0\s*!important[\s\S]*?background:\s*transparent\s*!important/);
+});
+
+test("cashier legibility increases total, table and shortcut typography without growing the total card", () => {
+  const css = read(legibilityCssPath);
+  assert.match(css, /div:nth-of-type\(5\)\s*\{[\s\S]*?height:\s*62px\s*!important[\s\S]*?font-size:\s*34px\s*!important/);
+  assert.match(css, /div:nth-of-type\(5\)::before[\s\S]*?font-size:\s*10px\s*!important/);
+  assert.match(css, /div:nth-of-type\(3\)\s*>\s*div[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /aside\s*>\s*div:last-of-type\s*>\s*button[\s\S]*?font-size:\s*11px\s*!important/);
 });
