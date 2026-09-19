@@ -8,7 +8,7 @@
     {"action":"expectVisible","text":"Picanha Bovina","exact":true,"name":"produto-demo-visivel","holdMs":2500},
     {"action":"screenshot","name":"01-catalogo-completo"},
     {"action":"click","selector":"article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]","name":"abrir-estoque","holdMs":4000},
-    {"action":"expectVisible","text":"Arroz Tipo 1 5kg","exact":true,"name":"estoque-historico-visivel","holdMs":1800},
+    {"action":"expectVisible","selector":"article:has(h2:text-is(\"Estoque\")) tbody tr:has-text(\"Arroz Tipo 1 5kg\")","name":"estoque-historico-visivel","holdMs":1800},
     {"action":"screenshot","name":"02-estoque-demo"},
     {"action":"click","selector":"a[href=\"#/clientes\"]","name":"abrir-clientes","holdMs":4500},
     {"action":"expectURL","includes":"#/clientes","name":"clientes-route"},
