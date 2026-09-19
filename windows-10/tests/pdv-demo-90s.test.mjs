@@ -7,7 +7,7 @@ import test from "node:test";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = resolve(root, "qa/artisys-qa.demo.config.json");
 const flowPath = resolve(root, "qa/flows/pdv-demo-90s.json");
-const desktopMainPath = resolve(root, "apps/nexus-desktop/main.cjs");
+const desktopQaMainPath = resolve(root, "apps/nexus-desktop/main.qa.cjs");
 const workflowPath = resolve(root, "../.github/workflows/pdv-demo-90s.yml");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -36,10 +36,13 @@ test("flow de 90s usa dataset demo completo e percorre produtos, estoque, caixa 
   assert.match(selectors, /#\/financeiro/);
 });
 
-test("Electron aceita userData isolado por variavel somente para QA/demo", () => {
-  const source = readFileSync(desktopMainPath, "utf8");
+test("Electron do QA usa userData isolado e nunca o perfil normal do cliente", () => {
+  assert.equal(manifest.electron.entry, "../apps/nexus-desktop/main.qa.cjs");
+  assert.equal(manifest.environments.local.env.NEXUS_USER_DATA_DIR, ".artisys-qa/pdv-demo-isolated");
+  const source = readFileSync(desktopQaMainPath, "utf8");
   assert.match(source, /NEXUS_USER_DATA_DIR/);
   assert.match(source, /app\.setPath\(["']userData["']/);
+  assert.match(source, /require\(["']\.\/main\.cjs["']\)/);
 });
 
 test("workflow dedicado gera e publica apenas o artefato do demo 90s", () => {
@@ -48,4 +51,5 @@ test("workflow dedicado gera e publica apenas o artefato do demo 90s", () => {
   assert.match(workflow, /--demo full-90s/);
   assert.match(workflow, /PDV-Nexus-Demo-90s/);
   assert.match(workflow, /qa-demo-90s-artifacts/);
+  assert.match(workflow, /ffprobe/);
 });

@@ -13,12 +13,13 @@
   "environments": {
     "local": {
       "env": {
-        "NEXUS_APP": "pdv-demo"
+        "NEXUS_APP": "pdv-demo",
+        "NEXUS_USER_DATA_DIR": ".artisys-qa/pdv-demo-isolated"
       }
     }
   },
   "electron": {
-    "entry": "../apps/nexus-desktop/main.cjs",
+    "entry": "../apps/nexus-desktop/main.qa.cjs",
     "executablePath": "../node_modules/electron/dist/electron.exe",
     "env": {
       "NEXUS_APP": "pdv-demo"
@@ -29,6 +30,15 @@
       "file": "flows/pdv-demo.json",
       "preset": "landscape-16x9",
       "durationTargetSec": 24,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "full-90s": {
+      "file": "flows/pdv-demo-90s.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 90,
       "captureViewport": {
         "width": 1440,
         "height": 960
