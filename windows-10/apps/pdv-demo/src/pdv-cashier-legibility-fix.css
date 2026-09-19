@@ -1,0 +1,145 @@
+/* Final cashier legibility pass.
+   Loaded after the observation-layout compatibility layer so the observation
+   anchor cannot inherit the legacy positional product-list styles. */
+
+/* Sale observation: give the dynamically inserted anchor its own left-column
+   grid area instead of allowing it to match the legacy nth-of-type(2) product
+   list selector. This removes the real UI overlap seen in QA captures. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] {
+  grid-row: 7 / 11 !important;
+  grid-column: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  display: block !important;
+  align-self: start !important;
+  justify-self: stretch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #1f3048 !important;
+  overflow: visible !important;
+  z-index: 0 !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"]::before {
+  content: none !important;
+  display: none !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] > section[aria-label="Observação da venda"] {
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  gap: 7px !important;
+  border: 1px solid #d9e0e8 !important;
+  border-radius: 5px !important;
+  background: #ffffff !important;
+  color: #1f3048 !important;
+  box-shadow: none !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] > section[aria-label="Observação da venda"] strong {
+  font-size: 14px !important;
+  color: #102642 !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] > section[aria-label="Observação da venda"] span,
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] > section[aria-label="Observação da venda"] label {
+  color: #334155 !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] > section[aria-label="Observação da venda"] textarea {
+  min-height: 66px !important;
+  max-height: 66px !important;
+  resize: none !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #1f3048 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* Product list and summary: slightly larger type while preserving the fixed
+   210px list viewport and its own scrollbar for larger baskets. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3)::before {
+  font-size: 10px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3) > div {
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) > div {
+  font-size: 10px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) strong {
+  font-size: 12px !important;
+}
+
+/* Total card remains 62px high, but the amount and label are more readable.
+   Zero padding keeps the amount genuinely centered in both axes. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(5) {
+  min-height: 62px !important;
+  height: 62px !important;
+  max-height: 62px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 12px !important;
+  font-size: 34px !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(5)::before {
+  top: 4px !important;
+  left: 12px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+}
+
+/* Payment labels gain one point without changing their vertical allocation. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(6)::before {
+  font-size: 10px !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(6) > button {
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(7) {
+  font-size: 8.5px !important;
+}
+
+/* Shortcuts keep the enlarged 134px area, with larger button labels. */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:last-of-type > button {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+
+.cashier-reference-metric {
+  font-size: 10px !important;
+}
+
+.cashier-reference-metric strong {
+  font-size: 13px !important;
+}
+
+@media (max-width: 900px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div[data-sale-observation-anchor="true"] {
+    grid-row: auto !important;
+    grid-column: 1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(5) {
+    font-size: 30px !important;
+  }
+}

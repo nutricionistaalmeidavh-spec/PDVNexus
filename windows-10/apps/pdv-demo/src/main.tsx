@@ -12,6 +12,7 @@ import "./pdv-dense-v2-grid.css";
 import "./pdv-cashier-v3.css";
 import "./pdv-e55.css";
 import "./pdv-observation-layout-fix.css";
+import "./pdv-cashier-legibility-fix.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
