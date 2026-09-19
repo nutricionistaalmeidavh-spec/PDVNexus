@@ -235,3 +235,79 @@
     font-size: 11px !important;
   }
 }
+
+/* Second desktop reading pass: same proportional increase requested after the
+   first QA capture. No card height, grid row or spacing changes here. */
+@media (min-width: 901px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child::before {
+    font-size: 14px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child > p:first-child {
+    font-size: 16px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child span {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child strong {
+    font-size: 18px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2)::before {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) input {
+    font-size: 18px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) button {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1)::before {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) span {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) strong {
+    font-size: 16px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > select {
+    font-size: 14px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3)::before {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3) > div {
+    font-size: 13px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) > div {
+    font-size: 12px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) strong {
+    font-size: 15px !important;
+  }
+
+  .cashier-reference-metric {
+    font-size: 12px !important;
+  }
+
+  .cashier-reference-metric strong {
+    font-size: 16px !important;
+  }
+
+  .cashier-reference-action {
+    font-size: 12px !important;
+  }
+}
