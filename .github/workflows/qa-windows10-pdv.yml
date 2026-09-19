@@ -63,6 +63,9 @@ jobs:
       - name: Validate business journey coverage
         run: node --test tests/pdv-qa-business-flows.test.mjs
 
+      - name: Validate 90s demo contract
+        run: node --test tests/pdv-demo-90s.test.mjs
+
       - name: Validate release and Drive sync contract
         run: node --test tests/pdv-release-drive-sync.test.mjs
 
