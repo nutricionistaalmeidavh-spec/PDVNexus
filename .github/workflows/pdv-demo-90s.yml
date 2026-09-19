@@ -66,6 +66,7 @@ jobs:
         run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo full-90s --output qa-demo-90s-artifacts
 
       - name: Verify MP4 duration
+        if: success()
         run: |
           $video = Get-ChildItem -Path qa-demo-90s-artifacts -Filter demo-video.mp4 -Recurse | Select-Object -First 1
           if (-not $video) { throw "demo-video.mp4 not found" }
@@ -74,13 +75,14 @@ jobs:
           if ($duration -lt 89 -or $duration -gt 91.5) { throw "Unexpected demo duration: $duration" }
 
       - name: Upload 90s demo artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Demo-90s
           path: windows-10/qa-demo-90s-artifacts
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
 
       - name: Remove isolated demo profile
         if: always()
-        run: Remove-Item -Recurse -Force qa/.artisys-qa -ErrorAction SilentlyContinue
+        run: Remove-Item -Recurse -Force .artisys-qa -ErrorAction SilentlyContinue
