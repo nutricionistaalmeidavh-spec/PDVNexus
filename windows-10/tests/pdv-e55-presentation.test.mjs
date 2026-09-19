@@ -105,3 +105,19 @@ test("cashier legibility increases total, table and shortcut typography without 
   assert.match(css, /div:nth-of-type\(3\)\s*>\s*div[\s\S]*?font-size:\s*11px\s*!important/);
   assert.match(css, /aside\s*>\s*div:last-of-type\s*>\s*button[\s\S]*?font-size:\s*11px\s*!important/);
 });
+
+test("cashier upper work area uses larger typography without changing card heights", () => {
+  const css = read(legibilityCssPath);
+  assert.match(css, /div:nth-child\(1\) > div:first-child::before[\s\S]*?font-size:\s*12px\s*!important/);
+  assert.match(css, /div:nth-child\(1\) > div:first-child > p:first-child[\s\S]*?font-size:\s*14px\s*!important/);
+  assert.match(css, /div:nth-child\(1\) > div:last-child span[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /div:nth-child\(1\) > div:last-child strong[\s\S]*?font-size:\s*16px\s*!important/);
+  assert.match(css, /div:nth-child\(2\)::before[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /div:nth-child\(2\) input[\s\S]*?font-size:\s*16px\s*!important/);
+  assert.match(css, /aside > div:nth-of-type\(1\)::before[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /aside > select[\s\S]*?font-size:\s*12px\s*!important/);
+  assert.match(css, /div:nth-of-type\(4\) > div[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /div:nth-of-type\(4\) strong[\s\S]*?font-size:\s*13px\s*!important/);
+  assert.match(css, /\.cashier-reference-metric\s*\{[\s\S]*?font-size:\s*11px\s*!important/);
+  assert.match(css, /\.cashier-reference-metric strong\s*\{[\s\S]*?font-size:\s*14px\s*!important/);
+});
