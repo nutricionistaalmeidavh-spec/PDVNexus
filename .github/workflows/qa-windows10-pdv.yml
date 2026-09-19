@@ -59,6 +59,7 @@ jobs:
         run: |
           node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.config.json
           node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
+          node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo90.config.json
 
       - name: Validate business journey coverage
         run: node --test tests/pdv-qa-business-flows.test.mjs

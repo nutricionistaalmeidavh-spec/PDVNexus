@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "systemId": "pdv-nexus-demo",
+  "systemId": "pdv-nexus-demo-90s",
   "mode": "electron",
   "defaultEnvironment": "local",
   "defaultViewport": "desktop",
@@ -14,7 +14,8 @@
     "local": {
       "env": {
         "NEXUS_APP": "pdv-demo",
-        "NEXUS_USER_DATA_DIR": ".artisys-qa/pdv-demo-isolated"
+        "NEXUS_USER_DATA_DIR": ".artisys-qa/pdv-demo-90s-isolated",
+        "NEXUS_QA_PDV_SEED_FILE": "fixtures/pdv-demo-90s-seed.json"
       }
     }
   },
@@ -26,15 +27,15 @@
     }
   },
   "demos": {
-    "checkout-flow": {
-      "file": "flows/pdv-demo.json",
+    "full-90s": {
+      "file": "flows/pdv-demo-90s.json",
       "preset": "landscape-16x9",
-      "durationTargetSec": 24,
+      "durationTargetSec": 90,
       "captureViewport": {
         "width": 1440,
         "height": 960
       }
     }
   },
-  "defaultDemo": "checkout-flow"
+  "defaultDemo": "full-90s"
 }

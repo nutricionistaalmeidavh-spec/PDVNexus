@@ -1,121 +1,46 @@
 {
   "id": "pdv-demo-90s",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 700 },
-    {
-      "action": "desktopStoreSet",
-      "key": "nexus-core:pdv-store:v1",
-      "name": "seed-demo-completo-temporario",
-      "value": {
-        "catalogProducts": [
-          { "productCode": "00021", "barcode": "7891000000212", "productName": "Picanha Bovina", "unitPrice": 79.9, "itemType": "weight", "shelfLifeDays": 3, "unitLabel": "KG", "stock": 18.4, "minStock": 3, "category": "Acougue" },
-          { "productCode": "00034", "barcode": "7891000000342", "productName": "Tomate Italiano", "unitPrice": 8.99, "itemType": "weight", "shelfLifeDays": 4, "unitLabel": "KG", "stock": 31.7, "minStock": 6, "category": "Hortifruti" },
-          { "productCode": "00101", "barcode": "7895555441971", "productName": "Teclado com fio", "unitPrice": 100, "itemType": "unit", "shelfLifeDays": 0, "unitLabel": "UN", "stock": 12, "minStock": 2, "category": "Informatica" },
-          { "productCode": "00102", "barcode": "7894123412341", "productName": "Mouse sem fio", "unitPrice": 49.9, "itemType": "unit", "shelfLifeDays": 0, "unitLabel": "UN", "stock": 19, "minStock": 4, "category": "Informatica" },
-          { "productCode": "00103", "barcode": "7894900011110", "productName": "Coca-Cola 2,5L", "unitPrice": 12, "itemType": "unit", "shelfLifeDays": 90, "unitLabel": "UN", "stock": 44, "minStock": 8, "category": "Bebidas", "quantityPriceRules": [{ "quantity": 3, "bundlePrice": 30 }] },
-          { "productCode": "00104", "barcode": "7896004000857", "productName": "Arroz Tipo 1 5kg", "unitPrice": 29.9, "itemType": "unit", "shelfLifeDays": 180, "unitLabel": "UN", "stock": 27, "minStock": 5, "category": "Mercearia" },
-          { "productCode": "00105", "barcode": "7896036090246", "productName": "Feijao Carioca 1kg", "unitPrice": 8.49, "itemType": "unit", "shelfLifeDays": 150, "unitLabel": "UN", "stock": 36, "minStock": 7, "category": "Mercearia" },
-          { "productCode": "00106", "barcode": "7891021001205", "productName": "Leite Integral 1L", "unitPrice": 5.79, "itemType": "unit", "shelfLifeDays": 60, "unitLabel": "UN", "stock": 52, "minStock": 10, "category": "Laticinios" },
-          { "productCode": "00107", "barcode": "7891910000197", "productName": "Cafe Torrado 500g", "unitPrice": 18.9, "itemType": "unit", "shelfLifeDays": 180, "unitLabel": "UN", "stock": 21, "minStock": 5, "category": "Mercearia" },
-          { "productCode": "00108", "barcode": "7891150010019", "productName": "Detergente Neutro 500ml", "unitPrice": 3.99, "itemType": "unit", "shelfLifeDays": 365, "unitLabel": "UN", "stock": 63, "minStock": 12, "category": "Limpeza" },
-          { "productCode": "00109", "barcode": "7891000100103", "productName": "Queijo Mussarela", "unitPrice": 42.9, "itemType": "weight", "shelfLifeDays": 20, "unitLabel": "KG", "stock": 9.6, "minStock": 2, "category": "Frios" },
-          { "productCode": "00110", "barcode": "7891000100110", "productName": "Pao de Forma", "unitPrice": 9.49, "itemType": "unit", "shelfLifeDays": 12, "unitLabel": "UN", "stock": 17, "minStock": 4, "category": "Padaria" }
-        ],
-        "registeredCustomers": [
-          { "id": "CLI-001", "name": "Cliente Balcao", "document": "Consumidor final", "city": "Ribeirao Preto", "creditLimit": 0, "creditUsed": 0 },
-          { "id": "CLI-002", "name": "Joao Santos", "document": "123.456.789-00", "city": "Ribeirao Preto", "creditLimit": 5000, "creditUsed": 284.99 },
-          { "id": "CLI-003", "name": "Maria Oliveira", "document": "987.654.321-00", "city": "Sertaozinho", "creditLimit": 2500, "creditUsed": 420 },
-          { "id": "CLI-004", "name": "Mercado Boa Compra", "document": "12.345.678/0001-90", "city": "Ribeirao Preto", "creditLimit": 12000, "creditUsed": 980.5 },
-          { "id": "CLI-005", "name": "Ana Paula Souza", "document": "321.654.987-10", "city": "Cravinhos", "creditLimit": 1800, "creditUsed": 135.8 }
-        ],
-        "completedSales": [
-          { "number": "000101", "openedAt": "2026-09-18T10:00:00.000Z", "customerId": "CLI-002", "seller": "Operador Caixa", "discountPercent": 0, "items": [{ "id": "I-101", "productCode": "00101", "productName": "Teclado com fio", "unitLabel": "UN", "quantity": 1, "unitPrice": 100, "totalPrice": 100, "source": "catalog" }, { "id": "I-102", "productCode": "00102", "productName": "Mouse sem fio", "unitLabel": "UN", "quantity": 1, "unitPrice": 49.9, "totalPrice": 49.9, "source": "catalog" }], "payments": [{ "method": "PIX", "amount": 149.9 }], "finalizedAt": "2026-09-18T10:06:00.000Z", "netTotal": 149.9, "paymentSummary": { "status": "paid", "total": 149.9, "paidTotal": 149.9, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 149.9 } },
-          { "number": "000102", "openedAt": "2026-09-18T13:12:00.000Z", "customerId": "CLI-004", "seller": "Operador Caixa", "discountPercent": 0, "items": [{ "id": "I-201", "productCode": "00021", "productName": "Picanha Bovina", "unitLabel": "KG", "quantity": 1.4, "unitPrice": 79.9, "totalPrice": 111.86, "source": "catalog" }, { "id": "I-202", "productCode": "00104", "productName": "Arroz Tipo 1 5kg", "unitLabel": "UN", "quantity": 2, "unitPrice": 29.9, "totalPrice": 59.8, "source": "catalog" }], "payments": [{ "method": "CREDITO", "amount": 171.66 }], "finalizedAt": "2026-09-18T13:18:00.000Z", "netTotal": 171.66, "paymentSummary": { "status": "paid", "total": 171.66, "paidTotal": 171.66, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 171.66 } },
-          { "number": "000103", "openedAt": "2026-09-18T17:35:00.000Z", "customerId": "CLI-003", "seller": "Gerente", "discountPercent": 5, "items": [{ "id": "I-301", "productCode": "00106", "productName": "Leite Integral 1L", "unitLabel": "UN", "quantity": 4, "unitPrice": 5.79, "totalPrice": 23.16, "source": "catalog" }, { "id": "I-302", "productCode": "00107", "productName": "Cafe Torrado 500g", "unitLabel": "UN", "quantity": 2, "unitPrice": 18.9, "totalPrice": 37.8, "source": "catalog" }], "payments": [{ "method": "A VISTA", "amount": 57.91 }], "finalizedAt": "2026-09-18T17:41:00.000Z", "netTotal": 57.91, "paymentSummary": { "status": "paid", "total": 57.91, "paidTotal": 57.91, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 57.91 } }
-        ],
-        "cashSession": null,
-        "paymentOptions": [
-          { "name": "A VISTA", "feePercent": 0, "showsInCashflow": true },
-          { "name": "PIX", "feePercent": 0, "showsInCashflow": true },
-          { "name": "CREDITO", "feePercent": 3, "showsInCashflow": true },
-          { "name": "DEBITO", "feePercent": 2.5, "showsInCashflow": true },
-          { "name": "A PRAZO", "feePercent": 0, "showsInCashflow": false },
-          { "name": "CHEQUE", "feePercent": 0, "showsInCashflow": true },
-          { "name": "OUTROS", "feePercent": 0, "showsInCashflow": true }
-        ],
-        "deviceConfig": { "scaleBrand": "toledo", "barcodeMode": "DEFAULT_PRICE", "requestCommand": "\u0005", "selectedPort": "", "baudRate": "9600", "manualProductCode": "00034" },
-        "extensions": {
-          "inventoryMovements": [
-            { "id": "MOV-001", "type": "entry", "productCode": "00104", "productName": "Arroz Tipo 1 5kg", "quantity": 20, "reason": "Compra fornecedor", "createdAt": "2026-09-17T08:20:00.000Z", "previousStock": 7, "newStock": 27 },
-            { "id": "MOV-002", "type": "entry", "productCode": "00106", "productName": "Leite Integral 1L", "quantity": 30, "reason": "Reposicao semanal", "createdAt": "2026-09-17T09:10:00.000Z", "previousStock": 22, "newStock": 52 },
-            { "id": "MOV-003", "type": "inventory", "productCode": "00034", "productName": "Tomate Italiano", "quantity": 31.7, "reason": "Inventario abertura", "createdAt": "2026-09-18T07:50:00.000Z", "previousStock": 29.4, "newStock": 31.7 },
-            { "id": "MOV-004", "type": "adjustment", "productCode": "00108", "productName": "Detergente Neutro 500ml", "quantity": 3, "reason": "Ajuste de contagem", "createdAt": "2026-09-18T08:05:00.000Z", "previousStock": 60, "newStock": 63 }
-          ],
-          "cashClosings": [
-            { "id": "CLOSE-001", "status": "balanced", "createdAt": "2026-09-17T22:10:00.000Z", "expected": 1245.3, "counted": 1245.3 },
-            { "id": "CLOSE-002", "status": "balanced", "createdAt": "2026-09-18T22:05:00.000Z", "expected": 987.4, "counted": 987.4 }
-          ],
-          "receiptPrinterConfig": { "paperFormat": "58mm", "paperWidth": 32, "autoPrint": false, "printerName": "Impressora 58/80mm ou A4" },
-          "lastReceiptText": "",
-          "users": [
-            { "id": "OP-001", "name": "Operador Caixa", "role": "cashier", "active": true },
-            { "id": "GER-001", "name": "Gerente", "role": "manager", "active": true, "managerPassword": "123456" }
-          ],
-          "currentOperatorId": "OP-001",
-          "auditLogs": [
-            { "id": "AUD-001", "action": "cash-close", "operatorId": "GER-001", "createdAt": "2026-09-18T22:05:00.000Z" },
-            { "id": "AUD-002", "action": "inventory", "operatorId": "GER-001", "createdAt": "2026-09-18T08:05:00.000Z" }
-          ],
-          "cancelledSales": [{ "number": "000099", "finalizedAt": "2026-09-17T16:20:00.000Z", "reason": "Cliente desistiu", "items": [], "netTotal": 0 }],
-          "terminalConfig": { "terminalId": "CAIXA-01", "terminalName": "Caixa principal", "mode": "single", "active": true },
-          "tefConfig": { "enabled": false, "simulationMode": false, "provider": "Captura manual", "merchantCode": "", "endpointUrl": "", "integrationMode": "simulated" },
-          "tefTransactions": [],
-          "autoBackupConfig": { "enabled": true, "retention": 7, "trigger": "sale-finalized" },
-          "autoBackups": [],
-          "storeSettings": { "storeName": "Mercado Nexus Demo", "document": "12.345.678/0001-90", "phone": "(16) 3333-4455", "address": "Av. Demo, 1000 - Ribeirao Preto/SP", "showOnReceipt": true },
-          "promotionGroups": [{ "id": "PROMO-BEBIDAS", "name": "Bebidas Demo", "active": true, "quantityPriceRules": [{ "quantity": 3, "bundlePrice": 30 }] }]
-        }
-      }
-    },
-    { "action": "reload", "name": "reload-seed", "holdMs": 1200 },
-    { "action": "waitFor", "selector": "a[href=\"#/produtos\"]", "name": "catalogo-ready", "timeoutMs": 20000 },
-
-    { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "abrir-produtos", "holdMs": 4500 },
-    { "action": "expectURL", "includes": "#/produtos", "name": "produtos-route" },
-    { "action": "expectVisible", "text": "Picanha Bovina", "exact": true, "name": "produto-demo-visivel", "holdMs": 2500 },
-    { "action": "screenshot", "name": "01-catalogo-completo" },
-    { "action": "click", "selector": "article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]", "name": "abrir-estoque", "holdMs": 4500 },
-    { "action": "screenshot", "name": "02-estoque-demo" },
-
-    { "action": "click", "selector": "a[href=\"#/caixa\"]", "name": "abrir-caixa", "holdMs": 3500 },
-    { "action": "expectURL", "includes": "#/caixa", "name": "caixa-route" },
-    { "action": "clickIfVisible", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa-se-necessario", "holdMs": 1800 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F2", "name": "nova-venda", "holdMs": 2200 },
-    { "action": "selectOption", "selector": "aside > select", "value": "CLI-002", "name": "selecionar-cliente", "holdMs": 1800 },
-
-    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00103", "name": "digitar-coca", "holdMs": 700 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-coca", "holdMs": 1600 },
-    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00021", "name": "digitar-picanha", "holdMs": 700 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-picanha", "holdMs": 1600 },
-    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00034", "name": "digitar-tomate", "holdMs": 700 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-tomate", "holdMs": 1600 },
-    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00102", "name": "digitar-mouse", "holdMs": 700 },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-mouse", "holdMs": 2500 },
-    { "action": "fill", "selector": "section[aria-label=\"Observação da venda\"] textarea", "value": "Separar em duas sacolas; cliente retira a segunda parte amanhã às 10h.", "name": "observacao-venda", "holdMs": 3500 },
-    { "action": "screenshot", "name": "03-venda-completa" },
-
-    { "action": "click", "text": "PIX", "exact": true, "name": "pagamento-pix", "holdMs": 4000 },
-    { "action": "screenshot", "name": "04-pagamento" },
-    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 2500 },
-    { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "comprovante", "holdMs": 6500 },
-    { "action": "expectText", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "expected": "Mercado Nexus Demo", "name": "loja-no-cupom" },
-    { "action": "screenshot", "name": "05-cupom-nao-fiscal" },
-    { "action": "click", "text": "Fechar", "exact": true, "name": "fechar-comprovante", "holdMs": 1800 },
-
-    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 6500 },
-    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route" },
-    { "action": "expectVisible", "text": "Resumo local das vendas finalizadas", "exact": true, "name": "resumo-financeiro", "holdMs": 4500 },
-    { "action": "expectVisible", "text": "Relatórios e dashboard", "exact": true, "name": "dashboard", "holdMs": 4500 },
-    { "action": "screenshot", "name": "06-financeiro-dashboard" }
+    {"action":"waitFor","selector":"a[href=\"#/caixa\"]","name":"pdv-ready","timeoutMs":20000,"holdMs":1200},
+    {"action":"expectVisible","text":"PDV Nexus","exact":true,"name":"brand-visible","holdMs":800},
+    {"action":"click","selector":"a[href=\"#/produtos\"]","name":"abrir-produtos","holdMs":5000},
+    {"action":"expectURL","includes":"#/produtos","name":"produtos-route"},
+    {"action":"expectVisible","text":"Picanha Bovina","exact":true,"name":"produto-demo-visivel","holdMs":2500},
+    {"action":"screenshot","name":"01-catalogo-completo"},
+    {"action":"click","selector":"article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]","name":"abrir-estoque","holdMs":4000},
+    {"action":"expectVisible","text":"Arroz Tipo 1 5kg","exact":true,"name":"estoque-historico-visivel","holdMs":1800},
+    {"action":"screenshot","name":"02-estoque-demo"},
+    {"action":"click","selector":"a[href=\"#/clientes\"]","name":"abrir-clientes","holdMs":4500},
+    {"action":"expectURL","includes":"#/clientes","name":"clientes-route"},
+    {"action":"expectVisible","text":"Joao Santos","exact":true,"name":"cliente-demo-visivel","holdMs":2500},
+    {"action":"screenshot","name":"03-clientes-demo"},
+    {"action":"click","selector":"a[href=\"#/caixa\"]","name":"abrir-caixa-tela","holdMs":4000},
+    {"action":"expectURL","includes":"#/caixa","name":"caixa-route"},
+    {"action":"click","text":"Abrir caixa","exact":true,"name":"abrir-caixa","holdMs":2200},
+    {"action":"expectVisible","selector":"button:has-text(\"Caixa aberto\")","name":"caixa-aberto","holdMs":1200},
+    {"action":"selectOption","selector":"aside > select","value":"CLI-002","name":"selecionar-cliente","holdMs":1600},
+    {"action":"click","selector":"button:has-text(\"Nova venda\")","name":"nova-venda","holdMs":2200},
+    {"action":"expectVisible","text":"Venda aberta. Adicione produtos.","exact":true,"name":"venda-iniciada","holdMs":800},
+    {"action":"fill","selector":"input[placeholder*=\"Bipe\"]","value":"00103","name":"digitar-coca","holdMs":600},
+    {"action":"press","selector":"input[placeholder*=\"Bipe\"]","key":"Enter","name":"adicionar-coca","holdMs":1500},
+    {"action":"fill","selector":"input[placeholder*=\"Bipe\"]","value":"00021","name":"digitar-picanha","holdMs":600},
+    {"action":"press","selector":"input[placeholder*=\"Bipe\"]","key":"Enter","name":"adicionar-picanha","holdMs":1500},
+    {"action":"fill","selector":"input[placeholder*=\"Bipe\"]","value":"00034","name":"digitar-tomate","holdMs":600},
+    {"action":"press","selector":"input[placeholder*=\"Bipe\"]","key":"Enter","name":"adicionar-tomate","holdMs":1500},
+    {"action":"fill","selector":"input[placeholder*=\"Bipe\"]","value":"00102","name":"digitar-mouse","holdMs":600},
+    {"action":"press","selector":"input[placeholder*=\"Bipe\"]","key":"Enter","name":"adicionar-mouse","holdMs":2500},
+    {"action":"fill","selector":"section[aria-label=\"Observação da venda\"] textarea","value":"Separar em duas sacolas; cliente retira a segunda parte amanhã às 10h.","name":"observacao-venda","holdMs":3500},
+    {"action":"screenshot","name":"04-venda-completa"},
+    {"action":"click","text":"PIX","exact":true,"name":"pagamento-pix","holdMs":4200},
+    {"action":"screenshot","name":"05-pagamento"},
+    {"action":"press","selector":"input[placeholder*=\"Bipe\"]","key":"F8","name":"finalizar-venda","holdMs":2500},
+    {"action":"expectVisible","selector":"[role=\"dialog\"][aria-label=\"Comprovante da venda\"]","name":"comprovante","holdMs":6500},
+    {"action":"expectText","selector":"[role=\"dialog\"][aria-label=\"Comprovante da venda\"] pre","expected":"Mercado Nexus Demo","name":"loja-no-cupom","holdMs":1200},
+    {"action":"screenshot","name":"06-cupom-nao-fiscal"},
+    {"action":"click","text":"Fechar","exact":true,"name":"fechar-comprovante","holdMs":1800},
+    {"action":"click","selector":"a[href=\"#/financeiro\"]","name":"abrir-financeiro","holdMs":6500},
+    {"action":"expectURL","includes":"#/financeiro","name":"financeiro-route"},
+    {"action":"expectVisible","text":"Resumo local das vendas finalizadas","exact":true,"name":"resumo-financeiro","holdMs":4500},
+    {"action":"screenshot","name":"07-financeiro-dashboard"}
   ]
 }

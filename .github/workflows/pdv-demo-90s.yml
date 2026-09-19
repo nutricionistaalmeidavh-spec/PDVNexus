@@ -8,7 +8,8 @@ on:
       - "feat/**"
     paths:
       - ".github/workflows/pdv-demo-90s.yml"
-      - "windows-10/qa/artisys-qa.demo.config.json"
+      - "windows-10/qa/artisys-qa.demo90.config.json"
+      - "windows-10/qa/fixtures/pdv-demo-90s-seed.json"
       - "windows-10/qa/flows/pdv-demo-90s.json"
       - "windows-10/apps/nexus-desktop/main.qa.cjs"
       - "windows-10/apps/pdv-demo/src/**"
@@ -54,7 +55,7 @@ jobs:
         run: node --test tests/pdv-demo-90s.test.mjs
 
       - name: Validate demo manifest
-        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
+        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo90.config.json
 
       - name: Build PDV renderer
         run: npm run build:pdv-demo
@@ -63,7 +64,7 @@ jobs:
         run: choco install ffmpeg -y --no-progress
 
       - name: Generate real 90s Electron demo
-        run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo full-90s --output qa-demo-90s-artifacts
+        run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo90.config.json --demo full-90s --output qa-demo-90s-artifacts
 
       - name: Verify MP4 duration
         if: success()
@@ -85,4 +86,4 @@ jobs:
 
       - name: Remove isolated demo profile
         if: always()
-        run: Remove-Item -Recurse -Force .artisys-qa -ErrorAction SilentlyContinue
+        run: Remove-Item -Recurse -Force qa/.artisys-qa -ErrorAction SilentlyContinue
