@@ -1,0 +1,90 @@
+name: PDV Nexus Demo 90s
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/pdv-demo-90s.yml"
+      - "windows-10/qa/artisys-qa.demo.config.json"
+      - "windows-10/qa/pdv-demo-ephemeral-entry.cjs"
+      - "windows-10/qa/flows/pdv-demo-90s.json"
+      - "windows-10/tests/pdv-demo-90s.test.mjs"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  demo-90s:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+
+      - name: Install PDV dependencies
+        run: npm ci
+
+      - name: Install ArtiSys QA dependencies
+        run: npm ci --prefix tools/artisys-qa
+
+      - name: Validate 90s demo contract
+        run: node --test tests/pdv-demo-90s.test.mjs
+
+      - name: Validate demo manifest
+        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
+
+      - name: Build PDV renderer
+        run: npm run build:pdv-demo
+
+      - name: Install open-source FFmpeg
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Verify video tools
+        run: |
+          ffmpeg -version | Select-Object -First 1
+          ffprobe -version | Select-Object -First 1
+
+      - name: Capture commercial PDV flow
+        run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo commercial-flow-90s --output qa-demo-90s-artifacts
+
+      - name: Verify and expose final MP4
+        run: |
+          $summary = Get-ChildItem qa-demo-90s-artifacts -Recurse -Filter demo-summary.json | Select-Object -First 1
+          if (-not $summary) { throw "demo-summary.json nao encontrado" }
+          $data = Get-Content $summary.FullName -Raw | ConvertFrom-Json
+          if ($data.status -ne "passed") { throw "Demo falhou: $($data.status)" }
+          if ([math]::Abs([double]$data.videoDurationSec - 90) -gt 1.0) { throw "Duracao fora do alvo: $($data.videoDurationSec)s" }
+          $video = Get-ChildItem qa-demo-90s-artifacts -Recurse -Filter demo-video.mp4 | Select-Object -First 1
+          if (-not $video) { throw "demo-video.mp4 nao encontrado" }
+          Copy-Item $video.FullName "qa-demo-90s-artifacts/PDV-Nexus-Demo-90s.mp4" -Force
+          Copy-Item $summary.FullName "qa-demo-90s-artifacts/PDV-Nexus-Demo-90s-summary.json" -Force
+          Write-Host "Video final: $($video.FullName)"
+          Write-Host "Duracao: $($data.videoDurationSec)s"
+
+      - name: Upload 90s demo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Demo-90s
+          path: windows-10/qa-demo-90s-artifacts
+          if-no-files-found: error
+          retention-days: 3

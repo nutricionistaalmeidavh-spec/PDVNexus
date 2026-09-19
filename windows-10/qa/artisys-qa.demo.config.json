@@ -18,7 +18,7 @@
     }
   },
   "electron": {
-    "entry": "../apps/nexus-desktop/main.cjs",
+    "entry": "pdv-demo-ephemeral-entry.cjs",
     "executablePath": "../node_modules/electron/dist/electron.exe",
     "env": {
       "NEXUS_APP": "pdv-demo"
@@ -29,6 +29,15 @@
       "file": "flows/pdv-demo.json",
       "preset": "landscape-16x9",
       "durationTargetSec": 24,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "commercial-flow-90s": {
+      "file": "flows/pdv-demo-90s.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 90,
       "captureViewport": {
         "width": 1440,
         "height": 960
