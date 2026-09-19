@@ -143,3 +143,95 @@
     font-size: 30px !important;
   }
 }
+
+/* Desktop reading pass for the upper cashier work area. Card dimensions stay
+   untouched: only typography, weight and line-height are increased. */
+@media (min-width: 901px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child::before {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:first-child > p:first-child {
+    font-size: 14px !important;
+    line-height: 1.15 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child span {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(1) > div:last-child strong {
+    font-size: 16px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2)::before {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) input {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) button {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1)::before {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) span {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > div:nth-of-type(1) strong {
+    font-size: 14px !important;
+    line-height: 1.1 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > aside > select {
+    font-size: 12px !important;
+    line-height: 1.15 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3)::before {
+    font-size: 11px !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(3) > div {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) > div {
+    font-size: 11px !important;
+    line-height: 1.15 !important;
+  }
+
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(4) strong {
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cashier-reference-metric {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cashier-reference-metric strong {
+    font-size: 14px !important;
+    line-height: 1 !important;
+  }
+
+  .cashier-reference-action {
+    font-size: 11px !important;
+  }
+}
