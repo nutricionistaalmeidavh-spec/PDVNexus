@@ -11,6 +11,7 @@
   "include": [
     "tests/**/*.ts",
     "packages/database/src/pdv.ts",
+    "packages/modules/pdv-ops/src/index.ts",
     "apps/pdv-demo/src/receiptPrintFormat.ts",
     "apps/pdv-demo/src/quantityPricing.ts",
     "apps/pdv-demo/src/productLabels.ts",
