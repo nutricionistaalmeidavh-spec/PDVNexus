@@ -95,6 +95,13 @@ jobs:
             echo "draft=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Protect published version from overwrite
+        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'true' && steps.existing.outputs.draft != 'true'
+        shell: bash
+        run: |
+          echo "::error::${{ steps.version.outputs.tag }} já foi publicada. Incremente pdv-release.json antes de gerar novos instaladores."
+          exit 1
+
       - name: Check Drive synchronization credential
         if: steps.gates.outputs.ready == 'true'
         id: drive_auth
