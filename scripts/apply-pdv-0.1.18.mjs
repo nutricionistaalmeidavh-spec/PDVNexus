@@ -68,7 +68,7 @@ if (!publish.includes("Protect published version from overwrite")) {
         if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'true' && steps.existing.outputs.draft != 'true'
         shell: bash
         run: |
-          echo "::error::${{ steps.version.outputs.tag }} já foi publicada. Incremente pdv-release.json antes de gerar novos instaladores."
+          echo "::error::\${{ steps.version.outputs.tag }} já foi publicada. Incremente pdv-release.json antes de gerar novos instaladores."
           exit 1
 
 `;
