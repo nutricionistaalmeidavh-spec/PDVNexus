@@ -47,12 +47,12 @@ jobs:
           npm run test:pdv-payments
           npm run test:pdv-upgrade
 
-      - name: Commit verified implementation
+      - name: Commit verified application changes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add windows-10/apps/pdv-demo/src/PdvDemoApp.tsx windows-7/apps/pdv-demo/src/PdvDemoApp.tsx pdv-release.json .github/workflows/publish-pdv-release.yml
+          git add windows-10/apps/pdv-demo/src/PdvDemoApp.tsx windows-7/apps/pdv-demo/src/PdvDemoApp.tsx pdv-release.json
           git diff --cached --quiet && exit 0
           git commit -m "feat(pdv): release 0.1.18 with cart quantity controls"
           git push origin HEAD:feat/pdv-0.1.18-cart-quantity-release-guard
