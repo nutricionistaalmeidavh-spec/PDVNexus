@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
-const { compareVersions, launchWindowsInstaller, preparePdvVersionMigration, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
+const { compareVersions, formatUpdaterErrorDetail, launchWindowsInstaller, preparePdvVersionMigration, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
 
 function seed017Database(dbPath) {
   const db = new DatabaseSync(dbPath);
@@ -118,4 +118,15 @@ test("launcher usa ShellExecute via PowerShell com UAC e só conclui após o com
   assert.match(commandText, /Start-Process/);
   assert.match(commandText, /-Verb RunAs/);
   assert.match(commandText, /PDV Nexus ''Teste''\.exe/);
+});
+
+test("erro de execução bloqueada vira mensagem amigável e mantém o PDV aberto", () => {
+  const error = new Error("spawn installer EACCES");
+  error.code = "EACCES";
+
+  const detail = formatUpdaterErrorDetail(error);
+
+  assert.match(detail, /Windows impediu/i);
+  assert.match(detail, /PDV continuará aberto/i);
+  assert.doesNotMatch(detail, /spawn installer EACCES/i);
 });
