@@ -4,10 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createRequire } from "node:module";
+import { EventEmitter } from "node:events";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
-const { compareVersions, preparePdvVersionMigration, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
+const { compareVersions, launchWindowsInstaller, preparePdvVersionMigration, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
 
 function seed017Database(dbPath) {
   const db = new DatabaseSync(dbPath);
@@ -79,4 +80,42 @@ test("manifesto seleciona apenas o canal e arquitetura corretos", () => {
   };
   assert.equal(selectArtifact(manifest, "windows10-x64", "x64").file, "w10.exe");
   assert.throws(() => selectArtifact(manifest, "windows8-x86", "x64"), /Arquitetura incompatível/);
+});
+
+test("launcher do instalador trata EACCES como rejeição controlada, sem erro não tratado", async () => {
+  const child = new EventEmitter();
+  child.unref = () => assert.fail("não deve chamar unref quando o processo falha ao iniciar");
+  const spawnImpl = () => {
+    queueMicrotask(() => {
+      const error = new Error("spawn installer EACCES");
+      error.code = "EACCES";
+      child.emit("error", error);
+    });
+    return child;
+  };
+
+  await assert.rejects(
+    launchWindowsInstaller("C:\\Temp\\PDV-Nexus-Setup.exe", { spawnImpl }),
+    (error) => error?.code === "EACCES"
+  );
+});
+
+test("launcher usa ShellExecute via PowerShell com UAC e só conclui após o comando iniciar", async () => {
+  const child = new EventEmitter();
+  child.unref = () => {};
+  let invocation = null;
+  const spawnImpl = (command, args, options) => {
+    invocation = { command, args, options };
+    queueMicrotask(() => child.emit("exit", 0, null));
+    return child;
+  };
+
+  await launchWindowsInstaller("C:\\Temp\\PDV Nexus 'Teste'.exe", { spawnImpl });
+
+  assert.equal(invocation.command.toLowerCase(), "powershell.exe");
+  assert.ok(invocation.args.includes("-Command"));
+  const commandText = invocation.args[invocation.args.indexOf("-Command") + 1];
+  assert.match(commandText, /Start-Process/);
+  assert.match(commandText, /-Verb RunAs/);
+  assert.match(commandText, /PDV Nexus ''Teste''\.exe/);
 });
