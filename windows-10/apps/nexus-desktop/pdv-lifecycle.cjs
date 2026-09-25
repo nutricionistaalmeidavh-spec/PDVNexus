@@ -143,6 +143,59 @@ function appendUpdaterLog(logPath, message) {
   }
 }
 
+function powershellLiteral(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function launchWindowsInstaller(installerPath, { spawnImpl = spawn } = {}) {
+  const command = `$ErrorActionPreference = 'Stop'; Start-Process -FilePath ${powershellLiteral(installerPath)} -Verb RunAs`;
+
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnImpl(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", command],
+        { windowsHide: true, stdio: "ignore" }
+      );
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    let settled = false;
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    child.once("error", rejectOnce);
+    child.once("exit", (code, signal) => {
+      if (settled) return;
+      settled = true;
+      if (code === 0) {
+        resolve({ code: 0 });
+        return;
+      }
+
+      const error = new Error("O Windows não conseguiu iniciar o instalador da atualização.");
+      error.code = "PDV_INSTALLER_LAUNCH_FAILED";
+      error.exitCode = code;
+      error.signal = signal;
+      reject(error);
+    });
+  });
+}
+
+function formatUpdaterErrorDetail(error) {
+  const code = error?.code;
+  if (code === "EACCES" || code === "EPERM" || code === "PDV_INSTALLER_LAUNCH_FAILED") {
+    return "O Windows impediu a abertura do instalador. O PDV continuará aberto e seus dados não foram alterados. Tente novamente e confirme a solicitação de permissão do Windows (UAC).";
+  }
+  return "Não foi possível concluir a atualização automática. O PDV continuará aberto e seus dados não foram alterados. Tente novamente em alguns minutos.";
+}
+
 async function startPdvAutoUpdater({ app, dialog, channel, manifestUrl }) {
   if (!app?.isPackaged || !channel || !manifestUrl) return { status: "disabled" };
 
@@ -184,19 +237,33 @@ async function startPdvAutoUpdater({ app, dialog, channel, manifestUrl }) {
       return { status: "deferred", version: manifest.version };
     }
 
-    const child = spawn(installerPath, [], { detached: true, stdio: "ignore" });
-    child.unref();
-    appendUpdaterLog(logPath, `Instalador ${manifest.version} iniciado.`);
+    await launchWindowsInstaller(installerPath);
+    appendUpdaterLog(logPath, `Instalador ${manifest.version} iniciado com elevação do Windows.`);
     app.quit();
     return { status: "installing", version: manifest.version };
   } catch (error) {
     appendUpdaterLog(logPath, `Falha: ${error?.stack || error?.message || String(error)}`);
+    try {
+      await dialog?.showMessageBox?.({
+        type: "error",
+        title: "Atualização do PDV Nexus",
+        message: "Não foi possível iniciar a atualização.",
+        detail: formatUpdaterErrorDetail(error),
+        buttons: ["OK"],
+        defaultId: 0,
+        noLink: true
+      });
+    } catch {
+      // A falha do aviso não pode encerrar o PDV.
+    }
     return { status: "error", error: error?.message || String(error) };
   }
 }
 
 module.exports = {
   compareVersions,
+  formatUpdaterErrorDetail,
+  launchWindowsInstaller,
   preparePdvVersionMigration,
   selectArtifact,
   sha256File,

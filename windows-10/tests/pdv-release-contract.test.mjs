@@ -6,8 +6,8 @@ const appSource = fs.readFileSync(new URL("../apps/pdv-demo/src/PdvDemoApp.tsx",
 const releaseConfig = JSON.parse(fs.readFileSync(new URL("../../pdv-release.json", import.meta.url), "utf8"));
 const publishWorkflow = fs.readFileSync(new URL("../../.github/workflows/publish-pdv-release.yml", import.meta.url), "utf8");
 
-test("release atual do PDV é 0.1.18", () => {
-  assert.equal(releaseConfig.version, "0.1.18");
+test("release atual do PDV é 0.1.19", () => {
+  assert.equal(releaseConfig.version, "0.1.19");
 });
 
 test("carrinho expõe controles explícitos para diminuir e aumentar quantidade", () => {
