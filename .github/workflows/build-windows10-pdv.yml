@@ -43,7 +43,20 @@ jobs:
           cache-dependency-path: windows-10/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+              npm ci
+              if ($LASTEXITCODE -eq 0) { break }
+              throw "npm ci exited with code $LASTEXITCODE"
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Write-Warning "npm ci attempt $attempt failed; retrying after transient download error."
+              Start-Sleep -Seconds (10 * $attempt)
+            }
+          }
 
       - name: Typecheck
         run: npm run typecheck
