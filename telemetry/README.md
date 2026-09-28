@@ -2,6 +2,13 @@
 
 A telemetria do PDV Nexus e opcional, privacy-first e fail-open: nenhuma venda, estoque, caixa, impressao ou atualizacao depende dela para funcionar.
 
+## Arquitetura de dados
+
+- dados operacionais do PDV permanecem no SQLite/local do cliente;
+- o D1 remoto `pdvnexus` e o banco de controle usado para licencas e telemetria;
+- a telemetria usa tabelas proprias prefixadas com `telemetry_`;
+- o Worker de telemetria e separado do fluxo de licenciamento, embora ambos possam usar o mesmo D1.
+
 ## Politica do cliente
 
 - endpoint vazio por padrao: nenhum dado e enviado;
@@ -53,22 +60,23 @@ Endpoints:
 
 O resumo administrativo retorna contagem de instalacoes, estimativa de online nos ultimos 10 minutos, ativos em 24 horas e erros tecnicos em 24 horas.
 
-## Opcional: Cloudflare Worker + D1
+## Cloudflare Worker + D1 `pdvnexus`
 
-Existe um adaptador em `cloudflare/telemetry/` que implementa o mesmo protocolo. Ele e opcional e nao e dependencia do PDV.
+O adaptador em `cloudflare/telemetry/` implementa o mesmo protocolo e reutiliza o D1 `pdvnexus`, criado como banco remoto de controle para licencas + telemetria.
 
-A configuracao `cloudflare/telemetry/wrangler.telemetry.jsonc` usa somente o binding dedicado `DB`. O `database_id` versionado no repositorio e propositalmente um placeholder seguro e nunca aponta para o banco operacional do PDV.
+A configuracao `cloudflare/telemetry/wrangler.telemetry.jsonc` publica um Worker separado chamado `pdv-nexus-telemetry`, ligado ao mesmo D1 `pdvnexus` pelo binding `DB`. Isso evita sobrescrever o Worker/rotas de licenciamento.
 
-Passos gerais:
+As tabelas novas da telemetria sao isoladas por nome:
 
-1. criar um D1 dedicado `pdv-nexus-telemetry`;
-2. substituir o placeholder pelo `database_id` desse D1 dedicado em `cloudflare/telemetry/wrangler.telemetry.jsonc`;
-3. aplicar `cloudflare/telemetry/migrations/0001_init.sql` no D1 dedicado;
-4. cadastrar `TELEMETRY_ADMIN_TOKEN` como secret do Worker;
-5. publicar com `npm run deploy:isolated --prefix cloudflare/telemetry`;
-6. compilar o instalador com `PDV_TELEMETRY_ENDPOINT=https://...` definido explicitamente.
+- `telemetry_installations`
+- `telemetry_events`
 
-Nao existe caminho de deploy de telemetria apontando para D1/R2 operacional do Nexus.
+Passos de deploy:
+
+1. aplicar `cloudflare/telemetry/migrations/0001_init.sql` no D1 `pdvnexus`;
+2. cadastrar `TELEMETRY_ADMIN_TOKEN` como secret do Worker de telemetria;
+3. publicar com `npm run deploy:isolated --prefix cloudflare/telemetry`;
+4. compilar o instalador com `PDV_TELEMETRY_ENDPOINT=https://...` definido explicitamente.
 
 ## Ativacao no instalador
 
