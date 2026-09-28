@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS installations (
+CREATE TABLE IF NOT EXISTS telemetry_installations (
   installation_id TEXT PRIMARY KEY,
   credential_hash TEXT NOT NULL UNIQUE,
   app_version TEXT NOT NULL,
@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS installations (
   last_session_id TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_installations_last_seen
-  ON installations(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_telemetry_installations_last_seen
+  ON telemetry_installations(last_seen_at);
 
 CREATE TABLE IF NOT EXISTS telemetry_events (
   event_id TEXT PRIMARY KEY,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
   release_id TEXT NOT NULL,
   dimensions_json TEXT NOT NULL,
   measurements_json TEXT NOT NULL,
-  FOREIGN KEY (installation_id) REFERENCES installations(installation_id) ON DELETE CASCADE
+  FOREIGN KEY (installation_id) REFERENCES telemetry_installations(installation_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_events_installation_time
