@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pdv-nexus-telemetry",
+  "name": "pdvnexus",
   "main": "cloudflare/telemetry/src/index.js",
   "compatibility_date": "2026-09-28",
   "workers_dev": true,
