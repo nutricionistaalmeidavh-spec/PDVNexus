@@ -4,7 +4,8 @@ import {
   ensureSchema,
   registerInstallation,
   recordEvent,
-  purgeOldEvents
+  purgeOldEvents,
+  telemetrySummary
 } from './storage.js';
 
 const MAX_BODY_BYTES = 128 * 1024;
@@ -42,14 +43,20 @@ function validateAsClient(fn, input) {
     return fn(input);
   } catch (error) {
     if (error?.statusCode) throw error;
-    throw httpError(422, String(error?.message || 'Payload invalido.'));
+    throw httpError(422, String(error?.message || 'Payload invalido.').slice(0, 180));
   }
 }
 
 function database(env) {
-  const db = env?.pdvnexus;
-  if (!db?.prepare) throw httpError(503, 'Binding D1 pdvnexus indisponivel.');
+  const db = env?.DB;
+  if (!db?.prepare) throw httpError(503, 'Binding D1 DB indisponivel.');
   return db;
+}
+
+function adminAuthorized(request, env) {
+  const expected = String(env?.TELEMETRY_ADMIN_TOKEN || '').trim();
+  if (!expected) return false;
+  return String(request.headers.get('authorization') || '') === `Bearer ${expected}`;
 }
 
 async function handleRegistration(request, env) {
@@ -73,6 +80,23 @@ async function handleEvents(request, env) {
   for (const event of batch.events) {
     if (event.installation_id !== auth.installation_id) throw httpError(403, 'installation_id divergente da credencial.');
     await recordEvent(db, event, now);
+    env.ANALYTICS?.writeDataPoint?.({
+      indexes: [event.installation_id],
+      blobs: [
+        event.event_name,
+        event.app_version,
+        event.release_id,
+        event.dimensions?.subsystem || '',
+        event.dimensions?.operation || '',
+        event.dimensions?.fingerprint || '',
+        event.dimensions?.result || '',
+        event.dimensions?.channel || ''
+      ],
+      doubles: [
+        Number(event.measurements?.uptime_seconds || 0),
+        Number(event.measurements?.duration_ms || 0)
+      ]
+    });
   }
 
   try {
@@ -82,6 +106,11 @@ async function handleEvents(request, env) {
   }
 
   return json(202, { accepted: batch.events.length });
+}
+
+async function handleAdminSummary(request, env) {
+  if (!adminAuthorized(request, env)) return json(401, { error: 'Nao autorizado.' });
+  return json(200, await telemetrySummary(database(env), new Date().toISOString()));
 }
 
 async function handleRequest(request, env) {
@@ -96,6 +125,9 @@ async function handleRequest(request, env) {
     if (request.method === 'POST' && url.pathname === '/v1/events') {
       return await handleEvents(request, env);
     }
+    if (request.method === 'GET' && url.pathname === '/v1/admin/summary') {
+      return await handleAdminSummary(request, env);
+    }
     return json(404, { error: 'Not found.' });
   } catch (error) {
     const status = Number(error?.statusCode) || 500;
@@ -104,5 +136,5 @@ async function handleRequest(request, env) {
   }
 }
 
-export { MAX_BODY_BYTES, handleRequest };
+export { MAX_BODY_BYTES, adminAuthorized, handleRequest };
 export default { fetch: handleRequest };
