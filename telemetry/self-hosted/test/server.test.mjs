@@ -96,7 +96,7 @@ test('coletor rejeita payload sensivel e credencial invalida', async t => {
       email: 'cliente@example.com'
     })
   });
-  assert.equal(invalidRegistration.status, 500);
+  assert.equal(invalidRegistration.status, 422);
 
   const invalidCredential = await fetch(`${base}/v1/events`, {
     method: 'POST',
