@@ -1,0 +1,62 @@
+name: QA Telemetria PDV Nexus
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/qa-telemetry.yml"
+      - "cloudflare/telemetry/**"
+      - "telemetry/**"
+      - "windows-10/apps/nexus-desktop/pdv-telemetry.cjs"
+      - "windows-10/tests/pdv-telemetry.test.mjs"
+      - "windows-7/apps/nexus-desktop/pdv-telemetry.cjs"
+      - "windows-7/tests/pdv-telemetry.test.mjs"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/qa-telemetry.yml"
+      - "cloudflare/telemetry/**"
+      - "telemetry/**"
+      - "windows-10/apps/nexus-desktop/pdv-telemetry.cjs"
+      - "windows-10/tests/pdv-telemetry.test.mjs"
+      - "windows-7/apps/nexus-desktop/pdv-telemetry.cjs"
+      - "windows-7/tests/pdv-telemetry.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telemetry-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check Cloudflare collector syntax
+        run: |
+          node --check cloudflare/telemetry/src/schema.js
+          node --check cloudflare/telemetry/src/auth.js
+          node --check cloudflare/telemetry/src/storage.js
+          node --check cloudflare/telemetry/src/index.js
+
+      - name: Test Cloudflare protocol contract
+        run: node --test cloudflare/telemetry/test/*.test.mjs
+
+      - name: Check self-hosted collector syntax
+        run: node --check telemetry/self-hosted/server.mjs
+
+      - name: Test self-hosted collector
+        run: node --test telemetry/self-hosted/test/*.test.mjs
+
+      - name: Test Windows 10 and 11 telemetry client
+        run: node --test windows-10/tests/pdv-telemetry.test.mjs
+
+      - name: Test Windows 7 and 8 telemetry client
+        run: node --test windows-7/tests/pdv-telemetry.test.mjs
