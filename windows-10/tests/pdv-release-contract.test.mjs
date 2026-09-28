@@ -21,3 +21,11 @@ test("release publicada bloqueia sobrescrita silenciosa da mesma versão", () =>
   assert.match(publishWorkflow, /steps\.existing\.outputs\.exists == 'true'/);
   assert.match(publishWorkflow, /steps\.existing\.outputs\.draft != 'true'/);
 });
+
+test("manifesto de atualização usa bridge sem elevação para clientes legados e preserva o instalador real", () => {
+  assert.match(publishWorkflow, /PDV-Nexus-Update-Bridge-/);
+  assert.match(publishWorkflow, /RequestExecutionLevel user/);
+  assert.match(publishWorkflow, /ExecShell "runas"/);
+  assert.match(publishWorkflow, /legacyDirectSpawnCompatible:true/);
+  assert.match(publishWorkflow, /installerFile:\$w10InstallerFile/);
+});
