@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pdv-nexus-telemetry",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-28",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pdv-nexus-telemetry",
+      "database_id": "REPLACE_WITH_D1_ID"
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "pdv_nexus_telemetry"
+    }
+  ]
+}
