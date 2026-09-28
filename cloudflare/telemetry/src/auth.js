@@ -21,7 +21,7 @@ async function authenticateRequest(request, db) {
   const match = /^Bearer\s+(.+)$/i.exec(header);
   if (!match) return null;
   const credentialHash = await hashCredential(match[1].trim());
-  return db.prepare('SELECT installation_id FROM installations WHERE credential_hash = ?').bind(credentialHash).first();
+  return db.prepare('SELECT installation_id FROM telemetry_installations WHERE credential_hash = ?').bind(credentialHash).first();
 }
 
 export { createCredential, hashCredential, authenticateRequest };
