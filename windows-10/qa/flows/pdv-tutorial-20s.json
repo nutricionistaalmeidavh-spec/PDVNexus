@@ -1,0 +1,35 @@
+{
+  "id": "pdv-tutorial-20s",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/produtos\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 300 },
+    { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "abrir-produtos", "holdMs": 550 },
+    { "action": "expectVisible", "text": "Produtos e variações", "exact": true, "name": "produtos-visiveis", "holdMs": 300 },
+
+    { "action": "click", "text": "Novo produto", "exact": true, "name": "novo-produto", "holdMs": 450 },
+    { "action": "fill", "selector": "input[placeholder=\"Código *\"]", "value": "00999", "name": "preencher-codigo", "holdMs": 300 },
+    { "action": "fill", "selector": "input[placeholder=\"Descrição *\"]", "value": "Café 500g", "name": "preencher-descricao", "holdMs": 300 },
+    { "action": "fill", "selector": "input[placeholder=\"Categoria (opcional)\"]", "value": "Mercearia", "name": "preencher-categoria", "holdMs": 250 },
+    { "action": "fill", "selector": "input[placeholder=\"Preço de venda *\"]", "value": "18.90", "name": "preencher-preco", "holdMs": 300 },
+    { "action": "fill", "selector": "input[placeholder=\"Estoque inicial (opcional)\"]", "value": "10", "name": "preencher-estoque", "holdMs": 250 },
+    { "action": "fill", "selector": "input[placeholder=\"Estoque mínimo (opcional)\"]", "value": "2", "name": "preencher-estoque-minimo", "holdMs": 250 },
+    { "action": "click", "text": "Cadastrar produto", "exact": true, "name": "cadastrar-produto", "holdMs": 700 },
+    { "action": "expectVisible", "text": "Café 500g", "exact": true, "name": "produto-cadastrado", "holdMs": 500 },
+
+    { "action": "click", "selector": "a[href=\"#/caixa\"]", "name": "abrir-caixa-tutorial", "holdMs": 550 },
+    { "action": "click", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa", "holdMs": 650 },
+    { "action": "expectVisible", "selector": "button:has-text(\"Caixa aberto\")", "name": "caixa-aberto", "holdMs": 350 },
+
+    { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda", "holdMs": 550 },
+    { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "venda-iniciada", "holdMs": 250 },
+    { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "00999", "name": "digitar-produto", "holdMs": 300 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "adicionar-produto", "holdMs": 600 },
+    { "action": "expectVisible", "text": "1 UN x R$ 18,90", "exact": true, "name": "produto-no-carrinho", "holdMs": 400 },
+
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F6", "name": "pagamento-a-vista", "holdMs": 550 },
+    { "action": "expectVisible", "selector": "input[type=\"number\"][value=\"18.9\"]", "name": "pagamento-registrado", "holdMs": 300 },
+    { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "F8", "name": "finalizar-venda", "holdMs": 900 },
+    { "action": "expectVisible", "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]", "name": "venda-concluida", "holdMs": 1200 },
+    { "action": "expectVisible", "selector": "pre:has-text(\"CUPOM NAO FISCAL\")", "name": "comprovante-visivel", "holdMs": 500 },
+    { "action": "screenshot", "name": "tutorial-venda-finalizada" }
+  ]
+}
