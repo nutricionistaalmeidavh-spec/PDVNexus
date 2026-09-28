@@ -25,8 +25,8 @@ test('release workflow syncs stable installers to Drive after GitHub Release', (
 test('release artifacts are downloaded even when a Release already exists so Drive sync can be retried', () => {
   const marker = '- name: Download installers from successful gate runs';
   const start = workflow.indexOf(marker);
-  const end = workflow.indexOf('- name: Generate update manifest', start);
-  const block = workflow.slice(start, end);
-  assert.ok(start >= 0 && end > start, 'download step block missing');
+  const nextStep = workflow.indexOf('\n      - name:', start + marker.length);
+  const block = workflow.slice(start, nextStep >= 0 ? nextStep : workflow.length);
+  assert.ok(start >= 0, 'download step block missing');
   assert.doesNotMatch(block, /steps\.existing\.outputs\.exists == 'false'/);
 });
