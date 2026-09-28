@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.21",
+  "version": "2.0.0",
   "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
   "telemetryEndpoint": "https://pdvnexus.nutricionistaalmeidavh.workers.dev",
   "distribution": {
