@@ -12,7 +12,7 @@
       "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
-        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-10-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
         { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2026-09-17", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
       ],
       "saleAllocations": []
@@ -29,7 +29,7 @@
       "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
-        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-10-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
         { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2027-06-30", "quantity": 5, "remainingQuantity": 0, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
       ],
       "saleAllocations": []
@@ -45,7 +45,7 @@
       "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
-        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
+        { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-10-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
         { "id": "LOT-QA-B", "productCode": "00103", "lotNumber": "QA-LONGO", "expiresAt": "2027-06-30", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" }
       ],
       "saleAllocations": []
