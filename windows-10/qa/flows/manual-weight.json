@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "name": "peso-manual-caixa",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "desktopStoreSet",
+      "key": "nexus-core:pdv-store:v1",
+      "name": "reset-pdv",
+      "value": {}
+    },
+    {
+      "action": "reload",
+      "name": "reload-reset"
+    },
+    {
+      "action": "waitFor",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "name": "caixa-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "clickIfVisible",
+      "text": "Abrir caixa",
+      "exact": true,
+      "name": "abrir-caixa",
+      "holdMs": 150
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F2",
+      "name": "nova-venda",
+      "holdMs": 150
+    },
+    {
+      "action": "click",
+      "text": "Pesar",
+      "exact": true,
+      "name": "abrir-peso"
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Código do produto vendido por peso\"]",
+      "value": "00034",
+      "name": "produto"
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Peso manual (g)\"]",
+      "value": "350",
+      "name": "gramatura"
+    },
+    {
+      "action": "click",
+      "text": "Lançar gramatura",
+      "exact": true,
+      "name": "lancar"
+    },
+    {
+      "action": "expectVisible",
+      "text": "0,35 KG x R$ 8,99",
+      "exact": true,
+      "name": "item-fracionado"
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F6",
+      "name": "pagamento",
+      "holdMs": 150
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F8",
+      "name": "finalizar",
+      "holdMs": 650
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]",
+      "name": "comprovante"
+    },
+    {
+      "action": "click",
+      "text": "Fechar",
+      "exact": true,
+      "name": "fechar",
+      "holdMs": 150
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 450,
+      "name": "persistir"
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "completedSales.0.items.0.quantity",
+      "expected": 0.35,
+      "name": "peso-persistido"
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "completedSales.0.items.0.source",
+      "expected": "manual",
+      "name": "origem-manual"
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "completedSales.0.netTotal",
+      "expected": 3.15,
+      "name": "total"
+    }
+  ]
+}
