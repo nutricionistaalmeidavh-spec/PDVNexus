@@ -98,6 +98,9 @@ jobs:
       - name: Run physical batch tracking user journey
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow batch-physical-tracking --output qa-batch-tracking-artifacts
 
+      - name: Run manual weight checkout E2E
+        run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow manual-weight --output qa-manual-weight-artifacts
+
       - name: Run business-critical user journeys
         run: node qa/run-business-flows.mjs --config qa/artisys-qa.config.json --suite qa/business-flows.json --output qa-business-artifacts
 
@@ -125,6 +128,15 @@ jobs:
         with:
           name: PDV-Nexus-ArtiSys-QA-Batch-Tracking
           path: windows-10/qa-batch-tracking-artifacts
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload manual weight QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA-Manual-Weight
+          path: windows-10/qa-manual-weight-artifacts
           if-no-files-found: warn
           retention-days: 3
 
