@@ -7,6 +7,7 @@ module.exports = {
   extraMetadata: {
     ...(base.extraMetadata || {}),
     version: release.version,
-    pdvUpdateManifestUrl: release.manifestUrl
+    pdvUpdateManifestUrl: release.manifestUrl,
+    pdvTelemetryEndpoint: String(process.env.PDV_TELEMETRY_ENDPOINT || "").trim()
   }
 };
