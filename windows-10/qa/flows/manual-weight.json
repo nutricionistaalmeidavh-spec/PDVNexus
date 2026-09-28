@@ -64,7 +64,7 @@
     },
     {
       "action": "expectVisible",
-      "text": "0,35 KG x R$ 8,99",
+      "text": "0.350 KG x R$ 8,99",
       "exact": true,
       "name": "item-fracionado"
     },
