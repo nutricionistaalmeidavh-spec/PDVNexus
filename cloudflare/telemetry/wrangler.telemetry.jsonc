@@ -7,9 +7,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "pdv-nexus-telemetry",
-      // Placeholder seguro para CI/dry-run. Substituir somente pelo ID de um D1 dedicado de telemetria antes do deploy real.
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_name": "pdvnexus",
+      "database_id": "4a4cf881-6996-4fa7-86d0-4137bf4789f6"
     }
   ]
 }
