@@ -9,6 +9,7 @@ const desktopBuilder = fs.readFileSync(new URL("../apps/nexus-desktop/electron-b
 
 test("release atual do PDV é 2.0.0", () => {
   assert.equal(releaseConfig.version, "2.0.0");
+  assert.match(releaseConfig.version, /^\d+\.\d+\.\d+$/);
 });
 
 test("carrinho expõe controles explícitos para diminuir e aumentar quantidade", () => {
