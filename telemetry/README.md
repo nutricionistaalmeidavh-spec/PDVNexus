@@ -57,18 +57,18 @@ O resumo administrativo retorna contagem de instalacoes, estimativa de online no
 
 Existe um adaptador em `cloudflare/telemetry/` que implementa o mesmo protocolo. Ele e opcional e nao e dependencia do PDV.
 
-Para telemetria isolada, use `cloudflare/telemetry/wrangler.telemetry.jsonc`. O arquivo `wrangler.jsonc` existente pode representar recursos ja provisionados por outros fluxos e nao deve ser reaproveitado automaticamente.
+A configuracao `cloudflare/telemetry/wrangler.telemetry.jsonc` usa somente o binding dedicado `DB`. O `database_id` versionado no repositorio e propositalmente um placeholder seguro e nunca aponta para o banco operacional do PDV.
 
 Passos gerais:
 
 1. criar um D1 dedicado `pdv-nexus-telemetry`;
-2. colocar o `database_id` em `cloudflare/telemetry/wrangler.telemetry.jsonc`;
+2. substituir o placeholder pelo `database_id` desse D1 dedicado em `cloudflare/telemetry/wrangler.telemetry.jsonc`;
 3. aplicar `cloudflare/telemetry/migrations/0001_init.sql` no D1 dedicado;
 4. cadastrar `TELEMETRY_ADMIN_TOKEN` como secret do Worker;
 5. publicar com `npm run deploy:isolated --prefix cloudflare/telemetry`;
 6. compilar o instalador com `PDV_TELEMETRY_ENDPOINT=https://...` definido explicitamente.
 
-O Worker aceita tanto o binding dedicado `DB` quanto o nome legado/provisionado `pdvnexus`, mas o caminho documentado para novas instalacoes e o D1 dedicado.
+Nao existe caminho de deploy de telemetria apontando para D1/R2 operacional do Nexus.
 
 ## Ativacao no instalador
 
