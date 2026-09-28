@@ -48,8 +48,8 @@ function validateAsClient(fn, input) {
 }
 
 function database(env) {
-  const db = env?.DB;
-  if (!db?.prepare) throw httpError(503, 'Binding D1 DB indisponivel.');
+  const db = env?.pdvnexus || env?.DB;
+  if (!db?.prepare) throw httpError(503, 'Binding D1 do PDV Nexus indisponivel.');
   return db;
 }
 
@@ -136,5 +136,5 @@ async function handleRequest(request, env) {
   }
 }
 
-export { MAX_BODY_BYTES, adminAuthorized, handleRequest };
+export { MAX_BODY_BYTES, database, adminAuthorized, handleRequest };
 export default { fetch: handleRequest };
