@@ -7,8 +7,8 @@ const releaseConfig = JSON.parse(fs.readFileSync(new URL("../../pdv-release.json
 const publishWorkflow = fs.readFileSync(new URL("../../.github/workflows/publish-pdv-release.yml", import.meta.url), "utf8");
 const desktopBuilder = fs.readFileSync(new URL("../apps/nexus-desktop/electron-builder.cjs", import.meta.url), "utf8");
 
-test("release atual do PDV é 0.1.21", () => {
-  assert.equal(releaseConfig.version, "0.1.21");
+test("release atual do PDV é 2.0.0", () => {
+  assert.equal(releaseConfig.version, "2.0.0");
 });
 
 test("carrinho expõe controles explícitos para diminuir e aumentar quantidade", () => {
