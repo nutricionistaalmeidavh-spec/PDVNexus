@@ -90,6 +90,15 @@ async function readJson(req) {
   }
 }
 
+function validateAsClient(fn, input) {
+  try {
+    return fn(input);
+  } catch (error) {
+    if (error?.statusCode) throw error;
+    throw Object.assign(new Error(String(error?.message || 'Payload invalido.').slice(0, 180)), { statusCode: 422 });
+  }
+}
+
 function registerInstallation(db, input, now) {
   const credential = randomBytes(32).toString('base64url');
   const credentialHash = hashCredential(credential);
@@ -169,7 +178,7 @@ function createTelemetryServer({
       }
 
       if (req.method === 'POST' && url.pathname === '/v1/installations/register') {
-        const input = validateRegistration(await readJson(req));
+        const input = validateAsClient(validateRegistration, await readJson(req));
         const credential = registerInstallation(db, input, new Date().toISOString());
         return json(res, 201, { installation_id: input.installation_id, credential });
       }
@@ -177,7 +186,7 @@ function createTelemetryServer({
       if (req.method === 'POST' && url.pathname === '/v1/events') {
         const auth = authenticateInstallation(db, req);
         if (!auth) return json(res, 401, { error: 'Credencial de telemetria invalida.' });
-        const batch = validateBatch(await readJson(req));
+        const batch = validateAsClient(validateBatch, await readJson(req));
         const receivedAt = new Date().toISOString();
         for (const event of batch.events) {
           if (event.installation_id !== auth.installation_id) return json(res, 403, { error: 'installation_id divergente da credencial.' });
