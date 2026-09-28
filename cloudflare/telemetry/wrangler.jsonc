@@ -1,19 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pdv-nexus-telemetry",
+  "name": "pdvnexus",
   "main": "src/index.js",
   "compatibility_date": "2026-09-28",
+  "workers_dev": true,
   "d1_databases": [
     {
-      "binding": "DB",
-      "database_name": "pdv-nexus-telemetry",
-      "database_id": "REPLACE_WITH_D1_ID"
+      "binding": "pdvnexus",
+      "database_name": "pdvnexus",
+      "database_id": "4a4cf881-6996-4fa7-86d0-4137bf4789f6"
     }
   ],
-  "analytics_engine_datasets": [
+  "r2_buckets": [
     {
-      "binding": "ANALYTICS",
-      "dataset": "pdv_nexus_telemetry"
+      "binding": "pdvnexusr2",
+      "bucket_name": "pdvnexus"
     }
   ]
 }
