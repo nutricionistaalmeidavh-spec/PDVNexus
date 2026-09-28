@@ -96,10 +96,21 @@ jobs:
         run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo checkout-flow --output qa-demo-artifacts
 
       - name: Run physical batch tracking user journey
+        id: batch_tracking
+        continue-on-error: true
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow batch-physical-tracking --output qa-batch-tracking-artifacts
 
       - name: Run manual weight checkout E2E
+        id: manual_weight
+        continue-on-error: true
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow manual-weight --output qa-manual-weight-artifacts
+
+      - name: Enforce isolated E2E gates
+        if: always()
+        shell: pwsh
+        run: |
+          if ("${{ steps.batch_tracking.outcome }}" -ne "success") { throw "Batch physical tracking E2E failed." }
+          if ("${{ steps.manual_weight.outcome }}" -ne "success") { throw "Manual weight checkout E2E failed." }
 
       - name: Run business-critical user journeys
         run: node qa/run-business-flows.mjs --config qa/artisys-qa.config.json --suite qa/business-flows.json --output qa-business-artifacts
