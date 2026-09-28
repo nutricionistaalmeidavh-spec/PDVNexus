@@ -1,0 +1,12 @@
+{
+  "name": "pdv-nexus-cloudflare",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node --check cloudflare/telemetry/src/index.js && node --test cloudflare/telemetry/test/*.test.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.140.0"
+  }
+}
