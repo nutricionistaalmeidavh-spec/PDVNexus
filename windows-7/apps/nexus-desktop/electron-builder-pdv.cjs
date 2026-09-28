@@ -2,7 +2,7 @@ process.env.NEXUS_APP = "pdv-demo";
 const release = require("../../../pdv-release.json");
 const base = require("./electron-builder.cjs");
 
-const DEFAULT_PDV_TELEMETRY_ENDPOINT = "https://pdv-nexus-telemetry.nutricionistaalmeidavh.workers.dev";
+const DEFAULT_PDV_TELEMETRY_ENDPOINT = "https://pdvnexus.nutricionistaalmeidavh.workers.dev";
 
 module.exports = {
   ...base,
