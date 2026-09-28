@@ -9,7 +9,7 @@
     { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-lote-vencido", "value": {
       "version": 2,
       "updatedAt": "{{NOW_ISO}}",
-      "fefoStartedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
         { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
@@ -26,7 +26,7 @@
     { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-lote-esgotado", "value": {
       "version": 2,
       "updatedAt": "{{NOW_ISO}}",
-      "fefoStartedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
         { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
@@ -42,7 +42,7 @@
     { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-dois-lotes-validos", "value": {
       "version": 2,
       "updatedAt": "{{NOW_ISO}}",
-      "fefoStartedAt": "{{NOW_ISO}}",
+      "fefoStartedAt": "2026-09-01T00:00:00.000Z",
       "productIdentities": [],
       "batches": [
         { "id": "LOT-QA-A", "productCode": "00103", "lotNumber": "QA-PRIMEIRO", "expiresAt": "2026-09-25", "quantity": 5, "remainingQuantity": 5, "createdAt": "{{NOW_ISO}}", "updatedAt": "{{NOW_ISO}}" },
