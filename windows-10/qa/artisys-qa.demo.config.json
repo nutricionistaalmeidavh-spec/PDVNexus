@@ -42,6 +42,15 @@
         "width": 1440,
         "height": 960
       }
+    },
+    "quick-sale-tutorial-20s": {
+      "file": "flows/pdv-tutorial-20s.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
     }
   },
   "defaultDemo": "checkout-flow"
