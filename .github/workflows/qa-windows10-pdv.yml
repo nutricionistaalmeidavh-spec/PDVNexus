@@ -85,7 +85,17 @@ jobs:
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow ui-review --output qa-artifacts
 
       - name: Install open-source FFmpeg for QA demo
-        run: choco install ffmpeg -y --no-progress
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install ffmpeg -y --no-progress
+            if ($LASTEXITCODE -eq 0 -and (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { break }
+            if ($attempt -eq 3) { throw "FFmpeg installation failed after 3 attempts." }
+            Write-Warning "FFmpeg install attempt $attempt failed; retrying after transient Chocolatey/feed error."
+            Start-Sleep -Seconds (15 * $attempt)
+            choco source enable -n=chocolatey | Out-Null
+          }
 
       - name: Verify demo video tools
         run: |
@@ -96,7 +106,21 @@ jobs:
         run: node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo checkout-flow --output qa-demo-artifacts
 
       - name: Run physical batch tracking user journey
+        id: batch_tracking
+        continue-on-error: true
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow batch-physical-tracking --output qa-batch-tracking-artifacts
+
+      - name: Run manual weight checkout E2E
+        id: manual_weight
+        continue-on-error: true
+        run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow manual-weight --output qa-manual-weight-artifacts
+
+      - name: Enforce isolated E2E gates
+        if: always()
+        shell: pwsh
+        run: |
+          if ("${{ steps.batch_tracking.outcome }}" -ne "success") { throw "Batch physical tracking E2E failed." }
+          if ("${{ steps.manual_weight.outcome }}" -ne "success") { throw "Manual weight checkout E2E failed." }
 
       - name: Run business-critical user journeys
         run: node qa/run-business-flows.mjs --config qa/artisys-qa.config.json --suite qa/business-flows.json --output qa-business-artifacts
@@ -125,6 +149,15 @@ jobs:
         with:
           name: PDV-Nexus-ArtiSys-QA-Batch-Tracking
           path: windows-10/qa-batch-tracking-artifacts
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload manual weight QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-ArtiSys-QA-Manual-Weight
+          path: windows-10/qa-manual-weight-artifacts
           if-no-files-found: warn
           retention-days: 3
 
