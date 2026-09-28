@@ -1,6 +1,6 @@
 async function ensureSchema(db) {
   await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS installations (
+    db.prepare(`CREATE TABLE IF NOT EXISTS telemetry_installations (
       installation_id TEXT PRIMARY KEY,
       credential_hash TEXT NOT NULL UNIQUE,
       app_version TEXT NOT NULL,
@@ -10,8 +10,8 @@ async function ensureSchema(db) {
       last_event_name TEXT,
       last_session_id TEXT
     )`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS idx_installations_last_seen
-      ON installations(last_seen_at)`),
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_telemetry_installations_last_seen
+      ON telemetry_installations(last_seen_at)`),
     db.prepare(`CREATE TABLE IF NOT EXISTS telemetry_events (
       event_id TEXT PRIMARY KEY,
       installation_id TEXT NOT NULL,
@@ -33,7 +33,7 @@ async function ensureSchema(db) {
 
 async function registerInstallation(db, input, credentialHash, now) {
   await ensureSchema(db);
-  await db.prepare(`INSERT INTO installations (
+  await db.prepare(`INSERT INTO telemetry_installations (
       installation_id, credential_hash, app_version, release_id, created_at, last_seen_at
     ) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(installation_id) DO UPDATE SET
@@ -71,7 +71,7 @@ async function recordEvent(db, event, receivedAt) {
     )
     .run();
 
-  await db.prepare(`UPDATE installations SET
+  await db.prepare(`UPDATE telemetry_installations SET
       app_version = ?,
       release_id = ?,
       last_seen_at = ?,
@@ -99,9 +99,9 @@ async function telemetrySummary(db, nowIso) {
   const onlineCutoff = new Date(Date.parse(nowIso) - 10 * 60 * 1000).toISOString();
   const dayCutoff = new Date(Date.parse(nowIso) - 24 * 60 * 60 * 1000).toISOString();
   const [installations, online, activeDay, errorsDay] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS count FROM installations').first(),
-    db.prepare('SELECT COUNT(*) AS count FROM installations WHERE last_seen_at >= ?').bind(onlineCutoff).first(),
-    db.prepare('SELECT COUNT(*) AS count FROM installations WHERE last_seen_at >= ?').bind(dayCutoff).first(),
+    db.prepare('SELECT COUNT(*) AS count FROM telemetry_installations').first(),
+    db.prepare('SELECT COUNT(*) AS count FROM telemetry_installations WHERE last_seen_at >= ?').bind(onlineCutoff).first(),
+    db.prepare('SELECT COUNT(*) AS count FROM telemetry_installations WHERE last_seen_at >= ?').bind(dayCutoff).first(),
     db.prepare("SELECT COUNT(*) AS count FROM telemetry_events WHERE event_name = 'operation_failed' AND received_at >= ?").bind(dayCutoff).first()
   ]);
   return {
