@@ -1,0 +1,15 @@
+{
+  "name": "@pdv-nexus/telemetry-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check src/index.js && node --check src/schema.js && node --check src/auth.js && node --check src/storage.js",
+    "deploy": "npx wrangler deploy",
+    "dev": "npx wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.140.0"
+  }
+}
