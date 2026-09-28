@@ -8,6 +8,7 @@ module.exports = {
     ...(base.extraMetadata || {}),
     version: release.version,
     pdvUpdateChannel: "windows10-x64",
-    pdvUpdateManifestUrl: release.manifestUrl
+    pdvUpdateManifestUrl: release.manifestUrl,
+    pdvTelemetryEndpoint: String(process.env.PDV_TELEMETRY_ENDPOINT || "").trim()
   }
 };
