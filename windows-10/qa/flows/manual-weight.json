@@ -64,7 +64,7 @@
     },
     {
       "action": "expectVisible",
-      "text": "0.350 KG x R$ 8,99",
+      "text": "0.350 KG x R$ 8,90",
       "exact": true,
       "name": "item-fracionado"
     },
@@ -117,7 +117,7 @@
       "action": "expectDesktopStoreJson",
       "key": "nexus-core:pdv-store:v1",
       "path": "completedSales.0.netTotal",
-      "expected": 3.15,
+      "expected": 3.12,
       "name": "total"
     }
   ]
