@@ -5,15 +5,11 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/qa-cloudflare-telemetry.yml"
-      - "package.json"
-      - "wrangler.jsonc"
       - "cloudflare/telemetry/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/qa-cloudflare-telemetry.yml"
-      - "package.json"
-      - "wrangler.jsonc"
       - "cloudflare/telemetry/**"
   workflow_dispatch:
 
@@ -34,10 +30,13 @@ jobs:
           node-version: 22
 
       - name: Install Cloudflare tooling
+        working-directory: cloudflare/telemetry
         run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Test telemetry contract
-        run: npm run build
+        working-directory: cloudflare/telemetry
+        run: npm run check && npm test
 
-      - name: Validate Wrangler bundle
-        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+      - name: Validate isolated Wrangler bundle
+        working-directory: cloudflare/telemetry
+        run: npx wrangler deploy --dry-run --config wrangler.telemetry.jsonc --outdir .wrangler-dry-run
