@@ -21,7 +21,7 @@
     "desktop:start": "npm run build:meu-engenheiro && npm run start --workspace @nexus-core/nexus-desktop",
     "desktop:start:pdv": "npm run build:pdv-demo && npm run start:pdv --workspace @nexus-core/nexus-desktop",
     "desktop:pack": "npm run build:meu-engenheiro && npm run build:pdv-demo && npm run pack --workspace @nexus-core/nexus-desktop",
-    "desktop:dist:meu-engenheiro": "npm run build:meu-engenheiro && npm run build:pdv-demo && npm run pack --workspace @nexus-core/nexus-desktop",
+    "desktop:dist:meu-engenheiro": "npm run build:meu-engenheiro && npm run dist:meu-engenheiro --workspace @nexus-core/nexus-desktop",
     "desktop:dist:pdv": "npm run build:pdv-demo && npm run dist:pdv --workspace @nexus-core/nexus-desktop"
   },
   "devDependencies": {
