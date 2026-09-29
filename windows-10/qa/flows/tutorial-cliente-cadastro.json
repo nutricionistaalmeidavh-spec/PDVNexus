@@ -1,0 +1,15 @@
+{
+  "id": "tutorial-cliente-cadastro",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/clientes\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 500 },
+    { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "abrir-clientes", "holdMs": 1200 },
+    { "action": "expectVisible", "text": "Clientes", "exact": true, "name": "clientes-visivel", "holdMs": 900 },
+    { "action": "fill", "selector": "input[placeholder=\"Nome do cliente\"]", "value": "Ana Souza", "name": "preencher-nome", "holdMs": 650 },
+    { "action": "fill", "selector": "input[placeholder=\"CPF/CNPJ\"]", "value": "123.456.789-10", "name": "preencher-documento", "holdMs": 650 },
+    { "action": "fill", "selector": "input[placeholder=\"Cidade\"]", "value": "Ribeirão Preto", "name": "preencher-cidade", "holdMs": 650 },
+    { "action": "fill", "selector": "input[placeholder*=\"Limite\"]", "value": "1000", "name": "preencher-limite", "holdMs": 650 },
+    { "action": "click", "text": "Cadastrar Cliente", "exact": true, "name": "cadastrar-cliente", "holdMs": 1700 },
+    { "action": "expectVisible", "text": "Ana Souza", "exact": true, "name": "cliente-cadastrado", "holdMs": 1600 },
+    { "action": "screenshot", "name": "tutorial-cliente-final" }
+  ]
+}
