@@ -51,6 +51,51 @@
         "width": 1440,
         "height": 960
       }
+    },
+    "cash-open-close-tutorial": {
+      "file": "flows/tutorial-caixa-abertura-fechamento.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "stock-adjustment-tutorial": {
+      "file": "flows/tutorial-estoque-consulta-ajuste.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "customer-register-tutorial": {
+      "file": "flows/tutorial-cliente-cadastro.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "sales-history-tutorial": {
+      "file": "flows/tutorial-historico-vendas.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
+    },
+    "reports-dashboard-tutorial": {
+      "file": "flows/tutorial-relatorios-dashboard.json",
+      "preset": "landscape-16x9",
+      "durationTargetSec": 20,
+      "captureViewport": {
+        "width": 1440,
+        "height": 960
+      }
     }
   },
   "defaultDemo": "checkout-flow"
