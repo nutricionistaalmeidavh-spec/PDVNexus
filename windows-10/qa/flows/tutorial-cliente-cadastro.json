@@ -2,8 +2,14 @@
   "id": "tutorial-cliente-cadastro",
   "steps": [
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 350 },
-    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "reset-pdv", "value": {} },
-    { "action": "reload", "name": "reload-reset", "holdMs": 600 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "seed-clientes", "value": {
+      "registeredCustomers": [
+        { "id": "CLI-001", "name": "Cliente Balcao", "document": "Consumidor final", "city": "Sao Paulo", "creditLimit": 0, "creditUsed": 0 },
+        { "id": "CLI-002", "name": "Joao Santos", "document": "123.456.789-00", "city": "Cubatao", "creditLimit": 5000, "creditUsed": 284.99 },
+        { "id": "CLI-003", "name": "Maria Oliveira", "document": "987.654.321-00", "city": "Sao Paulo", "creditLimit": 2500, "creditUsed": 420 }
+      ]
+    } },
+    { "action": "reload", "name": "reload-seed", "holdMs": 600 },
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 350 },
     { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "open-clientes", "holdMs": 900 },
     { "action": "expectURL", "includes": "#/clientes", "name": "clientes-route", "holdMs": 450 },
