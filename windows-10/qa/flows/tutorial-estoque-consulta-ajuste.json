@@ -1,0 +1,23 @@
+{
+  "id": "tutorial-estoque-consulta-ajuste",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/produtos\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 400 },
+    { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "abrir-produtos", "holdMs": 850 },
+    { "action": "click", "text": "Novo produto", "exact": true, "name": "novo-produto", "holdMs": 450 },
+    { "action": "fill", "selector": "input[placeholder=\"Código *\"]", "value": "00998", "name": "codigo", "holdMs": 200 },
+    { "action": "fill", "selector": "input[placeholder=\"Descrição *\"]", "value": "Água Mineral 500ml", "name": "descricao", "holdMs": 200 },
+    { "action": "fill", "selector": "input[placeholder=\"Preço de venda *\"]", "value": "3.50", "name": "preco", "holdMs": 200 },
+    { "action": "fill", "selector": "input[placeholder=\"Estoque inicial (opcional)\"]", "value": "20", "name": "estoque-inicial", "holdMs": 200 },
+    { "action": "fill", "selector": "input[placeholder=\"Estoque mínimo (opcional)\"]", "value": "5", "name": "estoque-minimo", "holdMs": 200 },
+    { "action": "click", "text": "Cadastrar produto", "exact": true, "name": "cadastrar-produto", "holdMs": 900 },
+    { "action": "expectVisible", "text": "Água Mineral 500ml", "exact": true, "name": "produto-visivel", "holdMs": 800 },
+    { "action": "click", "selector": "article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]", "name": "abrir-estoque", "holdMs": 1100 },
+    { "action": "selectOption", "selector": "article:has(h2:text-is(\"Estoque\")) select:first-of-type", "value": "00998", "name": "selecionar-produto", "holdMs": 700 },
+    { "action": "selectOption", "selector": "article:has(h2:text-is(\"Estoque\")) select:nth-of-type(2)", "value": "inventory", "name": "selecionar-inventario", "holdMs": 600 },
+    { "action": "fill", "selector": "input[placeholder=\"Quantidade contada\"]", "value": "18", "name": "quantidade-contada", "holdMs": 500 },
+    { "action": "fill", "selector": "input[placeholder=\"Motivo\"]", "value": "Contagem de estoque", "name": "motivo", "holdMs": 500 },
+    { "action": "click", "text": "Registrar Movimento", "exact": true, "name": "registrar-movimento", "holdMs": 1300 },
+    { "action": "expectVisible", "text": "Contagem de estoque", "exact": true, "name": "movimento-registrado", "holdMs": 1000 },
+    { "action": "screenshot", "name": "tutorial-estoque-final" }
+  ]
+}
