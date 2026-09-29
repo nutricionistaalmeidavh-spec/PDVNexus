@@ -37,7 +37,7 @@
           "paymentSummary": { "status": "paid", "total": 100, "paidTotal": 100, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 100 }
         }
       ]
-    },
+    } },
     { "action": "reload", "name": "recarregar-relatorios", "holdMs": 1200 },
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 1500 },
     { "action": "expectVisible", "text": "Relatórios e dashboard", "exact": true, "name": "dashboard-visivel", "holdMs": 1200 },
