@@ -13,7 +13,7 @@
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 350 },
     { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "open-clientes", "holdMs": 900 },
     { "action": "expectURL", "includes": "#/clientes", "name": "clientes-route", "holdMs": 450 },
-    { "action": "expectVisible", "text": "Clientes", "exact": true, "name": "clientes-visivel", "holdMs": 800 },
+    { "action": "waitFor", "selector": "input[placeholder=\"Nome do cliente\"]", "name": "form-cliente-visivel", "timeoutMs": 10000, "holdMs": 800 },
     { "action": "fill", "selector": "input[placeholder=\"Nome do cliente\"]", "value": "Ana Souza", "name": "nome", "holdMs": 700 },
     { "action": "fill", "selector": "input[placeholder=\"CPF/CNPJ\"]", "value": "123.456.789-10", "name": "documento", "holdMs": 700 },
     { "action": "fill", "selector": "input[placeholder=\"Cidade\"]", "value": "Ribeirao Preto", "name": "cidade", "holdMs": 700 },
