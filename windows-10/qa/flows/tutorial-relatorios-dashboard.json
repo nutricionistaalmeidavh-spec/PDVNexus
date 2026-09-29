@@ -1,48 +1,32 @@
 {
   "id": "tutorial-relatorios-dashboard",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/financeiro\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 400 },
-    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "preparar-relatorios", "value": {
-      "registeredCustomers": [
-        { "id": "CLI-001", "name": "Cliente Balcao", "document": "Consumidor final", "city": "Ribeirao Preto", "creditLimit": 0, "creditUsed": 0 },
-        { "id": "CLI-002", "name": "Joao Santos", "document": "123.456.789-00", "city": "Ribeirao Preto", "creditLimit": 5000, "creditUsed": 0 }
-      ],
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 350 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "seed-relatorio", "value": {
       "completedSales": [
         {
-          "number": "001251",
-          "openedAt": "27/09/2026, 10:14:00",
+          "number": "000101",
+          "openedAt": "18/09/2026, 10:00:00",
           "customerId": "CLI-001",
           "seller": "Operador Caixa",
           "discountPercent": 0,
           "items": [
-            { "id": "I-1251-1", "productCode": "00103", "productName": "Coca-Cola 2,5L", "unitLabel": "UN", "quantity": 3, "unitPrice": 12, "totalPrice": 36, "source": "catalog" }
+            { "id": "I-1", "productCode": "00101", "productName": "Teclado com fio", "unitLabel": "UN", "quantity": 1, "unitPrice": 100, "totalPrice": 100, "source": "catalog" }
           ],
-          "payments": [{ "method": "PIX", "amount": 36 }],
-          "finalizedAt": "27/09/2026, 10:15:00",
-          "netTotal": 36,
-          "paymentSummary": { "status": "paid", "total": 36, "paidTotal": 36, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 36 }
-        },
-        {
-          "number": "001252",
-          "openedAt": "28/09/2026, 15:39:00",
-          "customerId": "CLI-002",
-          "seller": "Operador Caixa",
-          "discountPercent": 0,
-          "items": [
-            { "id": "I-1252-1", "productCode": "00101", "productName": "Teclado com fio", "unitLabel": "UN", "quantity": 1, "unitPrice": 100, "totalPrice": 100, "source": "catalog" }
-          ],
-          "payments": [{ "method": "CREDITO", "amount": 100 }],
-          "finalizedAt": "28/09/2026, 15:40:00",
+          "payments": [{ "method": "PIX", "amount": 100 }],
+          "finalizedAt": "18/09/2026, 10:05:00",
           "netTotal": 100,
           "paymentSummary": { "status": "paid", "total": 100, "paidTotal": 100, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 100 }
         }
       ]
     } },
-    { "action": "reload", "name": "recarregar-relatorios", "holdMs": 1200 },
-    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 1500 },
-    { "action": "expectVisible", "text": "Relatórios e dashboard", "exact": true, "name": "dashboard-visivel", "holdMs": 1200 },
-    { "action": "expectVisible", "text": "Ticket médio", "exact": true, "name": "ticket-medio-visivel", "holdMs": 1300 },
-    { "action": "expectVisible", "text": "Coca-Cola 2,5L", "exact": true, "name": "produto-no-relatorio", "holdMs": 1400 },
+    { "action": "reload", "name": "reload-seed", "holdMs": 700 },
+    { "action": "waitFor", "selector": "a[href=\"#/financeiro\"]", "name": "financeiro-ready", "timeoutMs": 20000, "holdMs": 500 },
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "open-financeiro", "holdMs": 1200 },
+    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route", "holdMs": 500 },
+    { "action": "expectVisible", "text": "Relatórios e dashboard", "exact": true, "name": "dashboard", "holdMs": 1500 },
+    { "action": "expectVisible", "text": "Ticket médio", "exact": true, "name": "ticket", "holdMs": 1400 },
+    { "action": "expectVisible", "text": "Teclado com fio", "exact": true, "name": "produto-relatorio", "holdMs": 1400 },
     { "action": "screenshot", "name": "tutorial-relatorios-final" }
   ]
 }
