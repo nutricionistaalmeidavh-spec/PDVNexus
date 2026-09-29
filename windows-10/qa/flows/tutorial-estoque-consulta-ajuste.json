@@ -2,8 +2,13 @@
   "id": "tutorial-estoque-consulta-ajuste",
   "steps": [
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 350 },
-    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "reset-pdv", "value": {} },
-    { "action": "reload", "name": "reload-reset", "holdMs": 600 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "seed-produto", "value": {
+      "catalogProducts": [
+        { "productCode": "00101", "barcode": "7895555441971", "productName": "Teclado com fio", "unitPrice": 100, "itemType": "unit", "shelfLifeDays": 0, "unitLabel": "UN", "stock": 8, "minStock": 2, "category": "Informatica" }
+      ],
+      "extensions": { "inventoryMovements": [] }
+    } },
+    { "action": "reload", "name": "reload-seed", "holdMs": 600 },
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 350 },
     { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos", "holdMs": 850 },
     { "action": "expectURL", "includes": "#/produtos", "name": "produtos-route", "holdMs": 400 },
@@ -15,7 +20,7 @@
     { "action": "fill", "selector": "input[placeholder=\"Motivo\"]", "value": "Inventario QA", "name": "motivo", "holdMs": 700 },
     { "action": "click", "text": "Registrar Movimento", "exact": true, "name": "registrar", "holdMs": 1200 },
     { "action": "waitForTimeout", "timeoutMs": 300, "name": "persistir", "holdMs": 400 },
-    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "catalogProducts.2.stock", "expected": 3, "name": "estoque-contado", "holdMs": 800 },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "catalogProducts.0.stock", "expected": 3, "name": "estoque-contado", "holdMs": 800 },
     { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "extensions.inventoryMovements.0.type", "expected": "inventory", "name": "movimento-inventario", "holdMs": 700 },
     { "action": "screenshot", "name": "tutorial-estoque-final" }
   ]
