@@ -1,12 +1,8 @@
 {
   "id": "tutorial-historico-vendas",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/financeiro\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 400 },
-    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "preparar-historico", "value": {
-      "registeredCustomers": [
-        { "id": "CLI-001", "name": "Cliente Balcao", "document": "Consumidor final", "city": "Ribeirao Preto", "creditLimit": 0, "creditUsed": 0 },
-        { "id": "CLI-002", "name": "Joao Santos", "document": "123.456.789-00", "city": "Ribeirao Preto", "creditLimit": 5000, "creditUsed": 0 }
-      ],
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 350 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "seed-historico", "value": {
       "completedSales": [
         {
           "number": "001250",
@@ -24,11 +20,13 @@
         }
       ]
     } },
-    { "action": "reload", "name": "recarregar-historico", "holdMs": 1200 },
-    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 1400 },
-    { "action": "expectVisible", "text": "Cancelamento e estorno", "exact": true, "name": "historico-visivel", "holdMs": 1100 },
-    { "action": "selectOption", "selector": "article:has(h2:text-is(\"Cancelamento e estorno\")) select", "value": "001250", "name": "selecionar-venda", "holdMs": 1500 },
-    { "action": "expectVisible", "text": "Cancelar/Estornar venda", "exact": true, "name": "venda-localizada", "holdMs": 1700 },
+    { "action": "reload", "name": "reload-seed", "holdMs": 700 },
+    { "action": "waitFor", "selector": "a[href=\"#/financeiro\"]", "name": "financeiro-ready", "timeoutMs": 20000, "holdMs": 500 },
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "open-financeiro", "holdMs": 1200 },
+    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route", "holdMs": 500 },
+    { "action": "expectVisible", "text": "Cancelamento e estorno", "exact": true, "name": "historico-visivel", "holdMs": 1400 },
+    { "action": "selectOption", "selector": "select:has(option[value=\"001250\"])", "value": "001250", "name": "selecionar-venda", "holdMs": 1500 },
+    { "action": "expectVisible", "text": "Cancelar/Estornar venda", "exact": true, "name": "venda-localizada", "holdMs": 1600 },
     { "action": "screenshot", "name": "tutorial-historico-final" }
   ]
 }
