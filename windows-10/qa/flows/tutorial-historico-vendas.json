@@ -23,7 +23,7 @@
           "paymentSummary": { "status": "paid", "total": 24, "paidTotal": 24, "remainingTotal": 0, "changeDue": 0, "creditTotal": 0, "immediateTotal": 24 }
         }
       ]
-    },
+    } },
     { "action": "reload", "name": "recarregar-historico", "holdMs": 1200 },
     { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 1400 },
     { "action": "expectVisible", "text": "Cancelamento e estorno", "exact": true, "name": "historico-visivel", "holdMs": 1100 },
