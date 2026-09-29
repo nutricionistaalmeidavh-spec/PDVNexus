@@ -7,14 +7,16 @@
     { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 350 },
     { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos", "holdMs": 850 },
     { "action": "expectURL", "includes": "#/produtos", "name": "produtos-route", "holdMs": 400 },
-    { "action": "expectVisible", "text": "Teclado com fio", "exact": true, "name": "produto-visivel", "holdMs": 900 },
+    { "action": "expectVisible", "text": "Estoque", "exact": true, "name": "estoque-visivel", "holdMs": 700 },
     { "action": "click", "name": "abrir-estoque", "holdMs": 650, "selector": "article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]" },
     { "action": "selectOption", "selector": "select:has(option[value=\"00101\"])", "value": "00101", "name": "produto-teclado", "holdMs": 700 },
     { "action": "selectOption", "selector": "select:has(option[value=\"inventory\"])", "value": "inventory", "name": "tipo-inventario", "holdMs": 700 },
     { "action": "fill", "selector": "input[placeholder=\"Quantidade contada\"]", "value": "3", "name": "contagem", "holdMs": 700 },
-    { "action": "fill", "selector": "input[placeholder=\"Motivo\"]", "value": "Contagem de estoque", "name": "motivo", "holdMs": 700 },
-    { "action": "click", "text": "Registrar Movimento", "exact": true, "name": "registrar", "holdMs": 1400 },
-    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "catalogProducts.2.stock", "expected": 3, "name": "estoque-contado", "holdMs": 900 },
+    { "action": "fill", "selector": "input[placeholder=\"Motivo\"]", "value": "Inventario QA", "name": "motivo", "holdMs": 700 },
+    { "action": "click", "text": "Registrar Movimento", "exact": true, "name": "registrar", "holdMs": 1200 },
+    { "action": "waitForTimeout", "timeoutMs": 300, "name": "persistir", "holdMs": 400 },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "catalogProducts.2.stock", "expected": 3, "name": "estoque-contado", "holdMs": 800 },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "extensions.inventoryMovements.0.type", "expected": "inventory", "name": "movimento-inventario", "holdMs": 700 },
     { "action": "screenshot", "name": "tutorial-estoque-final" }
   ]
 }
