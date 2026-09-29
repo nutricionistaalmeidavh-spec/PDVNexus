@@ -55,8 +55,12 @@ jobs:
       - name: Build PDV renderer
         run: npm run build:pdv-demo
 
-      - name: Install open-source FFmpeg
-        run: choco install ffmpeg -y --no-progress
+      - name: Install open-source video and Drive tools
+        run: |
+          choco install ffmpeg -y --no-progress
+          choco install rclone -y --no-progress
+          ffmpeg -version | Select-Object -First 1
+          rclone version | Select-Object -First 1
 
       - name: Capture tutorials
         run: |
@@ -85,14 +89,53 @@ jobs:
                   "drawtext=fontfile='$font':text='$($texts[3])':fontcolor=white:fontsize=46:box=1:boxcolor=black@0.78:boxborderw=20:x=(w-text_w)/2:y=h-110:enable='between(t,14.9,20)'"
             $final = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-$($item.Slug).mp4"
             ffmpeg -y -i $video.FullName -vf $vf -c:v libx264 -preset medium -crf 20 -an -movflags +faststart $final
-            ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $final
+            $duration = [double](ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $final)
+            if ($duration -lt 19 -or $duration -gt 21) { throw "Duração inesperada para $($item.Id): $duration s" }
           }
 
-      - name: Upload tutorial library
-        if: always()
+      - name: Upload tutorial library artifact
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Tutorial-Library
-          path: windows-10/qa-tutorial-library-artifacts
+          path: windows-10/qa-tutorial-library-artifacts/*.mp4
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish tutorials to Google Drive
+        env:
+          PDV_GDRIVE_RCLONE_CONFIG: ${{ secrets.PDV_GDRIVE_RCLONE_CONFIG }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PDV_GDRIVE_RCLONE_CONFIG)) {
+            throw "PDV_GDRIVE_RCLONE_CONFIG não configurado; tutoriais não serão publicados parcialmente."
+          }
+
+          $release = Get-Content ../pdv-release.json -Raw | ConvertFrom-Json
+          $remote = $release.distribution.googleDrive.remoteName
+          $rootId = $release.distribution.googleDrive.rootFolderId
+          if ([string]::IsNullOrWhiteSpace($remote) -or [string]::IsNullOrWhiteSpace($rootId)) {
+            throw "Configuração do Drive ausente em pdv-release.json"
+          }
+
+          $configPath = Join-Path $env:RUNNER_TEMP "pdv-rclone.conf"
+          [System.IO.File]::WriteAllText($configPath, $env:PDV_GDRIVE_RCLONE_CONFIG)
+          $flags = @("--config", $configPath, "--drive-root-folder-id", $rootId)
+          & rclone lsf "${remote}:TUTORIAIS EM VIDEO" @flags | Out-Null
+
+          $files = @(
+            @{ Local = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-caixa.mp4"; Drive = "Tutorial - Como abrir e fechar o caixa.mp4" },
+            @{ Local = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-estoque.mp4"; Drive = "Tutorial - Como consultar e ajustar o estoque.mp4" },
+            @{ Local = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-cliente.mp4"; Drive = "Tutorial - Como cadastrar um cliente.mp4" },
+            @{ Local = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-historico.mp4"; Drive = "Tutorial - Como consultar o histórico de vendas.mp4" },
+            @{ Local = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-relatorios.mp4"; Drive = "Tutorial - Como visualizar relatórios do negócio.mp4" }
+          )
+
+          foreach ($file in $files) {
+            if (-not (Test-Path $file.Local)) { throw "Vídeo ausente: $($file.Local)" }
+            & rclone copyto $file.Local "${remote}:TUTORIAIS EM VIDEO/$($file.Drive)" @flags --checksum
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar $($file.Drive)" }
+          }
+
+          $listing = & rclone lsf "${remote}:TUTORIAIS EM VIDEO" @flags
+          foreach ($file in $files) {
+            if ($listing -notcontains $file.Drive) { throw "Drive não confirmou $($file.Drive)" }
+          }
