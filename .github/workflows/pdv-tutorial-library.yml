@@ -74,6 +74,14 @@ jobs:
           foreach ($item in $items) {
             $out = "qa-tutorial-library-artifacts/$($item.Slug)"
             node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo $item.Id --output $out
+            if ($LASTEXITCODE -ne 0) {
+              $runSummary = Get-ChildItem $out -Recurse -Filter run-summary.json | Select-Object -First 1
+              if ($runSummary) {
+                Write-Host "=== DIAGNÓSTICO $($item.Id) ==="
+                Get-Content $runSummary.FullName -Raw | Write-Host
+              }
+              throw "Falha na captura do tutorial $($item.Id)"
+            }
             $summary = Get-ChildItem $out -Recurse -Filter demo-summary.json | Select-Object -First 1
             if (-not $summary) { throw "demo-summary.json não encontrado para $($item.Id)" }
             $data = Get-Content $summary.FullName -Raw | ConvertFrom-Json
@@ -94,14 +102,16 @@ jobs:
           }
 
       - name: Upload tutorial library artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Tutorial-Library
-          path: windows-10/qa-tutorial-library-artifacts/*.mp4
-          if-no-files-found: error
+          path: windows-10/qa-tutorial-library-artifacts
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Publish tutorials to Google Drive
+        if: success()
         env:
           PDV_GDRIVE_RCLONE_CONFIG: ${{ secrets.PDV_GDRIVE_RCLONE_CONFIG }}
         run: |
