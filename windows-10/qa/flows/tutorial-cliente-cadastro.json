@@ -1,15 +1,20 @@
 {
   "id": "tutorial-cliente-cadastro",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/clientes\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 500 },
-    { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "abrir-clientes", "holdMs": 1200 },
-    { "action": "expectVisible", "text": "Clientes", "exact": true, "name": "clientes-visivel", "holdMs": 900 },
-    { "action": "fill", "selector": "input[placeholder=\"Nome do cliente\"]", "value": "Ana Souza", "name": "preencher-nome", "holdMs": 650 },
-    { "action": "fill", "selector": "input[placeholder=\"CPF/CNPJ\"]", "value": "123.456.789-10", "name": "preencher-documento", "holdMs": 650 },
-    { "action": "fill", "selector": "input[placeholder=\"Cidade\"]", "value": "Ribeirão Preto", "name": "preencher-cidade", "holdMs": 650 },
-    { "action": "fill", "selector": "input[placeholder*=\"Limite\"]", "value": "1000", "name": "preencher-limite", "holdMs": 650 },
-    { "action": "click", "text": "Cadastrar Cliente", "exact": true, "name": "cadastrar-cliente", "holdMs": 1700 },
-    { "action": "expectVisible", "text": "Ana Souza", "exact": true, "name": "cliente-cadastrado", "holdMs": 1600 },
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 350 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "reset-pdv", "value": {} },
+    { "action": "reload", "name": "reload-reset", "holdMs": 600 },
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 350 },
+    { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "open-clientes", "holdMs": 900 },
+    { "action": "expectURL", "includes": "#/clientes", "name": "clientes-route", "holdMs": 450 },
+    { "action": "expectVisible", "text": "Clientes", "exact": true, "name": "clientes-visivel", "holdMs": 800 },
+    { "action": "fill", "selector": "input[placeholder=\"Nome do cliente\"]", "value": "Ana Souza", "name": "nome", "holdMs": 700 },
+    { "action": "fill", "selector": "input[placeholder=\"CPF/CNPJ\"]", "value": "123.456.789-10", "name": "documento", "holdMs": 700 },
+    { "action": "fill", "selector": "input[placeholder=\"Cidade\"]", "value": "Ribeirao Preto", "name": "cidade", "holdMs": 700 },
+    { "action": "fill", "selector": "input[placeholder=\"Limite de credito\"]", "value": "1000", "name": "limite", "holdMs": 700 },
+    { "action": "click", "text": "Cadastrar Cliente", "exact": true, "name": "cadastrar", "holdMs": 1500 },
+    { "action": "expectVisible", "text": "Ana Souza", "exact": true, "name": "cliente-visivel", "holdMs": 1200 },
+    { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-store:v1", "path": "registeredCustomers.3.name", "expected": "Ana Souza", "name": "cliente-persistido", "holdMs": 800 },
     { "action": "screenshot", "name": "tutorial-cliente-final" }
   ]
 }
