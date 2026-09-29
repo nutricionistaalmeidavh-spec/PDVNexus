@@ -1,0 +1,17 @@
+{
+  "id": "tutorial-caixa-abertura-fechamento",
+  "steps": [
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 500 },
+    { "action": "click", "selector": "a[href=\"#/caixa\"]", "name": "abrir-modulo-caixa", "holdMs": 900 },
+    { "action": "clickIfVisible", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa", "holdMs": 1800 },
+    { "action": "expectVisible", "text": "CAIXA ABERTO", "exact": true, "name": "caixa-aberto", "holdMs": 1700 },
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "ir-financeiro", "holdMs": 1600 },
+    { "action": "expectVisible", "text": "Conferência de caixa", "exact": true, "name": "conferencia-visivel", "holdMs": 1100 },
+    { "action": "fill", "selector": "input[placeholder=\"Dinheiro contado\"]", "value": "0", "name": "conferir-dinheiro", "holdMs": 700 },
+    { "action": "fill", "selector": "input[placeholder=\"PIX conferido\"]", "value": "0", "name": "conferir-pix", "holdMs": 700 },
+    { "action": "fill", "selector": "input[placeholder=\"Cartões conferidos\"]", "value": "0", "name": "conferir-cartoes", "holdMs": 700 },
+    { "action": "click", "text": "Fechar com conferência", "exact": true, "name": "fechar-caixa", "holdMs": 1900 },
+    { "action": "expectVisible", "text": "CAIXA FECHADO", "exact": true, "name": "caixa-fechado", "holdMs": 1600 },
+    { "action": "screenshot", "name": "tutorial-caixa-final" }
+  ]
+}
