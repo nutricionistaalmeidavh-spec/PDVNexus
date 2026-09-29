@@ -1,17 +1,20 @@
 {
   "id": "tutorial-caixa-abertura-fechamento",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 500 },
-    { "action": "click", "selector": "a[href=\"#/caixa\"]", "name": "abrir-modulo-caixa", "holdMs": 900 },
-    { "action": "clickIfVisible", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa", "holdMs": 1800 },
-    { "action": "expectVisible", "text": "CAIXA ABERTO", "exact": true, "name": "caixa-aberto", "holdMs": 1700 },
-    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "ir-financeiro", "holdMs": 1600 },
-    { "action": "expectVisible", "text": "Conferência de caixa", "exact": true, "name": "conferencia-visivel", "holdMs": 1100 },
-    { "action": "fill", "selector": "input[placeholder=\"Dinheiro contado\"]", "value": "0", "name": "conferir-dinheiro", "holdMs": 700 },
-    { "action": "fill", "selector": "input[placeholder=\"PIX conferido\"]", "value": "0", "name": "conferir-pix", "holdMs": 700 },
-    { "action": "fill", "selector": "input[placeholder=\"Cartões conferidos\"]", "value": "0", "name": "conferir-cartoes", "holdMs": 700 },
-    { "action": "click", "text": "Fechar com conferência", "exact": true, "name": "fechar-caixa", "holdMs": 1900 },
-    { "action": "expectVisible", "text": "CAIXA FECHADO", "exact": true, "name": "caixa-fechado", "holdMs": 1600 },
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000, "holdMs": 400 },
+    { "action": "desktopStoreSet", "key": "nexus-core:pdv-store:v1", "name": "reset-pdv", "value": {} },
+    { "action": "reload", "name": "reload-reset", "holdMs": 600 },
+    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-reset-ready", "timeoutMs": 20000, "holdMs": 400 },
+    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "abrir-financeiro", "holdMs": 900 },
+    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route", "holdMs": 500 },
+    { "action": "fill", "selector": "input[placeholder=\"Caixa inicial\"]", "value": "100", "name": "caixa-inicial", "holdMs": 500 },
+    { "action": "click", "text": "Abrir Caixa", "exact": true, "name": "abrir-caixa", "holdMs": 1300 },
+    { "action": "expectVisible", "text": "Status: ABERTO", "exact": true, "name": "status-aberto", "holdMs": 1200 },
+    { "action": "fill", "selector": "input[placeholder=\"Dinheiro contado\"]", "value": "100", "name": "dinheiro-contado", "holdMs": 500 },
+    { "action": "fill", "selector": "input[placeholder=\"PIX conferido\"]", "value": "0", "name": "pix-contado", "holdMs": 500 },
+    { "action": "fill", "selector": "input[placeholder=\"Cartões conferidos\"]", "value": "0", "name": "cartao-contado", "holdMs": 500 },
+    { "action": "click", "text": "Fechar com conferência", "exact": true, "name": "fechar-caixa", "holdMs": 1500 },
+    { "action": "expectVisible", "text": "Status: FECHADO", "exact": true, "name": "status-fechado", "holdMs": 1600 },
     { "action": "screenshot", "name": "tutorial-caixa-final" }
   ]
 }
