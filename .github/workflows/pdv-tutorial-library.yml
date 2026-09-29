@@ -1,0 +1,98 @@
+name: PDV Nexus Tutorial Library
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/pdv-tutorial-library.yml"
+      - "windows-10/qa/artisys-qa.demo.config.json"
+      - "windows-10/qa/pdv-demo-ephemeral-entry.cjs"
+      - "windows-10/qa/flows/tutorial-*.json"
+      - "windows-10/tests/pdv-tutorial-library.test.mjs"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tutorial-library:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+
+      - name: Install PDV dependencies
+        run: npm ci
+
+      - name: Install ArtiSys QA dependencies
+        run: npm ci --prefix tools/artisys-qa
+
+      - name: Validate tutorial library contract
+        run: node --test tests/pdv-tutorial-library.test.mjs
+
+      - name: Validate demo manifest
+        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.demo.config.json
+
+      - name: Build PDV renderer
+        run: npm run build:pdv-demo
+
+      - name: Install open-source FFmpeg
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Capture tutorials
+        run: |
+          $items = @(
+            @{ Id = "cash-open-close-tutorial"; Slug = "caixa"; Title = "1. Abra o caixa|2. Confira os valores|3. Feche com conferência|Caixa fechado com sucesso" },
+            @{ Id = "stock-adjustment-tutorial"; Slug = "estoque"; Title = "1. Acesse Produtos e Estoque|2. Escolha o produto|3. Informe o ajuste|Estoque atualizado" },
+            @{ Id = "customer-register-tutorial"; Slug = "cliente"; Title = "1. Acesse Clientes|2. Preencha os dados|3. Cadastre o cliente|Cliente cadastrado" },
+            @{ Id = "sales-history-tutorial"; Slug = "historico"; Title = "1. Acesse Financeiro|2. Abra o histórico|3. Consulte as vendas|Histórico localizado" },
+            @{ Id = "reports-dashboard-tutorial"; Slug = "relatorios"; Title = "1. Acesse Financeiro|2. Veja o dashboard|3. Confira vendas e ticket médio|Relatórios disponíveis" }
+          )
+          foreach ($item in $items) {
+            $out = "qa-tutorial-library-artifacts/$($item.Slug)"
+            node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.demo.config.json --demo $item.Id --output $out
+            $summary = Get-ChildItem $out -Recurse -Filter demo-summary.json | Select-Object -First 1
+            if (-not $summary) { throw "demo-summary.json não encontrado para $($item.Id)" }
+            $data = Get-Content $summary.FullName -Raw | ConvertFrom-Json
+            if ($data.status -ne "passed") { throw "$($item.Id) falhou: $($data.status)" }
+            $video = Get-ChildItem $out -Recurse -Filter demo-video.mp4 | Select-Object -First 1
+            if (-not $video) { throw "demo-video.mp4 não encontrado para $($item.Id)" }
+
+            $texts = $item.Title.Split('|')
+            $font = 'C\:/Windows/Fonts/segoeui.ttf'
+            $vf = "drawtext=fontfile='$font':text='$($texts[0])':fontcolor=white:fontsize=42:box=1:boxcolor=black@0.70:boxborderw=18:x=(w-text_w)/2:y=h-110:enable='between(t,0.3,4.8)'," +
+                  "drawtext=fontfile='$font':text='$($texts[1])':fontcolor=white:fontsize=42:box=1:boxcolor=black@0.70:boxborderw=18:x=(w-text_w)/2:y=h-110:enable='between(t,5,9.5)'," +
+                  "drawtext=fontfile='$font':text='$($texts[2])':fontcolor=white:fontsize=42:box=1:boxcolor=black@0.70:boxborderw=18:x=(w-text_w)/2:y=h-110:enable='between(t,9.7,14.7)'," +
+                  "drawtext=fontfile='$font':text='$($texts[3])':fontcolor=white:fontsize=46:box=1:boxcolor=black@0.78:boxborderw=20:x=(w-text_w)/2:y=h-110:enable='between(t,14.9,20)'"
+            $final = "qa-tutorial-library-artifacts/PDV-Nexus-Tutorial-$($item.Slug).mp4"
+            ffmpeg -y -i $video.FullName -vf $vf -c:v libx264 -preset medium -crf 20 -an -movflags +faststart $final
+            ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $final
+          }
+
+      - name: Upload tutorial library
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Tutorial-Library
+          path: windows-10/qa-tutorial-library-artifacts
+          if-no-files-found: error
+          retention-days: 7
