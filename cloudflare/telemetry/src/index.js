@@ -1,4 +1,5 @@
 import { validateRegistration, validateBatch } from './schema.js';
+import { activateLicense, createLicense, listLicenses, revokeLicense } from './licensing.js';
 import { createCredential, hashCredential, authenticateRequest } from './auth.js';
 import {
   ensureSchema,
@@ -51,6 +52,12 @@ function database(env) {
   const db = env?.DB;
   if (!db?.prepare) throw httpError(503, 'Binding D1 dedicado da telemetria indisponivel.');
   return db;
+}
+
+function licenseAdminAuthorized(request, env) {
+  const expected=String(env?.LICENSE_ADMIN_TOKEN||'').trim();
+  if(!expected)return false;
+  return String(request.headers.get('authorization')||'')===`Bearer ${expected}`;
 }
 
 function adminAuthorized(request, env) {
@@ -108,6 +115,11 @@ async function handleEvents(request, env) {
   return json(202, { accepted: batch.events.length });
 }
 
+async function handleLicenseActivation(request,env){return json(200,await activateLicense(database(env),await readJson(request),new Date().toISOString()));}
+async function handleAdminCreateLicense(request,env){if(!licenseAdminAuthorized(request,env))return json(401,{error:'Não autorizado.'});return json(201,await createLicense(database(env),await readJson(request),new Date().toISOString()));}
+async function handleAdminListLicenses(request,env){if(!licenseAdminAuthorized(request,env))return json(401,{error:'Não autorizado.'});return json(200,{licenses:await listLicenses(database(env))});}
+async function handleAdminRevokeLicense(request,env){if(!licenseAdminAuthorized(request,env))return json(401,{error:'Não autorizado.'});const input=await readJson(request);return json(200,await revokeLicense(database(env),input?.license_id,new Date().toISOString()));}
+
 async function handleAdminSummary(request, env) {
   if (!adminAuthorized(request, env)) return json(401, { error: 'Nao autorizado.' });
   return json(200, await telemetrySummary(database(env), new Date().toISOString()));
@@ -125,6 +137,10 @@ async function handleRequest(request, env) {
     if (request.method === 'POST' && url.pathname === '/v1/events') {
       return await handleEvents(request, env);
     }
+    if(request.method==='POST'&&url.pathname==='/v1/licenses/activate') return await handleLicenseActivation(request,env);
+    if(request.method==='POST'&&url.pathname==='/v1/admin/licenses') return await handleAdminCreateLicense(request,env);
+    if(request.method==='GET'&&url.pathname==='/v1/admin/licenses') return await handleAdminListLicenses(request,env);
+    if(request.method==='POST'&&url.pathname==='/v1/admin/licenses/revoke') return await handleAdminRevokeLicense(request,env);
     if (request.method === 'GET' && url.pathname === '/v1/admin/summary') {
       return await handleAdminSummary(request, env);
     }
@@ -136,5 +152,5 @@ async function handleRequest(request, env) {
   }
 }
 
-export { MAX_BODY_BYTES, database, adminAuthorized, handleRequest };
+export { MAX_BODY_BYTES, database, adminAuthorized, licenseAdminAuthorized, handleRequest };
 export default { fetch: handleRequest };

@@ -45,6 +45,8 @@ module.exports = {
     "bootstrap.cjs",
     "main.cjs",
     "pdv-lifecycle.cjs",
+    "pdv-license.cjs",
+    "pdv-license-preload.cjs",
     "pdv-telemetry.cjs",
     "preload.cjs",
     "package.json",

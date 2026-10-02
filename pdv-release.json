@@ -1,7 +1,11 @@
 {
-  "schemaVersion": 1,
-  "version": "2.0.0",
-  "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
+  "schemaVersion": 2,
+  "version": "2.1.0",
+  "generation": "licensed-v2",
+  "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest-v2.json",
+  "legacyManifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
+  "legacyFreezeVersion": "2.0.0",
+  "licenseEndpoint": "https://pdvnexus.nutricionistaalmeidavh.workers.dev",
   "telemetryEndpoint": "https://pdvnexus.nutricionistaalmeidavh.workers.dev",
   "distribution": {
     "googleDrive": {
