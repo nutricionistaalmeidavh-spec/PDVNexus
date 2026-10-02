@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { pathToFileURL } from 'node:url';
 
 const HOST=process.env.PDV_LICENSE_HOST||'127.0.0.1';
 const PORT=Number(process.env.PDV_LICENSE_PORT||8790);
@@ -46,5 +47,5 @@ async function handle(req,res,db){
  }catch(error){const status=Number(error?.status)||500;return send(res,status,{error:status>=500?'Internal server error.':String(error?.message||'Falha.')});}
 }
 function createServer({dbPath=DB_PATH}={}){const db=openDb(dbPath),server=http.createServer((req,res)=>void handle(req,res,db));server.on('close',()=>{try{db.close();}catch{}});return server;}
-if(import.meta.url===new URL(process.argv[1]||'', 'file://').href){createServer().listen(PORT,HOST,()=>console.log(`PDV Nexus licensing em http://${HOST}:${PORT}`));}
+if(process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){createServer().listen(PORT,HOST,()=>console.log(`PDV Nexus licensing em http://${HOST}:${PORT}`));}
 export {createServer,normalizeEmail,normalizeCode,generateCode};
