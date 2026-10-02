@@ -33,5 +33,5 @@ jobs:
           node-version: 22
       - name: Install root tooling
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Test Cloudflare and self-hosted licensing
+      - name: Test Cloudflare licensing
         run: npm run build
