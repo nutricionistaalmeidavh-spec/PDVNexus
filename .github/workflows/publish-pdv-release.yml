@@ -135,56 +135,8 @@ jobs:
           gh run download "${{ steps.gates.outputs.run_w7 }}" --repo "$REPO" -n PDV-Nexus-Windows-7 -D release-assets/w7
           gh run download "${{ steps.gates.outputs.run_w8 }}" --repo "$REPO" -n PDV-Nexus-Windows-8-32bit -D release-assets/w8
 
-      - name: Build legacy direct-spawn update bridges
-        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq nsis
-          mkdir -p release-assets/bridges
 
-          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          test -n "$W10" && test -n "$W7" && test -n "$W8"
-
-          build_bridge() {
-            local source="$1"
-            local channel="$2"
-            local embedded="$3"
-            local out="release-assets/bridges/PDV-Nexus-Update-Bridge-${channel}-${VERSION}.exe"
-            local nsi="release-assets/bridges/bridge-${channel}.nsi"
-            local source_abs
-            local out_abs
-            source_abs="$(realpath "$source")"
-            out_abs="$(realpath -m "$out")"
-
-            cat > "$nsi" <<EOF
-          Unicode true
-          Name "PDV Nexus Update Bridge"
-          OutFile "${out_abs}"
-          RequestExecutionLevel user
-          SilentInstall silent
-          ShowInstDetails nevershow
-          Section
-            SetOutPath "\$TEMP"
-            File /oname=${embedded} "${source_abs}"
-            ExecShell "runas" "\$TEMP\\${embedded}"
-          SectionEnd
-          EOF
-
-            makensis -V2 "$nsi"
-            test -s "$out"
-          }
-
-          build_bridge "$W10" "Windows-10" "PDV-Nexus-Windows-10-Setup-${VERSION}.exe"
-          build_bridge "$W7" "Windows-7" "PDV-Nexus-Windows-7-Setup-${VERSION}.exe"
-          build_bridge "$W8" "Windows-8-32bit" "PDV-Nexus-Windows-8-32bit-Setup-${VERSION}.exe"
-
-      - name: Generate update manifest
+      - name: Generate isolated update manifests
         if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
         env:
           REPO: ${{ github.repository }}
@@ -197,50 +149,33 @@ jobs:
           W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
           W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
           W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W10_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-10-${VERSION}.exe"
-          W7_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-7-${VERSION}.exe"
-          W8_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-8-32bit-${VERSION}.exe"
           test -n "$W10" && test -n "$W7" && test -n "$W8"
-          test -s "$W10_BRIDGE" && test -s "$W7_BRIDGE" && test -s "$W8_BRIDGE"
 
           W10_FILE="$(basename "$W10")"
           W7_FILE="$(basename "$W7")"
           W8_FILE="$(basename "$W8")"
-          W10_BRIDGE_FILE="$(basename "$W10_BRIDGE")"
-          W7_BRIDGE_FILE="$(basename "$W7_BRIDGE")"
-          W8_BRIDGE_FILE="$(basename "$W8_BRIDGE")"
-          [[ "$W10_FILE" == *"${VERSION}"* ]]
-          [[ "$W7_FILE" == *"${VERSION}"* ]]
-          [[ "$W8_FILE" == *"${VERSION}"* ]]
-
           W10_SHA="$(sha256sum "$W10" | awk '{print $1}')"
           W7_SHA="$(sha256sum "$W7" | awk '{print $1}')"
           W8_SHA="$(sha256sum "$W8" | awk '{print $1}')"
-          W10_BRIDGE_SHA="$(sha256sum "$W10_BRIDGE" | awk '{print $1}')"
-          W7_BRIDGE_SHA="$(sha256sum "$W7_BRIDGE" | awk '{print $1}')"
-          W8_BRIDGE_SHA="$(sha256sum "$W8_BRIDGE" | awk '{print $1}')"
           BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
           jq -n \
-            --arg version "$VERSION" \
-            --arg tag "$TAG" \
-            --arg commit "$SHA" \
-            --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --arg w10BridgeFile "$W10_BRIDGE_FILE" --arg w10BridgeUrl "${BASE_URL}/${W10_BRIDGE_FILE}" --arg w10BridgeSha "$W10_BRIDGE_SHA" \
-            --arg w7BridgeFile "$W7_BRIDGE_FILE" --arg w7BridgeUrl "${BASE_URL}/${W7_BRIDGE_FILE}" --arg w7BridgeSha "$W7_BRIDGE_SHA" \
-            --arg w8BridgeFile "$W8_BRIDGE_FILE" --arg w8BridgeUrl "${BASE_URL}/${W8_BRIDGE_FILE}" --arg w8BridgeSha "$W8_BRIDGE_SHA" \
-            --arg w10InstallerFile "$W10_FILE" --arg w10InstallerUrl "${BASE_URL}/${W10_FILE}" --arg w10InstallerSha "$W10_SHA" \
-            --arg w7InstallerFile "$W7_FILE" --arg w7InstallerUrl "${BASE_URL}/${W7_FILE}" --arg w7InstallerSha "$W7_SHA" \
-            --arg w8InstallerFile "$W8_FILE" --arg w8InstallerUrl "${BASE_URL}/${W8_FILE}" --arg w8InstallerSha "$W8_SHA" \
-            '{schemaVersion:1,version:$version,tag:$tag,commit:$commit,publishedAt:$publishedAt,artifacts:{"windows10-x64":{file:$w10BridgeFile,url:$w10BridgeUrl,sha256:$w10BridgeSha,arch:"x64",legacyDirectSpawnCompatible:true,installerFile:$w10InstallerFile,installerUrl:$w10InstallerUrl,installerSha256:$w10InstallerSha},"windows7-x64":{file:$w7BridgeFile,url:$w7BridgeUrl,sha256:$w7BridgeSha,arch:"x64",legacyDirectSpawnCompatible:true,installerFile:$w7InstallerFile,installerUrl:$w7InstallerUrl,installerSha256:$w7InstallerSha},"windows8-x86":{file:$w8BridgeFile,url:$w8BridgeUrl,sha256:$w8BridgeSha,arch:"ia32",legacyDirectSpawnCompatible:true,installerFile:$w8InstallerFile,installerUrl:$w8InstallerUrl,installerSha256:$w8InstallerSha}}}' \
-            > release-assets/latest.json
+            --arg version "$VERSION" --arg tag "$TAG" --arg commit "$SHA" --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg w10File "$W10_FILE" --arg w10Url "${BASE_URL}/${W10_FILE}" --arg w10Sha "$W10_SHA" \
+            --arg w7File "$W7_FILE" --arg w7Url "${BASE_URL}/${W7_FILE}" --arg w7Sha "$W7_SHA" \
+            --arg w8File "$W8_FILE" --arg w8Url "${BASE_URL}/${W8_FILE}" --arg w8Sha "$W8_SHA" \
+            '{schemaVersion:2,generation:"licensed-v2",version:$version,tag:$tag,commit:$commit,publishedAt:$publishedAt,artifacts:{"windows10-x64":{file:$w10File,url:$w10Url,sha256:$w10Sha,arch:"x64"},"windows7-x64":{file:$w7File,url:$w7Url,sha256:$w7Sha,arch:"x64"},"windows8-x86":{file:$w8File,url:$w8Url,sha256:$w8Sha,arch:"ia32"}}}' \
+            > release-assets/latest-v2.json
+
+          test -s release/legacy-latest.json
+          LEGACY_VERSION="$(jq -r '.version' release/legacy-latest.json)"
+          FREEZE_VERSION="$(jq -r '.legacyFreezeVersion' pdv-release.json)"
+          [[ "$LEGACY_VERSION" == "$FREEZE_VERSION" ]]
+          cp release/legacy-latest.json release-assets/latest.json
 
           cp "$W10" "release-assets/$W10_FILE"
           cp "$W7" "release-assets/$W7_FILE"
           cp "$W8" "release-assets/$W8_FILE"
-          cp "$W10_BRIDGE" "release-assets/$W10_BRIDGE_FILE"
-          cp "$W7_BRIDGE" "release-assets/$W7_BRIDGE_FILE"
-          cp "$W8_BRIDGE" "release-assets/$W8_BRIDGE_FILE"
 
       - name: Create GitHub Release
         if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
@@ -254,11 +189,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$TAG" \
-            release-assets/*.exe release-assets/latest.json \
+            release-assets/*.exe release-assets/latest.json release-assets/latest-v2.json \
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "Release automática do PDV Nexus. Corrige o empacotamento da telemetria e a ponte de atualização de clientes legados. Publicada somente após W10, W7, W8 x86, QA e sincronização do Drive completos." \
+            --notes "Release licenciada do PDV Nexus. O canal legacy permanece congelado em 2.0.0 via latest.json; novas instalações usam latest-v2.json e ativação por licença. Publicada somente após W10, W7, W8 x86, QA e sincronização do Drive completos." \
             --draft
 
       - name: Install rclone for Drive distribution

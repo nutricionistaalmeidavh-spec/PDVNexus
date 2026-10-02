@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "version": "2.0.0",
+  "tag": "pdv-v2.0.0",
+  "commit": "8ccbdc2ca9a3898e6a592c1ffb4db4b571a5c2a1",
+  "publishedAt": "2026-09-28T21:23:48Z",
+  "legacyFrozen": true,
+  "artifacts": {
+    "windows10-x64": {
+      "file": "PDV-Nexus-Update-Bridge-Windows-10-2.0.0.exe",
+      "url": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Update-Bridge-Windows-10-2.0.0.exe",
+      "sha256": "18ef1158f1e84f6a7326f535c63e8b1b0ecc94e75e501f4503f69224856d45f9",
+      "arch": "x64",
+      "legacyDirectSpawnCompatible": true,
+      "installerFile": "PDV-Nexus-Setup-2.0.0.exe",
+      "installerUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Setup-2.0.0.exe",
+      "installerSha256": "2ba3c380376bad5443613300f886ef093c2973798d5149e93ff9a99d4fd34a1b"
+    },
+    "windows7-x64": {
+      "file": "PDV-Nexus-Update-Bridge-Windows-7-2.0.0.exe",
+      "url": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Update-Bridge-Windows-7-2.0.0.exe",
+      "sha256": "c6231d023c2a902d0e762a50179ddb6a4a09b9def4ac3aec0fe16c035a5fa4c5",
+      "arch": "x64",
+      "legacyDirectSpawnCompatible": true,
+      "installerFile": "PDV-Nexus-Windows-7-Setup-2.0.0.exe",
+      "installerUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Windows-7-Setup-2.0.0.exe",
+      "installerSha256": "2bf1ffb70037f8f5c6b752f8536d081d5d557c819749ab52154cc492462e1bb7"
+    },
+    "windows8-x86": {
+      "file": "PDV-Nexus-Update-Bridge-Windows-8-32bit-2.0.0.exe",
+      "url": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Update-Bridge-Windows-8-32bit-2.0.0.exe",
+      "sha256": "efba345c9059066b850a1ca1de25d1390bc3b8a1452e5c9e5eb4faa43b5aebff",
+      "arch": "ia32",
+      "legacyDirectSpawnCompatible": true,
+      "installerFile": "PDV-Nexus-Windows-8-32bit-Setup-2.0.0.exe",
+      "installerUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/download/pdv-v2.0.0/PDV-Nexus-Windows-8-32bit-Setup-2.0.0.exe",
+      "installerSha256": "f357c6ee0d6cedac49bebd1b9d67d1d89e007f2943252383f0f6dc1d7a80c866"
+    }
+  }
+}
