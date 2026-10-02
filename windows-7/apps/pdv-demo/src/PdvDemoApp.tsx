@@ -162,8 +162,8 @@ export function PdvDemoApp() {
   const [persistenceState, setPersistenceState] = useState<"booting" | "ready" | "error">(() => getDesktopPdvStoreBridge() ? "booting" : "error");
   const backupInputRef = useRef<HTMLInputElement>(null);
   const checkoutSearchRef = useRef<HTMLInputElement>(null);
-  const persistenceSaveTimerRef = useRef<number | null>(null);
-  const persistenceSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const persistenceSaveActiveRef = useRef(false);
+  const pendingPersistenceSnapshotRef = useRef("");
   const lastPersistedSnapshotRef = useRef("");
   const savedConfig = initialStore.deviceConfig;
   const savedExtensions = normalizePdvExtensions(initialStore.extensions);
@@ -343,42 +343,47 @@ export function PdvDemoApp() {
     if (!desktopStoreBridge || persistenceState !== "ready") return;
     const snapshot = buildPdvSnapshotJson();
     if (snapshot === lastPersistedSnapshotRef.current) return;
-    if (persistenceSaveTimerRef.current !== null) window.clearTimeout(persistenceSaveTimerRef.current);
-    persistenceSaveTimerRef.current = window.setTimeout(() => {
-      persistenceSaveTimerRef.current = null;
-      persistenceSaveQueueRef.current = persistenceSaveQueueRef.current.then(async () => {
-        try {
-          await runPdvPersistenceWithRetry(
-            () => withPdvPersistenceTimeout(
-              desktopStoreBridge.save(PDV_STORE_KEY, snapshot),
-              PDV_STORE_SAVE_TIMEOUT_MS,
-              "Tempo esgotado ao salvar os dados locais do PDV."
-            ),
-            3
-          );
-          lastPersistedSnapshotRef.current = snapshot;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.";
-          setDesktopStoreStatus(`Falha temporária ao salvar no SQLite: ${message}`);
-          setLastEvent("O PDV continua aberto. Foi criado um backup de emergência enquanto o banco local se recupera.");
+    pendingPersistenceSnapshotRef.current = snapshot;
+    if (persistenceSaveActiveRef.current) return;
+
+    persistenceSaveActiveRef.current = true;
+    void (async () => {
+      try {
+        while (pendingPersistenceSnapshotRef.current && pendingPersistenceSnapshotRef.current !== lastPersistedSnapshotRef.current) {
+          const nextSnapshot = pendingPersistenceSnapshotRef.current;
           try {
-            await desktopPdvBackupBridge?.write({
-              snapshotJson: snapshot,
-              reason: "sqlite-save-failed",
-              retention: Math.max(autoBackupConfig.retention, 7)
-            });
-          } catch {
-            // the UI must remain usable even if the emergency file backup also fails
+            await runPdvPersistenceWithRetry(
+              () => withPdvPersistenceTimeout(
+                desktopStoreBridge.save(PDV_STORE_KEY, nextSnapshot),
+                PDV_STORE_SAVE_TIMEOUT_MS,
+                "Tempo esgotado ao salvar os dados locais do PDV."
+              ),
+              3
+            );
+            lastPersistedSnapshotRef.current = nextSnapshot;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.";
+            setDesktopStoreStatus(`Falha temporária ao salvar no SQLite: ${message}`);
+            setLastEvent("O PDV continua aberto. Foi criado um backup de emergência enquanto o banco local se recupera.");
+            try {
+              await desktopPdvBackupBridge?.write({
+                snapshotJson: nextSnapshot,
+                reason: "sqlite-save-failed",
+                retention: Math.max(autoBackupConfig.retention, 7)
+              });
+            } catch {
+              // the UI must remain usable even if the emergency file backup also fails
+            }
+            break;
           }
         }
-      }).catch(() => {});
-    }, 150);
-    return () => {
-      if (persistenceSaveTimerRef.current !== null) {
-        window.clearTimeout(persistenceSaveTimerRef.current);
-        persistenceSaveTimerRef.current = null;
+      } finally {
+        persistenceSaveActiveRef.current = false;
+        if (pendingPersistenceSnapshotRef.current === lastPersistedSnapshotRef.current) {
+          pendingPersistenceSnapshotRef.current = "";
+        }
       }
-    };
+    })();
   }, [persistenceState, catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions, scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups]);
 
   useEffect(() => {
