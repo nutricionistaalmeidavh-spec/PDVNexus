@@ -126,12 +126,45 @@ function createEmptyProductDraft(): ProductDraft {
 }
 function createEmptyPromotionGroupDraft(): PromotionGroupDraft { return { name: "", quantityPriceRules: [] }; }
 
+const PDV_STORE_STATUS_TIMEOUT_MS = 8000;
+const PDV_STORE_LOAD_TIMEOUT_MS = 12000;
+const PDV_STORE_SAVE_TIMEOUT_MS = 10000;
+const PDV_STORE_RETRY_DELAY_MS = 700;
+
+function withPdvPersistenceTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    operation.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error) => { window.clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+async function runPdvPersistenceWithRetry<T>(operation: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, PDV_STORE_RETRY_DELAY_MS * attempt));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError ?? "Falha de persistência local."));
+}
+
 export function PdvDemoApp() {
   const route = useHashRoute(defaultRoute);
   const [initialStore] = useState(loadInitialPdvStore);
   const [persistenceState, setPersistenceState] = useState<"booting" | "ready" | "error">(() => getDesktopPdvStoreBridge() ? "booting" : "error");
   const backupInputRef = useRef<HTMLInputElement>(null);
   const checkoutSearchRef = useRef<HTMLInputElement>(null);
+  const persistenceSaveTimerRef = useRef<number | null>(null);
+  const persistenceSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastPersistedSnapshotRef = useRef("");
   const savedConfig = initialStore.deviceConfig;
   const savedExtensions = normalizePdvExtensions(initialStore.extensions);
   const [sale, setSale] = useState<SaleState | null>(null);
@@ -265,27 +298,87 @@ export function PdvDemoApp() {
     if (!desktopStoreBridge) return;
     let cancelled = false;
     void (async () => {
-      const status = await Promise.race([desktopStoreBridge.status(), new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Tempo esgotado ao abrir o banco local.")), 8000))]);
+      const status = await withPdvPersistenceTimeout(
+        desktopStoreBridge.status(),
+        PDV_STORE_STATUS_TIMEOUT_MS,
+        "Tempo esgotado ao consultar o banco local."
+      );
       if (!status.available) { setDesktopStoreStatus("SQLite desktop indisponivel nesta versao."); setPersistenceState("error"); return; }
-      const row = await desktopStoreBridge.load(PDV_STORE_KEY);
+      const row = await runPdvPersistenceWithRetry(
+        () => withPdvPersistenceTimeout(
+          desktopStoreBridge.load(PDV_STORE_KEY),
+          PDV_STORE_LOAD_TIMEOUT_MS,
+          "Tempo esgotado ao carregar os dados locais do PDV."
+        ),
+        2
+      );
       if (cancelled) return;
       setDesktopStoreStatus(`SQLite ativo neste computador (${status.machineName}). Banco: ${status.path}`);
       if (row?.snapshotJson) {
+        lastPersistedSnapshotRef.current = row.snapshotJson;
         const imported = parsePdvSnapshot(row.snapshotJson);
         setCatalogProducts(imported.catalogProducts); setRegisteredCustomers(imported.registeredCustomers); setCompletedSales(imported.completedSales); setCashSession(imported.cashSession); setPaymentOptions(imported.paymentOptions);
         const importedExtensions = normalizePdvExtensions(imported.extensions);
         setInventoryMovements(importedExtensions.inventoryMovements); setCashClosings(importedExtensions.cashClosings); setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig); setLastReceiptText(importedExtensions.lastReceiptText); setUsers(importedExtensions.users); setCurrentOperatorId(importedExtensions.currentOperatorId); setAuditLogs(importedExtensions.auditLogs); setCancelledSales(importedExtensions.cancelledSales); setTerminalConfig(importedExtensions.terminalConfig); setTefConfig(importedExtensions.tefConfig); setTefTransactions(importedExtensions.tefTransactions); setAutoBackupConfig(importedExtensions.autoBackupConfig); setAutoBackups(importedExtensions.autoBackups); setStoreSettings(importedExtensions.storeSettings); setPromotionGroups(importedExtensions.promotionGroups); setPersistenceState("ready"); return;
       }
-      await desktopStoreBridge.save(PDV_STORE_KEY, buildPdvSnapshotJson());
+      const initialSnapshot = buildPdvSnapshotJson();
+      await runPdvPersistenceWithRetry(
+        () => withPdvPersistenceTimeout(
+          desktopStoreBridge.save(PDV_STORE_KEY, initialSnapshot),
+          PDV_STORE_SAVE_TIMEOUT_MS,
+          "Tempo esgotado ao preparar o banco local do PDV."
+        ),
+        2
+      );
+      lastPersistedSnapshotRef.current = initialSnapshot;
       if (!cancelled) setPersistenceState("ready");
-    })().catch((error) => { setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao abrir SQLite desktop."); setPersistenceState("error"); });
+    })().catch((error) => {
+      setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao abrir SQLite desktop.");
+      setPersistenceState("error");
+    });
     return () => { cancelled = true; };
   }, []);
   useEffect(() => { if (!desktopPdvSyncBridge) return; void desktopPdvSyncBridge.status().then(setSyncServerStatus).catch(() => setSyncServerStatus({ running: false })); }, [desktopPdvSyncBridge]);
   useEffect(() => {
     if (!desktopStoreBridge || persistenceState !== "ready") return;
     const snapshot = buildPdvSnapshotJson();
-    void desktopStoreBridge.save(PDV_STORE_KEY, snapshot).catch((error) => { setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao salvar SQLite desktop."); setPersistenceState("error"); });
+    if (snapshot === lastPersistedSnapshotRef.current) return;
+    if (persistenceSaveTimerRef.current !== null) window.clearTimeout(persistenceSaveTimerRef.current);
+    persistenceSaveTimerRef.current = window.setTimeout(() => {
+      persistenceSaveTimerRef.current = null;
+      persistenceSaveQueueRef.current = persistenceSaveQueueRef.current.then(async () => {
+        try {
+          await runPdvPersistenceWithRetry(
+            () => withPdvPersistenceTimeout(
+              desktopStoreBridge.save(PDV_STORE_KEY, snapshot),
+              PDV_STORE_SAVE_TIMEOUT_MS,
+              "Tempo esgotado ao salvar os dados locais do PDV."
+            ),
+            3
+          );
+          lastPersistedSnapshotRef.current = snapshot;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.";
+          setDesktopStoreStatus(`Falha temporária ao salvar no SQLite: ${message}`);
+          setLastEvent("O PDV continua aberto. Foi criado um backup de emergência enquanto o banco local se recupera.");
+          try {
+            await desktopPdvBackupBridge?.write({
+              snapshotJson: snapshot,
+              reason: "sqlite-save-failed",
+              retention: Math.max(autoBackupConfig.retention, 7)
+            });
+          } catch {
+            // the UI must remain usable even if the emergency file backup also fails
+          }
+        }
+      }).catch(() => {});
+    }, 150);
+    return () => {
+      if (persistenceSaveTimerRef.current !== null) {
+        window.clearTimeout(persistenceSaveTimerRef.current);
+        persistenceSaveTimerRef.current = null;
+      }
+    };
   }, [persistenceState, catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions, scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups]);
 
   useEffect(() => {

@@ -23,6 +23,8 @@ const APP_DB_FILE = "software-local.sqlite";
 const PDV_SYNC_DEFAULT_PORT = 4174;
 const TEF_BRIDGE_DEFAULT_PORT = 9090;
 const PDV_BACKUP_DIR = "pdv-backups";
+const PDV_SQLITE_LOG_FILE = "pdv-sqlite.log";
+const PDV_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const APP_BACKUP_DIR = "app-backups";
 const openSerialPorts = new Map();
 let mainWindowRef = null;
@@ -90,6 +92,29 @@ function getPdvBackupDir() {
   return path.join(app.getPath("userData"), PDV_BACKUP_DIR);
 }
 
+function getPdvSqliteLogPath() {
+  return path.join(app.getPath("userData"), PDV_SQLITE_LOG_FILE);
+}
+
+function appendPdvSqliteLog(phase, detail = "") {
+  try {
+    const logPath = getPdvSqliteLogPath();
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    const safeDetail = String(detail || "").replace(/[\r\n]+/g, " ").slice(0, 800);
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${phase}${safeDetail ? ` | ${safeDetail}` : ""}\n`, "utf8");
+  } catch {
+    // diagnostics must never prevent the PDV from opening
+  }
+}
+
+function normalizePdvSqliteError(error, operation) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/database is locked|database is busy|SQLITE_BUSY|SQLITE_LOCKED/i.test(message)) {
+    return new Error(`O banco local ficou temporariamente ocupado durante ${operation}. Feche outras instâncias do PDV e tente novamente.`);
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
 function getAppBackupDir(scope) {
   const safeScope = String(scope ?? "app").replace(/[^a-z0-9-]/gi, "-").replace(/^-+|-+$/g, "") || "app";
   return path.join(app.getPath("userData"), APP_BACKUP_DIR, safeScope);
@@ -132,8 +157,18 @@ function getPdvDatabase() {
   }
 
   const dbPath = getPdvDbPath();
+  appendPdvSqliteLog("database.open.start", dbPath);
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath);
+  let db;
+  try {
+    db = new DatabaseSync(dbPath);
+    db.exec(`PRAGMA busy_timeout = ${PDV_SQLITE_BUSY_TIMEOUT_MS}`);
+    appendPdvSqliteLog("database.open.ready", `busy_timeout=${PDV_SQLITE_BUSY_TIMEOUT_MS}ms`);
+    appendPdvSqliteLog("schema.ensure.start");
+  } catch (error) {
+    appendPdvSqliteLog("database.open.error", error?.message || error);
+    throw normalizePdvSqliteError(error, "a abertura do banco");
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS pdv_store (
       store_key TEXT PRIMARY KEY,
@@ -201,9 +236,23 @@ function getPdvDatabase() {
     CREATE INDEX IF NOT EXISTS idx_pdv_sales_finalized_at ON pdv_sales (store_key, finalized_at);
     CREATE INDEX IF NOT EXISTS idx_pdv_sale_items_product ON pdv_sale_items (store_key, product_code);
   `);
-  resetPdvDataForNewInstalledVersion(db);
-  pdvDbRef = db;
-  return db;
+  appendPdvSqliteLog("schema.ensure.done");
+  try {
+    const integrityRow = db.prepare("PRAGMA quick_check").get();
+    const integrityValue = integrityRow ? String(Object.values(integrityRow)[0] ?? "") : "";
+    appendPdvSqliteLog("integrity.quick_check", integrityValue || "sem retorno");
+    if (integrityValue && integrityValue.toLowerCase() !== "ok") {
+      throw new Error(`Falha de integridade do SQLite: ${integrityValue}`);
+    }
+    resetPdvDataForNewInstalledVersion(db);
+    pdvDbRef = db;
+    appendPdvSqliteLog("database.ready");
+    return db;
+  } catch (error) {
+    appendPdvSqliteLog("database.prepare.error", error?.message || error);
+    try { db.close(); } catch {}
+    throw normalizePdvSqliteError(error, "a preparação do banco");
+  }
 }
 
 function resetPdvDataForNewInstalledVersion(db) {
@@ -265,17 +314,35 @@ function saveAppStoreSnapshot(storeKey, snapshotJson) {
 }
 
 function loadPdvStoreSnapshot(storeKey) {
-  const db = getPdvDatabase();
+  const startedAt = Date.now();
   const key = String(storeKey ?? "default");
-  migrateLegacyPdvSnapshotIfNeeded(db, key);
-  const state = readPdvStateFromTables(db, key);
-  if (!state) return null;
-  return { snapshotJson: JSON.stringify(state), updatedAt: getPdvUpdatedAt(db, key) };
+  appendPdvSqliteLog("load.start", `store=${key}`);
+  try {
+    const db = getPdvDatabase();
+    appendPdvSqliteLog("load.migration.start", `store=${key}`);
+    migrateLegacyPdvSnapshotIfNeeded(db, key);
+    appendPdvSqliteLog("load.migration.done", `store=${key}`);
+    appendPdvSqliteLog("load.read.start", `store=${key}`);
+    const state = readPdvStateFromTables(db, key);
+    appendPdvSqliteLog("load.read.done", `store=${key}; found=${Boolean(state)}`);
+    if (!state) {
+      appendPdvSqliteLog("load.done", `store=${key}; empty=true; ms=${Date.now() - startedAt}`);
+      return null;
+    }
+    const result = { snapshotJson: JSON.stringify(state), updatedAt: getPdvUpdatedAt(db, key) };
+    appendPdvSqliteLog("load.done", `store=${key}; ms=${Date.now() - startedAt}`);
+    return result;
+  } catch (error) {
+    appendPdvSqliteLog("load.error", `store=${key}; ms=${Date.now() - startedAt}; ${error?.message || error}`);
+    throw normalizePdvSqliteError(error, "a leitura dos dados");
+  }
 }
 
 function savePdvStoreSnapshot(storeKey, snapshotJson) {
-  const db = getPdvDatabase();
+  const startedAt = Date.now();
   const key = String(storeKey ?? "default");
+  appendPdvSqliteLog("save.start", `store=${key}`);
+  const db = getPdvDatabase();
   const updatedAt = new Date().toISOString();
   let state;
   try {
@@ -283,13 +350,19 @@ function savePdvStoreSnapshot(storeKey, snapshotJson) {
   } catch {
     throw new Error("Snapshot do PDV inválido; os dados não foram gravados.");
   }
-  writePdvStateToTables(db, key, state, updatedAt);
-  db.prepare(`
-    INSERT INTO pdv_store (store_key, snapshot_json, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
-  `).run(key, JSON.stringify(state), updatedAt);
-  return { updatedAt };
+  try {
+    writePdvStateToTables(db, key, state, updatedAt);
+    db.prepare(`
+      INSERT INTO pdv_store (store_key, snapshot_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
+    `).run(key, JSON.stringify(state), updatedAt);
+    appendPdvSqliteLog("save.done", `store=${key}; ms=${Date.now() - startedAt}`);
+    return { updatedAt };
+  } catch (error) {
+    appendPdvSqliteLog("save.error", `store=${key}; ms=${Date.now() - startedAt}; ${error?.message || error}`);
+    throw normalizePdvSqliteError(error, "a gravação dos dados");
+  }
 }
 
 function parsePdvJson(value, fallback) {

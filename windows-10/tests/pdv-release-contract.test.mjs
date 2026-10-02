@@ -7,8 +7,8 @@ const releaseConfig = JSON.parse(fs.readFileSync(new URL("../../pdv-release.json
 const publishWorkflow = fs.readFileSync(new URL("../../.github/workflows/publish-pdv-release.yml", import.meta.url), "utf8");
 const desktopBuilder = fs.readFileSync(new URL("../apps/nexus-desktop/electron-builder.cjs", import.meta.url), "utf8");
 
-test("release atual do PDV é 2.0.0", () => {
-  assert.equal(releaseConfig.version, "2.0.0");
+test("release atual do PDV é 2.0.1", () => {
+  assert.equal(releaseConfig.version, "2.0.1");
   assert.match(releaseConfig.version, /^\d+\.\d+\.\d+$/);
 });
 
@@ -38,4 +38,16 @@ test("manifesto de atualização usa bridge sem elevação para clientes legados
   assert.match(publishWorkflow, /ExecShell "runas"/);
   assert.match(publishWorkflow, /legacyDirectSpawnCompatible:true/);
   assert.match(publishWorkflow, /installerFile:\$w10InstallerFile/);
+});
+
+
+test("hotfix 2.0.1 protege abertura e gravação do SQLite", () => {
+  const mainSource = fs.readFileSync(new URL("../apps/nexus-desktop/main.cjs", import.meta.url), "utf8");
+  assert.match(mainSource, /PRAGMA busy_timeout/);
+  assert.match(mainSource, /pdv-sqlite\.log/);
+  assert.match(mainSource, /integrity\.quick_check/);
+  assert.match(appSource, /PDV_STORE_LOAD_TIMEOUT_MS/);
+  assert.match(appSource, /runPdvPersistenceWithRetry/);
+  assert.match(appSource, /sqlite-save-failed/);
+  assert.doesNotMatch(appSource, /save\(PDV_STORE_KEY, snapshot\)\.catch\(\(error\) => \{ setDesktopStoreStatus[\s\S]{0,200}setPersistenceState\("error"\)/);
 });
