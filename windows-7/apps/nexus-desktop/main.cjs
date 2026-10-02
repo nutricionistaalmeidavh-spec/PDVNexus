@@ -128,10 +128,16 @@ function getDesktopStorePath() {
 
 function getDesktopStore() {
   if (desktopStoreRef) return desktopStoreRef;
+  const filePath = getDesktopStorePath();
+  const backupPath = filePath + ".bak";
   try {
-    desktopStoreRef = JSON.parse(fs.readFileSync(getDesktopStorePath(), "utf8"));
+    desktopStoreRef = JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch {
-    desktopStoreRef = {};
+    try {
+      desktopStoreRef = JSON.parse(fs.readFileSync(backupPath, "utf8"));
+    } catch {
+      desktopStoreRef = {};
+    }
   }
   desktopStoreRef.pdvSnapshots ??= {};
   desktopStoreRef.appSnapshots ??= {};
@@ -140,8 +146,15 @@ function getDesktopStore() {
 
 function saveDesktopStore() {
   const filePath = getDesktopStorePath();
+  const tempPath = filePath + ".tmp";
+  const backupPath = filePath + ".bak";
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(getDesktopStore()), "utf8");
+  const payload = JSON.stringify(getDesktopStore());
+  if (fs.existsSync(filePath)) {
+    try { fs.copyFileSync(filePath, backupPath); } catch {}
+  }
+  fs.writeFileSync(tempPath, payload, "utf8");
+  fs.renameSync(tempPath, filePath);
 }
 
 function loadAppStoreSnapshot(storeKey) {
