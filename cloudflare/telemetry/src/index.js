@@ -1,4 +1,6 @@
 import { validateRegistration, validateBatch } from './schema.js';
+import { geographicArea, recordGeographicObservation, geographicSummary } from './geography.js';
+import { geographyDashboard } from './geography-dashboard.js';
 import { createCredential, hashCredential, authenticateRequest } from './auth.js';
 import {
   ensureSchema,
@@ -99,6 +101,14 @@ async function handleEvents(request, env) {
     });
   }
 
+  // Only accepted, authenticated telemetry is counted. Geography stays strictly aggregated.
+  // Geo failures never interrupt the existing collector or clients.
+  try {
+    await recordGeographicObservation(db, geographicArea(request), batch.events[0].app_version, now);
+  } catch {
+    // Fail open: neither registration nor normal events depend on regional analytics.
+  }
+
   try {
     await purgeOldEvents(db, now, 30);
   } catch {
@@ -127,6 +137,22 @@ async function handleRequest(request, env) {
     }
     if (request.method === 'GET' && url.pathname === '/v1/admin/summary') {
       return await handleAdminSummary(request, env);
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/admin/geography') {
+      if (!adminAuthorized(request, env)) return json(401, { error: 'Nao autorizado.' });
+      return json(200, await geographicSummary(database(env), new Date().toISOString(), url.searchParams.get('days') ?? 7));
+    }
+    if (request.method === 'GET' && url.pathname === '/admin/geography') {
+      const nonce = crypto.randomUUID().replace(/-/g, '');
+      return new Response(geographyDashboard(nonce), {
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-frame-options': 'DENY',
+          'referrer-policy': 'no-referrer',
+          'content-security-policy': `default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'`
+        }
+      });
     }
     return json(404, { error: 'Not found.' });
   } catch (error) {
