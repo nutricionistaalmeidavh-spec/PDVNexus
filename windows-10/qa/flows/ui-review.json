@@ -119,6 +119,32 @@
       "name": "sales-reports-csv-visible"
     },
     {
+      "action": "expectVisible",
+      "text": "Exportar Excel (.xlsx)",
+      "exact": true,
+      "name": "sales-reports-xlsx-visible"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Exportar PDF",
+      "exact": true,
+      "name": "sales-reports-pdf-visible"
+    },
+    {
+      "action": "expectVisible",
+      "selector": ".nexus-reports__extras",
+      "name": "sales-reports-favorites-visible"
+    },
+    {
+      "action": "expectVisible",
+      "selector": ".nexus-reports__compare-control",
+      "name": "sales-reports-period-comparison-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "04b-relatorios-p2-p3"
+    },
+    {
       "action": "click",
       "text": "Por produto",
       "exact": true,
