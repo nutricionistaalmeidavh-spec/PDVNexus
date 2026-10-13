@@ -28,7 +28,7 @@ export function reportWorkbookTables(report: ReportResult, context: ExportContex
       ["Vendas sem itens", report.missingItems.join(", ") || "Nenhuma"],
       ["Atenção", "Pagamentos são vinculados à venda, não atribuídos individualmente ao produto."],
       ["Cobertura", "Apenas vendas existentes no histórico local; instalações legadas podem ter limite de 100 vendas."]
-    ], moneyColumns: [2] },
+    ], moneyColumns: [] },
     { name: "Itens", headers: ["Data", "Venda", "Operador", "Cliente", "Situação", "Código",
       "Produto", "Unidade", "Quantidade", "Unitário", "Bruto", "Desconto", "Líquido", "Pagamentos da venda"],
       widths: [23, 15, 20, 25, 16, 16, 39, 12, 14, 16, 16, 16, 16, 55],
@@ -64,7 +64,7 @@ function worksheet(table: WorkbookTable): Uint8Array {
     '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + width + '" customWidth="1"/>').join("");
   const header = "<row r=\"1\">" + table.headers.map((v, i) => cell(v, i + 1, 1, 1)).join("") + "</row>";
   const rows = table.rows.map((row, i) => "<row r=\"" + (i + 2) + "\">" +
-    row.map((v, j) => cell(v, j + 1, i + 2, typeof v === "number" && table.moneyColumns?.includes(j + 1) ? 2 : 0)).join("") +
+    row.map((v, j) => cell(v, j + 1, i + 2, typeof v === "number" && (table.moneyColumns?.includes(j + 1) || (table.name === "Resumo" && j === 1 && ["Faturamento", "Ticket médio", "Divergência de pagamentos"].includes(String(row[0])))) ? 2 : 0)).join("") +
     "</row>").join("");
   const lastCol = refColumn(table.headers.length);
   return utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
