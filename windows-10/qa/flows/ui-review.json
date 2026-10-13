@@ -126,9 +126,8 @@
     },
     {
       "action": "expectVisible",
-      "text": "Forma de pagamento",
-      "exact": true,
-      "name": "sales-reports-filters-visible"
+      "name": "sales-reports-filters-visible",
+      "selector": ".nexus-reports__filters"
     },
     {
       "action": "screenshot",
