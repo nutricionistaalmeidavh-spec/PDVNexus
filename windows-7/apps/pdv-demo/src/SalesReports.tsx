@@ -65,6 +65,7 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
 
   const setQuickPeriod = (key: string) => {
     setPeriod(key);
+    if (key === "custom") return;
     if (key === "all") { setFrom(""); setTo(""); return; }
     setFrom(daysAgo(Number(key) - 1));
     setTo(today());
