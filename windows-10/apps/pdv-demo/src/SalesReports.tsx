@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildSalesPdf, buildSalesXlsx, type ExportContext } from "./reportDocuments";
+import {
+  SALES_REPORT_FAVORITES_KEY, parseReportFavorites, saveReportFavorite, removeReportFavorite,
+  previousComparablePeriod, comparisonDelta, type SalesReportFavorite
+} from "./reportPreferences";
+
 import {
   buildSalesReport, exportSalesReportCsv, reportDate,
   type ReportSale, type ReportView, type ReportFilters
@@ -10,6 +16,8 @@ type Props = {
   cancelledSales: readonly ReportSale[];
   customers: readonly { id: string; name: string }[];
   cashMethodNames?: readonly string[];
+  storeName?: string;
+  allowed?: boolean;
 };
 
 const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -33,7 +41,7 @@ const tabs: { key: ReportView; label: string }[] = [
   { key: "sales", label: "Vendas" }
 ];
 
-export function SalesReports({ completedSales, cancelledSales, customers, cashMethodNames = [] }: Props) {
+export function SalesReports({ completedSales, cancelledSales, customers, cashMethodNames = [], storeName = "PDV Nexus", allowed = true }: Props) {
   const [view, setView] = useState<ReportView>("lines");
   const [period, setPeriod] = useState("30");
   const [from, setFrom] = useState(daysAgo(29));
@@ -44,6 +52,20 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
   const [operator, setOperator] = useState("");
   const [productCode, setProductCode] = useState("");
   const [message, setMessage] = useState("");
+
+  const [favorites, setFavorites] = useState<SalesReportFavorite[]>(() => {
+    try { return parseReportFavorites(window.localStorage.getItem(SALES_REPORT_FAVORITES_KEY)); }
+    catch { return []; }
+  });
+  const [favoriteName, setFavoriteName] = useState("");
+  const [favoriteId, setFavoriteId] = useState("");
+  const [compareEnabled, setCompareEnabled] = useState(false);
+  const [page, setPage] = useState(1);
+  const [detail, setDetail] = useState<{ number: string; date: string; terminalId: string } | null>(null);
+  const [busy, setBusy] = useState<"csv" | "pdf" | "xlsx" | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  useEffect(() => () => { workerRef.current?.terminate(); }, []);
+
 
   const methods = useMemo(() => [...new Set([...completedSales, ...cancelledSales].flatMap(s =>
     s.payments.filter(p => p.amount > 0).map(p => p.method)))].sort(), [completedSales, cancelledSales]);
@@ -60,6 +82,29 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
   const filters: ReportFilters = { from, to, query, status, paymentMethod, operator, productCode };
   const report = useMemo(() => buildSalesReport(completedSales, cancelledSales, customers, filters, cashMethodNames),
     [completedSales, cancelledSales, customers, from, to, query, status, paymentMethod, operator, productCode, cashMethodNames]);
+
+  const comparable = previousComparablePeriod(from, to);
+  const previousReport = useMemo(() => compareEnabled && comparable
+    ? buildSalesReport(completedSales, cancelledSales, customers,
+      { from: comparable.from, to: comparable.to, query, status, paymentMethod, operator, productCode }, cashMethodNames)
+    : null, [compareEnabled, comparable?.from, comparable?.to, completedSales, cancelledSales, customers,
+      query, status, paymentMethod, operator, productCode, cashMethodNames]);
+  useEffect(() => { setPage(1); setDetail(null); },
+    [from, to, query, status, paymentMethod, operator, productCode, view]);
+  const dataLength = view === "lines" ? report.lines.length : view === "sales" ? report.sales.length : report[view].length;
+  const pageCount = Math.max(1, Math.ceil(dataLength / 100));
+  const activePage = Math.min(page, pageCount);
+  const offset = (activePage - 1) * 100;
+  const detailSale = detail ? report.sales.find(s => s.number === detail.number &&
+    s.date === detail.date && s.terminalId === detail.terminalId) : null;
+  const detailLines = detail ? report.lines.filter(r => r.number === detail.number &&
+    r.date === detail.date && r.terminalId === detail.terminalId) : [];
+  const percentChange = (current: number, previous: number) => {
+    const delta = comparisonDelta(current, previous);
+    return delta.percentage === null ? "Sem base anterior" :
+      (delta.percentage >= 0 ? "+" : "") + delta.percentage.toFixed(1).replace(".", ",") + "%";
+  };
+
   const paymentFilterWarning = Boolean(paymentMethod || productCode);
   const coverageNote = "Os resultados incluem apenas vendas ainda presentes no histórico desta instalação. Versões anteriores limitavam esse histórico às 100 vendas mais recentes.";
 
@@ -71,23 +116,116 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
     setTo(today());
   };
 
-  const download = (target: ReportView) => {
+  const persistFavorites = (next: SalesReportFavorite[]) => {
     try {
-      const blob = new Blob([exportSalesReportCsv(report, target)], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "pdv-nexus-" + target + "-" + (from || "inicio") + "-a-" + (to || "atual") + ".csv";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setMessage("Arquivo CSV gerado com " + (target === "lines" ? report.lines.length : target === "sales" ? report.sales.length : report[target].length) + " registro(s) e os filtros selecionados.");
+      window.localStorage.setItem(SALES_REPORT_FAVORITES_KEY, JSON.stringify(next));
+      setFavorites(next);
+      return true;
     } catch {
-      setMessage("Não foi possível gerar o CSV. Os filtros foram preservados; tente novamente.");
+      setMessage("Não foi possível salvar favoritos no armazenamento deste computador. Os filtros foram mantidos.");
+      return false;
     }
   };
+  const addFavorite = () => {
+    try {
+      const id = "report-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+      const next = saveReportFavorite(favorites, { name: favoriteName, view, filters }, new Date().toISOString(), id);
+      if (persistFavorites(next)) {
+        setFavoriteId(next[0].id);
+        setFavoriteName("");
+        setMessage("Visão salva neste computador. Ela não altera os dados das vendas.");
+      }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível salvar o favorito."); }
+  };
+  const applyFavorite = (id: string) => {
+    setFavoriteId(id);
+    const chosen = favorites.find(f => f.id === id);
+    if (!chosen) return;
+    setView(chosen.view);
+    setFrom(chosen.filters.from || "");
+    setTo(chosen.filters.to || "");
+    setQuery(chosen.filters.query || "");
+    setStatus(chosen.filters.status || "completed");
+    setPaymentMethod(chosen.filters.paymentMethod || "");
+    setOperator(chosen.filters.operator || "");
+    setProductCode(chosen.filters.productCode || "");
+    setPeriod("custom");
+    setMessage("Filtros do favorito “" + chosen.name + "” aplicados.");
+  };
+  const deleteFavorite = () => {
+    if (!favoriteId) return;
+    const removed = favorites.find(f => f.id === favoriteId);
+    if (persistFavorites(removeReportFavorite(favorites, favoriteId))) {
+      setFavoriteId("");
+      setMessage(removed ? "Favorito “" + removed.name + "” excluído. Os filtros atuais foram preservados." : "Favorito excluído.");
+    }
+  };
+  const saveBlob = (bytes: Uint8Array, kind: "pdf" | "xlsx" | "csv", prefix: string) => {
+    const content = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const types = { csv: "text/csv;charset=utf-8", pdf: "application/pdf",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
+    const url = URL.createObjectURL(new Blob([content], { type: types[kind] }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "pdv-nexus-" + prefix + "-" + (from || "inicio") + "-a-" + (to || "atual") + "." + kind;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 45000);
+  };
+  const exportDocument = (kind: "csv" | "pdf" | "xlsx", target: ReportView = view) => {
+    if (!allowed || busy) return;
+    setBusy(kind);
+    setMessage("Preparando o relatório " + kind.toUpperCase() + " em segundo plano...");
+    const context: ExportContext = { storeName, generatedAt: new Date().toLocaleString("pt-BR"), filters, view: target };
+    const finish = () => { workerRef.current?.terminate(); workerRef.current = null; setBusy(null); };
+    try {
+      const worker = new Worker(new URL("./reportExport.worker.ts", import.meta.url), { type: "module" });
+      workerRef.current = worker;
+      worker.onmessage = (event: MessageEvent<{ type: string; bytes?: ArrayBuffer; message?: string }>) => {
+        const result = event.data;
+        if (result.type === "progress") return;
+        if (result.type === "done" && result.bytes) {
+          try {
+            saveBlob(new Uint8Array(result.bytes), kind, kind === "xlsx" ? "completo" : target);
+            setMessage("Arquivo " + kind.toUpperCase() + " preparado para download. Selecione-o na pasta de downloads.");
+          } catch { setMessage("Falha ao disponibilizar o arquivo. Seus filtros permanecem intactos; tente novamente."); }
+        } else setMessage(result.message || "Falha na exportação. Seus filtros foram preservados.");
+        finish();
+      };
+      worker.onerror = () => {
+        setMessage("Falha na exportação em segundo plano. Seus filtros foram preservados; tente novamente.");
+        finish();
+      };
+      worker.postMessage({ kind, report, context });
+    } catch {
+      // Small reports remain usable even if Electron disables web workers.
+      if (report.lines.length <= 500) {
+        window.setTimeout(() => {
+          try {
+            const bytes = kind === "pdf" ? buildSalesPdf(report, context) :
+              kind === "xlsx" ? buildSalesXlsx(report, context) :
+                new TextEncoder().encode(exportSalesReportCsv(report, target));
+            saveBlob(bytes, kind, kind === "xlsx" ? "completo" : target);
+            setMessage("Arquivo preparado para download.");
+          } catch { setMessage("Falha ao gerar o arquivo. Seus filtros foram mantidos."); }
+          setBusy(null);
+        }, 0);
+      } else {
+        setBusy(null);
+        setMessage("Exportação em segundo plano indisponível. Reduza o período e tente novamente.");
+      }
+    }
+  };
+  const cancelExport = () => {
+    workerRef.current?.terminate(); workerRef.current = null;
+    setBusy(null);
+    setMessage("Exportação cancelada; filtros e dados foram preservados.");
+  };
+  const download = (target: ReportView) => exportDocument("csv", target);
   const noData = report.sales.length === 0;
+
+  if (!allowed) return <p role="alert">Seu operador não tem permissão para consultar os relatórios.</p>;
 
   return (
     <div className="nexus-reports">
@@ -96,9 +234,37 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
           <h3>Vendas e recebimentos</h3>
           <p>Consulte os itens, os totais por produto e as formas de pagamento.</p>
         </div>
-        <button type="button" className="nexus-reports__primary" onClick={() => download(view)}>
-          Exportar CSV {view === "lines" ? "detalhado" : "da visão"}
+        <div className="nexus-reports__export-tools">
+          <button type="button" className="nexus-reports__primary" disabled={!!busy} onClick={() => download(view)}>
+            Exportar CSV {view === "lines" ? "detalhado" : "da visão"}
+          </button>
+          <button type="button" className="nexus-reports__secondary" disabled={!!busy}
+            onClick={() => exportDocument("xlsx")}>Exportar Excel (.xlsx)</button>
+          <button type="button" className="nexus-reports__secondary" disabled={!!busy}
+            onClick={() => exportDocument("pdf")}>Exportar PDF</button>
+          {busy && <button type="button" className="nexus-reports__secondary" onClick={cancelExport}>
+            Cancelar exportação
+          </button>}
+        </div>
+      </div>
+
+      <div className="nexus-reports__extras">
+        <label>Relatórios favoritos
+          <select value={favoriteId} onChange={e => applyFavorite(e.target.value)}>
+            <option value="">Escolha uma visão salva</option>
+            {favorites.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </label>
+        <label>Salvar filtros e visão atuais
+          <input value={favoriteName} maxLength={60} onChange={e => setFavoriteName(e.target.value)}
+            placeholder="Ex.: Fechamento semanal" />
+        </label>
+        <button type="button" className="nexus-reports__secondary" disabled={!favoriteName.trim()} onClick={addFavorite}>
+          Salvar favorito
         </button>
+        {favoriteId && <button type="button" className="nexus-reports__secondary" onClick={deleteFavorite}>
+          Excluir favorito
+        </button>}
       </div>
       <div className="nexus-reports__filters" aria-label="Filtros do relatório">
         <label>Período
@@ -145,12 +311,29 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Nome, código, cliente, venda..." />
         </label>
       </div>
+
+      <div className="nexus-reports__compare-control">
+        <label><input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)}
+          disabled={!comparable} /> Comparar com período anterior de mesma duração</label>
+        {!comparable && <small>Para comparar, selecione uma data inicial e final válidas.</small>}
+      </div>
       <div className="nexus-reports__metrics">
         <div><span>Vendas concluídas</span><strong>{report.salesCount}</strong></div>
         <div><span>Faturamento válido</span><strong>{currency(report.revenue)}</strong></div>
-        <div><span>Ticket médio</span><strong>{currency(report.ticket)}</strong></div>
+        <div><span>Ticket médio filtrado</span><strong>{currency(report.ticket)}</strong></div>
         <div><span>Quantidade vendida</span><strong>{number(report.quantity)}</strong></div>
       </div>
+
+      {previousReport && comparable && <div className="nexus-reports__compare" role="region" aria-label="Comparação de períodos">
+        <strong>Comparação: {from} a {to} versus {comparable.from} a {comparable.to}</strong>
+        <div className="nexus-reports__compare-grid">
+          <span>Vendas: {report.salesCount} / {previousReport.salesCount} <b>{percentChange(report.salesCount, previousReport.salesCount)}</b></span>
+          <span>Faturamento: {currency(report.revenue)} / {currency(previousReport.revenue)} <b>{percentChange(report.revenue, previousReport.revenue)}</b></span>
+          <span>Ticket médio filtrado: {currency(report.ticket)} / {currency(previousReport.ticket)} <b>{percentChange(report.ticket, previousReport.ticket)}</b></span>
+          <span>Quantidade: {number(report.quantity)} / {number(previousReport.quantity)} <b>{percentChange(report.quantity, previousReport.quantity)}</b></span>
+        </div>
+        <small>A comparação considera apenas registros ainda presentes no histórico local, inclusive no período anterior.</small>
+      </div>}
       <p className="nexus-reports__hint">{coverageNote}</p>
       {paymentFilterWarning && <p className="nexus-reports__notice">
         {paymentMethod ? "O filtro por pagamento seleciona vendas que utilizaram essa forma; não atribui produtos individualmente a ela. " : ""}
@@ -175,7 +358,7 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
         <table className="nexus-reports__table">
           {view === "lines" && <>
             <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento(s) da venda</th><th>Operador</th><th>Situação</th></tr></thead>
-            <tbody>{report.lines.map((r, i) => <tr key={r.number + "/" + r.productCode + "/" + i}>
+            <tbody>{report.lines.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + r.productCode + "/" + i}>
               <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td>
               <td>{number(r.quantity)}</td><td>{currency(r.unitPrice)}</td><td>{currency(r.discount)}</td>
               <td>{currency(r.net)}</td><td>{r.payments}</td><td>{r.operator}</td>
@@ -183,16 +366,16 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
             </tr>)}</tbody>
           </>}
           {view === "sales" && <>
-            <thead><tr><th>Data</th><th>Venda</th><th>Operador</th><th>Cliente</th><th>Itens</th><th>Pagamento(s)</th><th>Situação</th><th>Válido</th></tr></thead>
-            <tbody>{report.sales.map((r, i) => <tr key={r.number + "/" + i}><td>{r.date}</td>
+            <thead><tr><th>Data</th><th>Venda</th><th>Operador</th><th>Cliente</th><th>Itens</th><th>Pagamento(s)</th><th>Situação</th><th>Válido</th><th>Detalhes</th></tr></thead>
+            <tbody>{report.sales.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + i} onClick={() => setDetail({ number: r.number, date: r.date, terminalId: r.terminalId })} className="nexus-reports__clickable"><td>{r.date}</td>
               <td>#{r.number}</td><td>{r.operator}</td><td>{r.customer}</td><td>{number(r.quantity)}</td>
               <td>{r.payments}</td><td>{r.status === "cancelled" ? "Cancelada" : "Concluída"}</td>
-              <td>{currency(r.total)}</td></tr>)}</tbody>
+              <td>{currency(r.total)}</td><td><button type="button" className="nexus-reports__table-action" onClick={() => setDetail({ number: r.number, date: r.date, terminalId: r.terminalId })}>Ver itens</button></td></tr>)}</tbody>
           </>}
           {view !== "lines" && view !== "sales" && <>
             <thead><tr><th>{view === "products" ? "Produto" : view === "payments" ? "Forma de pagamento" : "Operador"}</th>
               <th>Vendas</th>{view === "products" && <th>Quantidade</th>}<th>Total</th></tr></thead>
-            <tbody>{report[view].map(r => <tr key={r.key}><td><strong>{r.label}</strong></td>
+            <tbody>{report[view].slice(offset, offset + 100).map(r => <tr key={r.key}><td><button type="button" className="nexus-reports__table-action" onClick={() => { if (view === "products") setProductCode(r.key); if (view === "payments") setPaymentMethod(r.key); if (view === "operators") setOperator(r.key); setView("sales"); }}>{r.label} · Ver vendas</button></td>
               <td>{r.count}</td>{view === "products" && <td>{number(r.quantity)}</td>}
               <td>{currency(r.total)}</td></tr>)}</tbody>
           </>}
@@ -200,6 +383,30 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
         {(noData || (view === "lines" && !report.lines.length)) &&
           <p className="nexus-reports__empty">Nenhum registro corresponde aos filtros selecionados. Experimente “Todo o histórico disponível” ou limpe os filtros.</p>}
       </div>
+
+      {dataLength > 100 && <nav className="nexus-reports__paging" aria-label="Paginação do relatório">
+        <span>Exibindo {offset + 1}–{Math.min(dataLength, offset + 100)} de {dataLength} registros</span>
+        <button type="button" className="nexus-reports__secondary" disabled={activePage === 1}
+          onClick={() => setPage(activePage - 1)}>Anterior</button>
+        <strong>Página {activePage} de {pageCount}</strong>
+        <button type="button" className="nexus-reports__secondary" disabled={activePage >= pageCount}
+          onClick={() => setPage(activePage + 1)}>Próxima</button>
+      </nav>}
+      {detailSale && <section className="nexus-reports__detail" aria-label="Itens da venda" role="region">
+        <div className="nexus-reports__detail-title">
+          <strong>Venda #{detailSale.number} — {detailSale.date}</strong>
+          <button className="nexus-reports__secondary" type="button" onClick={() => setDetail(null)}>Fechar detalhes</button>
+        </div>
+        <p>{detailSale.customer} · {detailSale.operator} · {detailSale.status === "cancelled" ? "Cancelada" : "Concluída"}</p>
+        <p><strong>Forma(s) de pagamento da venda:</strong> {detailSale.payments}</p>
+        <table className="nexus-reports__table">
+          <thead><tr><th>Produto</th><th>Quantidade</th><th>Desconto</th><th>Líquido</th></tr></thead>
+          <tbody>{detailLines.map((line, i) => <tr key={line.productCode + "-" + i}>
+            <td>{line.productName}</td><td>{number(line.quantity)}</td><td>{currency(line.discount)}</td><td>{currency(line.net)}</td>
+          </tr>)}</tbody>
+        </table>
+        <strong>Total válido: {currency(detailSale.total)}</strong>
+      </section>}
       <div className="nexus-reports__footer">
         <p>Pagamento misto é registrado por venda. O total do produto nunca é duplicado entre formas de pagamento.</p>
         {view !== "lines" && <button type="button" className="nexus-reports__secondary" onClick={() => download("lines")}>Baixar itens detalhados (CSV)</button>}
