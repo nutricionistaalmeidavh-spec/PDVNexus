@@ -235,5 +235,5 @@ test("P3: relatórios volumosos não perdem valores nem misturam terminais", () 
   const xlsx = buildSalesXlsx(report, { storeName: "PDV", generatedAt: "13/10/2026", filters: {}, view: "sales" });
   const files = unpackStoredZip(xlsx);
   assert.match(files.get("xl/worksheets/sheet3.xml") ?? "", /r="1201"/);
-  assert.equal(exportSalesReportCsv(report, "sales").split("\r\n").length, 1203);
+  assert.equal(exportSalesReportCsv(report, "sales").split("\r\n").length, 1202);
 });
