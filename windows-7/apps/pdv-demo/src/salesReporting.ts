@@ -13,12 +13,12 @@ export interface ReportFilters {
   paymentMethod?: string; operator?: string; productCode?: string;
 }
 export interface ReportLine {
-  date: string; number: string; operator: string; customer: string; status: string;
+  date: string; number: string; terminalId: string; operator: string; customer: string; status: string;
   productCode: string; productName: string; unit: string; quantity: number;
   unitPrice: number; gross: number; discount: number; net: number; payments: string;
 }
 export interface ReportSaleRow {
-  date: string; number: string; operator: string; customer: string; status: string;
+  date: string; number: string; terminalId: string; operator: string; customer: string; status: string;
   quantity: number; payments: string; total: number;
 }
 export interface ReportGroup { key: string; label: string; quantity: number; count: number; total: number }
@@ -108,7 +108,7 @@ export function buildSalesReport(
     const paymentsLabel = sale.payments.filter(p => asCents(p.amount) > 0)
       .map(p => p.method + ": R$ " + asAmount(asCents(p.amount)).toFixed(2)).join(" + ") || "Sem pagamentos";
     const allocated = allocateReportAmounts(sale);
-    sales.push({ date: sale.finalizedAt, number: sale.number, operator: seller, customer,
+    sales.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller, customer,
       status, quantity: sale.items.reduce((s, i) => s + i.quantity, 0),
       payments: paymentsLabel, total: active ? sale.netTotal : 0 });
     if (active) { salesCount++; revenue += asCents(sale.netTotal); if (!sale.items.length) missingItems.push(sale.number); }
@@ -116,7 +116,7 @@ export function buildSalesReport(
     sale.items.forEach((item, idx) => {
       const gross = asCents(item.totalPrice);
       const net = asCents(allocated[idx] ?? 0);
-      lines.push({ date: sale.finalizedAt, number: sale.number, operator: seller,
+      lines.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller,
         customer, status, productCode: item.productCode, productName: item.productName,
         unit: item.unitLabel ?? "UN", quantity: item.quantity, unitPrice: item.unitPrice ?? 0,
         gross: asAmount(gross), discount: asAmount(gross - net),
