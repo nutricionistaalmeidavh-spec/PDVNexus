@@ -100,7 +100,7 @@ test("P0: exportação CSV utiliza pt-BR, escapamento, BOM e não executa fórmu
   })], [], []);
   const csv = exportSalesReportCsv(report, "lines");
   assert.ok(csv.startsWith("\uFEFF"));
-  assert.ok(csv.includes(""'=FORMULA"));
+  assert.ok(csv.includes("'=FORMULA"));
   assert.ok(csv.includes("30,00"));
   assert.ok(csv.includes("\r\n"));
   assert.ok(exportSalesReportCsv(report, "payments").includes("PIX"));
