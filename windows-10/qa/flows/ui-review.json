@@ -1,44 +1,230 @@
 {
   "id": "pdv-ui-review",
   "steps": [
-    { "action": "waitFor", "selector": "a[href=\"#/caixa\"]", "name": "pdv-ready", "timeoutMs": 20000 },
-    { "action": "expectVisible", "text": "PDV Nexus", "exact": true, "name": "new-pdv-brand" },
-    { "action": "waitFor", "selector": "[data-cashier-layout=\"dense-v2\"]", "name": "dense-cashier-layout", "timeoutMs": 5000 },
-    { "action": "expectVisible", "text": "VENDA (PDV)", "exact": true, "name": "cashier-operational-heading" },
-    { "action": "waitFor", "selector": "[data-cashier-client-icon=\"true\"]", "name": "client-icon-visible", "timeoutMs": 5000 },
-    { "action": "waitFor", "selector": "[data-cashier-seller-icon=\"true\"]", "name": "seller-icon-visible", "timeoutMs": 5000 },
-    { "action": "waitFor", "selector": "[data-cashier-footer=\"sale-actions\"]", "name": "cashier-footer-visible", "timeoutMs": 5000 },
-    { "action": "expectVisible", "text": "Qtd. total", "exact": true, "name": "cashier-quantity-total" },
-    { "action": "screenshot", "name": "01-caixa-rapido" },
-
-    { "action": "click", "selector": "a[href=\"#/produtos\"]", "name": "open-produtos" },
-    { "action": "expectURL", "includes": "#/produtos", "name": "produtos-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "produtos-render" },
-    { "action": "screenshot", "name": "02-produtos" },
-
-    { "action": "click", "selector": "a[href=\"#/clientes\"]", "name": "open-clientes" },
-    { "action": "expectURL", "includes": "#/clientes", "name": "clientes-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "clientes-render" },
-    { "action": "screenshot", "name": "03-clientes" },
-
-    { "action": "click", "selector": "a[href=\"#/financeiro\"]", "name": "open-financeiro" },
-    { "action": "expectURL", "includes": "#/financeiro", "name": "financeiro-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "financeiro-render" },
-    { "action": "screenshot", "name": "04-financeiro" },
-
-    { "action": "click", "selector": "a[href=\"#/administracao\"]", "name": "open-administracao" },
-    { "action": "expectURL", "includes": "#/administracao", "name": "administracao-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "administracao-render" },
-    { "action": "screenshot", "name": "05-administracao" },
-
-    { "action": "click", "selector": "a[href=\"#/balanca\"]", "name": "open-balanca" },
-    { "action": "expectURL", "includes": "#/balanca", "name": "balanca-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "balanca-render" },
-    { "action": "screenshot", "name": "06-balanca" },
-
-    { "action": "click", "selector": "a[href=\"#/configuracoes\"]", "name": "open-configuracoes" },
-    { "action": "expectURL", "includes": "#/configuracoes", "name": "configuracoes-route" },
-    { "action": "waitForTimeout", "timeoutMs": 250, "name": "configuracoes-render" },
-    { "action": "screenshot", "name": "07-configuracoes" }
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "expectVisible",
+      "text": "PDV Nexus",
+      "exact": true,
+      "name": "new-pdv-brand"
+    },
+    {
+      "action": "waitFor",
+      "selector": "[data-cashier-layout=\"dense-v2\"]",
+      "name": "dense-cashier-layout",
+      "timeoutMs": 5000
+    },
+    {
+      "action": "expectVisible",
+      "text": "VENDA (PDV)",
+      "exact": true,
+      "name": "cashier-operational-heading"
+    },
+    {
+      "action": "waitFor",
+      "selector": "[data-cashier-client-icon=\"true\"]",
+      "name": "client-icon-visible",
+      "timeoutMs": 5000
+    },
+    {
+      "action": "waitFor",
+      "selector": "[data-cashier-seller-icon=\"true\"]",
+      "name": "seller-icon-visible",
+      "timeoutMs": 5000
+    },
+    {
+      "action": "waitFor",
+      "selector": "[data-cashier-footer=\"sale-actions\"]",
+      "name": "cashier-footer-visible",
+      "timeoutMs": 5000
+    },
+    {
+      "action": "expectVisible",
+      "text": "Qtd. total",
+      "exact": true,
+      "name": "cashier-quantity-total"
+    },
+    {
+      "action": "screenshot",
+      "name": "01-caixa-rapido"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/produtos\"]",
+      "name": "open-produtos"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/produtos",
+      "name": "produtos-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "produtos-render"
+    },
+    {
+      "action": "screenshot",
+      "name": "02-produtos"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/clientes\"]",
+      "name": "open-clientes"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/clientes",
+      "name": "clientes-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "clientes-render"
+    },
+    {
+      "action": "screenshot",
+      "name": "03-clientes"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/financeiro\"]",
+      "name": "open-financeiro"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/financeiro",
+      "name": "financeiro-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "financeiro-render"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Relatórios detalhados de vendas",
+      "exact": true,
+      "name": "sales-reports-visible"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Exportar CSV detalhado",
+      "exact": true,
+      "name": "sales-reports-csv-visible"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Exportar Excel (.xlsx)",
+      "exact": true,
+      "name": "sales-reports-xlsx-visible"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Exportar PDF",
+      "exact": true,
+      "name": "sales-reports-pdf-visible"
+    },
+    {
+      "action": "expectVisible",
+      "selector": ".nexus-reports__extras",
+      "name": "sales-reports-favorites-visible"
+    },
+    {
+      "action": "expectVisible",
+      "selector": ".nexus-reports__compare-control",
+      "name": "sales-reports-period-comparison-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "04b-relatorios-p2-p3"
+    },
+    {
+      "action": "click",
+      "text": "Por produto",
+      "exact": true,
+      "name": "sales-reports-product-tab"
+    },
+    {
+      "action": "expectVisible",
+      "name": "sales-reports-filters-visible",
+      "selector": ".nexus-reports__filters"
+    },
+    {
+      "action": "screenshot",
+      "name": "04a-relatorios-produtos"
+    },
+    {
+      "action": "click",
+      "text": "Itens vendidos",
+      "exact": true,
+      "name": "sales-reports-items-tab"
+    },
+    {
+      "action": "screenshot",
+      "name": "04-financeiro"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/administracao\"]",
+      "name": "open-administracao"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/administracao",
+      "name": "administracao-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "administracao-render"
+    },
+    {
+      "action": "screenshot",
+      "name": "05-administracao"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/balanca\"]",
+      "name": "open-balanca"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/balanca",
+      "name": "balanca-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "balanca-render"
+    },
+    {
+      "action": "screenshot",
+      "name": "06-balanca"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/configuracoes\"]",
+      "name": "open-configuracoes"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/configuracoes",
+      "name": "configuracoes-route"
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 250,
+      "name": "configuracoes-render"
+    },
+    {
+      "action": "screenshot",
+      "name": "07-configuracoes"
+    }
   ]
 }
