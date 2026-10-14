@@ -8,7 +8,7 @@ const xml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").repla
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 const money = (value: number) => Number.isFinite(value) ? Number(value.toFixed(2)) : 0;
 const groupTable = (values: ReportResult["products"], withQty: boolean) =>
-  values.map(g => withQty ? [g.label, g.count, g.quantity, money(g.total)] : [g.label, g.count, money(g.total)]);
+  values.map(g => withQty ? [g.label, g.brand ?? "", g.producer ?? "", g.count, g.quantity, money(g.total)] : [g.label, g.count, money(g.total)]);
 
 export interface WorkbookTable { name: string; headers: string[]; rows: Array<Array<string | number>>; widths: number[]; moneyColumns?: number[] }
 export function reportWorkbookTables(report: ReportResult, context: ExportContext): WorkbookTable[] {
@@ -31,17 +31,17 @@ export function reportWorkbookTables(report: ReportResult, context: ExportContex
       ["Cobertura", "Apenas vendas existentes no histórico local; instalações legadas podem ter limite de 100 vendas."]
     ], moneyColumns: [] },
     { name: "Itens", headers: ["Data", "Venda", "Operador", "Cliente", "Situação", "Código",
-      "Produto", "Unidade", "Quantidade", "Unitário", "Bruto", "Desconto", "Líquido", "Pagamento do item"],
-      widths: [23, 15, 20, 25, 16, 16, 39, 12, 14, 16, 16, 16, 16, 55],
-      moneyColumns: [10, 11, 12, 13],
+      "Produto", "Marca", "Empreendimento", "Unidade", "Quantidade", "Unitário", "Bruto", "Desconto", "Líquido", "Pagamento do item"],
+      widths: [23, 15, 20, 25, 16, 16, 39, 23, 29, 12, 14, 16, 16, 16, 16, 55],
+      moneyColumns: [12, 13, 14, 15],
       rows: report.lines.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.productCode,
-        r.productName, r.unit, r.quantity, money(r.unitPrice), money(r.gross), money(r.discount),
+        r.productName, r.brand, r.producer, r.unit, r.quantity, money(r.unitPrice), money(r.gross), money(r.discount),
         money(r.net), r.payments]) },
     { name: "Vendas", headers: ["Data", "Venda", "Operador", "Cliente", "Situação", "Quantidade", "Pagamentos", "Total válido"],
       widths: [23, 15, 20, 25, 16, 16, 55, 18], moneyColumns: [8],
       rows: report.sales.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.quantity, r.payments, money(r.total)]) },
-    { name: "Produtos", headers: ["Produto", "Vendas", "Quantidade", "Faturamento"],
-      widths: [40, 16, 16, 20], moneyColumns: [4], rows: groupTable(report.products, true) },
+    { name: "Produtos", headers: ["Produto", "Marca", "Empreendimento", "Vendas", "Quantidade", "Faturamento"],
+      widths: [40, 23, 29, 16, 16, 20], moneyColumns: [6], rows: groupTable(report.products, true) },
     { name: "Pagamentos", headers: ["Forma", "Vendas", "Total"],
       widths: [38, 16, 20], moneyColumns: [3], rows: groupTable(report.payments, false) },
     { name: "Operadores", headers: ["Operador", "Vendas", "Total"],
@@ -206,14 +206,14 @@ export function buildSalesPdf(report: ReportResult, context: ExportContext): Uin
     context.view === "lines" ? report.lines.map(r => ({
       left: r.date + " | Venda " + r.number + " | " + r.productName + " | " + r.quantity + " " + r.unit,
       right: brl(r.net),
-      subtitle: r.operator + " | " + r.status + " | Pagamento do item: " + r.payments
+      subtitle: "Marca: " + (r.brand || "Não informada") + " | Empreendimento: " + (r.producer || "Não informado") + " | " + r.operator + " | " + r.status + " | Pagamento: " + r.payments
     })) : context.view === "sales" ? report.sales.map(r => ({
       left: r.date + " | Venda " + r.number + " | " + r.operator,
       right: brl(r.total), subtitle: r.customer + " | " + r.status + " | " + r.payments
     })) : (context.view === "products" ? report.products : context.view === "payments" ?
       report.payments : report.operators).map(g => ({
         left: g.label, right: brl(g.total),
-        subtitle: g.count + " venda(s)" + (context.view === "products" ? " | Qtd. " + g.quantity : "")
+        subtitle: g.count + " venda(s)" + (context.view === "products" ? " | Marca: " + (g.brand || "Não informada") + " | Empreendimento: " + (g.producer || "Não informado") + " | Qtd. " + g.quantity : "")
       }));
   const newPage = () => {
     const page: PdfPage = { commands: [] };
