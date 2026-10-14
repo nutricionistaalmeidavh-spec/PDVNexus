@@ -45,7 +45,7 @@ test("P0: uma linha por item e centavos líquidos conciliados", () => {
   assert.equal(report.ticket, 30);
   assert.equal(report.lines.length, 2);
   assert.equal(report.lines[0].customer, "Cliente Teste");
-  assert.equal(report.lines[0].payments.includes("CREDITO"), true);
+  assert.equal(report.lines[0].payments.includes("Não identificado por item"), true);
   assert.equal(report.lines[0].net + report.lines[1].net, 30);
   assert.equal(report.products.reduce((s, v) => s + v.total, 0), 30);
 });

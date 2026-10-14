@@ -26,11 +26,12 @@ export function reportWorkbookTables(report: ReportResult, context: ExportContex
       ["Divergência de pagamentos", money(report.tenderDifference)],
       ["Vendas com divergência", report.unmatched.join(", ") || "Nenhuma"],
       ["Vendas sem itens", report.missingItems.join(", ") || "Nenhuma"],
+      ["Vendas sem pagamento por item", report.unidentifiedItemPayments.join(", ") || "Nenhuma"],
       ["Atenção", "Pagamentos são vinculados à venda, não atribuídos individualmente ao produto."],
       ["Cobertura", "Apenas vendas existentes no histórico local; instalações legadas podem ter limite de 100 vendas."]
     ], moneyColumns: [] },
     { name: "Itens", headers: ["Data", "Venda", "Operador", "Cliente", "Situação", "Código",
-      "Produto", "Unidade", "Quantidade", "Unitário", "Bruto", "Desconto", "Líquido", "Pagamentos da venda"],
+      "Produto", "Unidade", "Quantidade", "Unitário", "Bruto", "Desconto", "Líquido", "Pagamento do item"],
       widths: [23, 15, 20, 25, 16, 16, 39, 12, 14, 16, 16, 16, 16, 55],
       moneyColumns: [10, 11, 12, 13],
       rows: report.lines.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.productCode,
@@ -205,7 +206,7 @@ export function buildSalesPdf(report: ReportResult, context: ExportContext): Uin
     context.view === "lines" ? report.lines.map(r => ({
       left: r.date + " | Venda " + r.number + " | " + r.productName + " | " + r.quantity + " " + r.unit,
       right: brl(r.net),
-      subtitle: r.operator + " | " + r.status + " | Pagamentos da venda: " + r.payments
+      subtitle: r.operator + " | " + r.status + " | Pagamento do item: " + r.payments
     })) : context.view === "sales" ? report.sales.map(r => ({
       left: r.date + " | Venda " + r.number + " | " + r.operator,
       right: brl(r.total), subtitle: r.customer + " | " + r.status + " | " + r.payments
@@ -224,7 +225,7 @@ export function buildSalesPdf(report: ReportResult, context: ExportContext): Uin
     pdfLine(page, 44, 730, 507);
     pdfText(page, "Vendas: " + report.salesCount + "   Faturamento: " + brl(report.revenue), 44, 709, 10, true);
     pdfText(page, "Ticket medio: " + brl(report.ticket) + "   Produtos: " + report.quantity, 44, 692, 9);
-    pdfText(page, "Pagamentos vinculados a vendas; sem distribuicao ficticia por produto.", 44, 672, 8);
+    pdfText(page, "Pagamentos por item sao registrados ou de venda com forma unica.", 44, 672, 8);
     pdfText(page, "Apenas vendas do historico disponivel nesta instalacao.", 44, 659, 8);
     pdfLine(page, 44, 648, 507);
     return page;

@@ -1,0 +1,24 @@
+.sale-allocation{display:grid;gap:8px;border:1px solid #bfd3ed;border-radius:8px;background:#f7fbff;padding:12px;color:#183450;font-size:12px;min-width:0}
+.sale-allocation *{box-sizing:border-box}
+.sale-allocation__head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.sale-allocation__head strong{font-size:13px}
+.sale-allocation__head p{margin:5px 0 0;font-size:11px;line-height:1.45;color:#496581}
+.sale-allocation__toggle,.sale-allocation__clear{border:1px solid #9cbfe8;border-radius:6px;background:#fff;color:#14569f;padding:8px;min-height:34px;font:inherit;cursor:pointer;flex-shrink:0}
+.sale-allocation__toggle:focus-visible,.sale-allocation__clear:focus-visible,.sale-allocation input:focus-visible{outline:2px solid #2374db;outline-offset:2px}
+.sale-allocation__table{overflow:auto;max-height:260px}
+.sale-allocation__row{display:grid;grid-template-columns:minmax(140px,1.5fr) repeat(var(--allocation-cols,2),minmax(78px,1fr));gap:7px;align-items:center;border-bottom:1px solid #e0eaf8;padding:8px 0}
+.sale-allocation__column-head{font-weight:700;font-size:11px}
+.sale-allocation__column-head small{display:block;font-weight:400;color:#59728e;margin-top:3px}
+.sale-allocation__product{font-weight:650;min-width:0;overflow-wrap:anywhere}
+.sale-allocation__product small{display:block;font-weight:400;color:#59728e;margin-top:4px}
+.sale-allocation__row label{min-width:0}
+.sale-allocation__row input{width:100%;min-height:35px;border:1px solid #bfcfe2;background:white;border-radius:5px;padding:6px;color:#1c344e;font-size:12px}
+.sale-allocation__mobile-method{display:none}
+.sale-allocation__notice,.sale-allocation__error,.sale-allocation__ok{padding:8px;margin:0;border-radius:6px;line-height:1.4}
+.sale-allocation__notice{background:#eaf2fe;color:#285583}
+.sale-allocation__error{background:#fff0e8;color:#863c1e}
+.sale-allocation__ok{background:#e5f6eb;color:#20613b}
+.sale-allocation__foot{color:#516c87;font-size:11px;margin:0;line-height:1.45}
+.sale-allocation__clear{justify-self:start}
+.sale-allocation__clear:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:640px){.sale-allocation__table{max-height:310px}.sale-allocation__row{grid-template-columns:minmax(110px,1.2fr) repeat(var(--allocation-cols,2),minmax(67px,1fr))}}
