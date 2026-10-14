@@ -6,15 +6,16 @@ import {
   type AllocationSale, type ItemPaymentAssignment
 } from "../apps/pdv-demo/src/saleItemPayments.js";
 
-const base = (patch: Partial<AllocationSale> = {}): AllocationSale => ({
-  number: "000123", finalizedAt: "14/10/2026, 10:30:00", netTotal: 30, seller: "Caixa",
+const base = (patch: Partial<AllocationSale> = {}): AllocationSale & { finalizedAt: string } => ({
+  number: "000123", netTotal: 30, seller: "Caixa",
   items: [
     { id: "AB-1", productCode: "ABRINCO", productName: "Farinha ABRINCO", unitLabel: "UN", quantity: 1, totalPrice: 10, unitPrice: 10 },
     { id: "CO-1", productCode: "COOAFATRE", productName: "Farinha COOAFATRE", unitLabel: "UN", quantity: 2, totalPrice: 20, unitPrice: 10 }
   ],
   payments: [{ method: "A VISTA", amount: 10 }, { method: "CREDITO", amount: 20 }],
   paymentSummary: { changeDue: 0 },
-  ...patch
+  ...patch,
+  finalizedAt: patch.finalizedAt ?? "14/10/2026, 10:30:00"
 });
 
 const desired: ItemPaymentAssignment[] = [
