@@ -1,10 +1,12 @@
-/** Read-only reports from canonical recorded sales: no per-item payment attribution. */
+/** Read-only projections of recorded item assignments; mixed legacy sales stay unidentified. */
+import { effectiveItemTenders, verifiedStoredItemPayments, type AllocationSale } from "./saleItemPayments";
 export interface ReportSale {
   number: string; finalizedAt: string; seller?: string; customerId?: string; terminalId?: string;
   status?: "completed" | "cancelled"; netTotal: number;
-  items: Array<{ productCode: string; productName: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
+  items: Array<{ id?: string; productCode: string; productName: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
   payments: Array<{ method: string; amount: number }>;
   paymentSummary?: { changeDue?: number };
+  itemPaymentAllocations?: Array<{ itemId: string; method: string; quantity: number; amount: number }>;
 }
 export type ReportView = "lines" | "sales" | "products" | "payments" | "operators";
 export interface ReportFilters {
@@ -26,7 +28,7 @@ export interface ReportResult {
   lines: ReportLine[]; sales: ReportSaleRow[]; products: ReportGroup[];
   payments: ReportGroup[]; operators: ReportGroup[];
   salesCount: number; cancelledCount: number; revenue: number; quantity: number; ticket: number;
-  tenderDifference: number; unmatched: string[]; missingItems: string[];
+  tenderDifference: number; unmatched: string[]; missingItems: string[]; unidentifiedItemPayments: string[];
 }
 const asCents = (v: number) => Math.round((Number.isFinite(v) ? v : 0) * 100);
 const asAmount = (v: number) => Number((v / 100).toFixed(2));
@@ -98,7 +100,7 @@ export function buildSalesReport(
   const products = new Map<string, { label: string; cents: number; quantity: number; ids: Set<string> }>();
   const payments = new Map<string, { label: string; cents: number; ids: Set<string> }>();
   const operators = new Map<string, { label: string; cents: number; ids: Set<string> }>();
-  const unmatched: string[] = [], missingItems: string[] = [];
+  const unmatched: string[] = [], missingItems: string[] = [], unidentifiedItemPayments: string[] = [];
   let salesCount = 0, cancelledCount = 0, revenue = 0, quantity = 0, tenderDifference = 0;
   for (const { sale, status } of selected) {
     const active = status === "completed";
@@ -108,6 +110,13 @@ export function buildSalesReport(
     const paymentsLabel = sale.payments.filter(p => asCents(p.amount) > 0)
       .map(p => p.method + ": R$ " + asAmount(asCents(p.amount)).toFixed(2)).join(" + ") || "Sem pagamentos";
     const allocated = allocateReportAmounts(sale);
+    const settled = effectiveItemTenders(sale, cashNames);
+    const soloMethod = settled.size === 1 &&
+      [...settled.values()].reduce((sum, value) => sum + value.cents, 0) === asCents(sale.netTotal)
+        ? [...settled.values()][0].method : "";
+    const recorded = sale.items.every(item => !!item.id) ?
+      verifiedStoredItemPayments(sale as AllocationSale, cashNames) : null;
+    if (sale.items.length && !recorded && !soloMethod) unidentifiedItemPayments.push(sale.number);
     sales.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller, customer,
       status, quantity: sale.items.reduce((s, i) => s + i.quantity, 0),
       payments: paymentsLabel, total: active ? sale.netTotal : 0 });
@@ -116,11 +125,32 @@ export function buildSalesReport(
     sale.items.forEach((item, idx) => {
       const gross = asCents(item.totalPrice);
       const net = asCents(allocated[idx] ?? 0);
-      lines.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller,
-        customer, status, productCode: item.productCode, productName: item.productName,
-        unit: item.unitLabel ?? "UN", quantity: item.quantity, unitPrice: item.unitPrice ?? 0,
-        gross: asAmount(gross), discount: asAmount(gross - net),
-        net: active ? asAmount(net) : 0, payments: paymentsLabel });
+      const itemId = item.id ?? "";
+      const stored = itemId && recorded ? recorded.filter(row => row.itemId === itemId) : [];
+      const payShares = stored.length
+        ? stored.map(row => ({ method: row.method, qty: row.quantity, net: asCents(row.amount) }))
+        : soloMethod
+          ? [{ method: soloMethod, qty: item.quantity, net }]
+          : [{ method: "Não identificado por item (pagamento misto)", qty: item.quantity, net }];
+      // Split gross and discount by the allocated quantity, preserving exact cents.
+      const units = payShares.map(p => Math.round(p.qty * 1000));
+      const totalUnits = units.reduce((sum, u) => sum + u, 0);
+      const grossShares = units.map((u, i) => ({
+        i, floor: totalUnits ? Math.floor(gross * u / totalUnits) : 0,
+        rem: totalUnits ? (gross * u) % totalUnits : 0
+      }));
+      let grossLeft = gross - grossShares.reduce((sum, entry) => sum + entry.floor, 0);
+      grossShares.sort((a, b) => b.rem - a.rem || a.i - b.i);
+      for (const entry of grossShares) { if (!grossLeft) break; entry.floor++; grossLeft--; }
+      const grossByIndex = grossShares.sort((a, b) => a.i - b.i).map(entry => entry.floor);
+      payShares.forEach((share, shareIndex) => {
+        const grossPart = grossByIndex[shareIndex] ?? 0;
+        lines.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller,
+          customer, status, productCode: item.productCode, productName: item.productName,
+          unit: item.unitLabel ?? "UN", quantity: share.qty, unitPrice: item.unitPrice ?? 0,
+          gross: asAmount(grossPart), discount: asAmount(grossPart - share.net),
+          net: active ? asAmount(share.net) : 0, payments: share.method });
+      });
       if (!active) return;
       quantity += item.quantity;
       const key = item.productCode || item.productName;
@@ -149,7 +179,7 @@ export function buildSalesReport(
   return { lines, sales, products: groupResults(products), payments: groupResults(payments),
     operators: groupResults(operators), salesCount, cancelledCount, revenue: asAmount(revenue),
     quantity, ticket: salesCount ? asAmount(Math.round(revenue / salesCount)) : 0,
-    tenderDifference: asAmount(tenderDifference), unmatched, missingItems };
+    tenderDifference: asAmount(tenderDifference), unmatched, missingItems, unidentifiedItemPayments };
 }
 function escapeCell(value: string | number): string {
   let text = String(value ?? "");
@@ -163,7 +193,7 @@ function writeCsv(headers: string[], rows: Array<Array<string | number>>) {
 export function exportSalesReportCsv(report: ReportResult, view: ReportView): string {
   if (view === "lines") return writeCsv(
     ["data", "venda", "operador", "cliente", "status", "codigo", "produto", "unidade", "quantidade",
-      "preco_unitario", "bruto", "desconto", "total_liquido", "pagamentos_da_venda"],
+      "preco_unitario", "bruto", "desconto", "total_liquido", "pagamento_do_item"],
     report.lines.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.productCode, r.productName,
       r.unit, String(r.quantity).replace(".", ","), money(r.unitPrice), money(r.gross),
       money(r.discount), money(r.net), r.payments])
