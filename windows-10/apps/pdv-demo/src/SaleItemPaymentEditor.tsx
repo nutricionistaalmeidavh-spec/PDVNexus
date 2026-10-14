@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { effectiveItemTenders, resolveItemPayments,
   type AllocationSale, type ItemPaymentAssignment } from "./saleItemPayments";
 import "./sale-item-payments.css";
@@ -43,11 +43,11 @@ export function SaleItemPaymentEditor({ sale, cashMethodNames = [], onChange }: 
     </p>}
     {isMixed && expanded && <>
       <div className="sale-allocation__table" role="group" aria-label="Distribuição de quantidades entre pagamentos">
-        <div className="sale-allocation__row sale-allocation__column-head" style={{ "--allocation-cols": tenders.length } as React.CSSProperties}>
+        <div className="sale-allocation__row sale-allocation__column-head" style={{ "--allocation-cols": tenders.length } as CSSProperties}>
           <span>Produto / empreendimento</span>
           {tenders.map(t => <span key={t.method}>{t.method}<small>{money(t.cents / 100)}</small></span>)}
         </div>
-        {sale.items.map(item => <div className="sale-allocation__row" key={item.id} style={{ "--allocation-cols": tenders.length } as React.CSSProperties}>
+        {sale.items.map(item => <div className="sale-allocation__row" key={item.id} style={{ "--allocation-cols": tenders.length } as CSSProperties}>
           <label className="sale-allocation__product">{item.productName}
             <small>{item.productCode} · {qtyLabel(item.quantity)} {item.unitLabel} · {money(item.totalPrice)}</small>
           </label>
