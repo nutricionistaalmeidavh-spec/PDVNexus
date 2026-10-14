@@ -204,7 +204,7 @@ export function PdvOpsDecor() {
   };
 
   const exportReport = () => {
-    const csv = exportPdvOperationsReportCsv(snapshot?.completedSales ?? []);
+    const csv = exportPdvOperationsReportCsv((snapshot?.completedSales ?? []).filter((sale) => !(sale as PdvReportingSale & { reportExclusion?: unknown }).reportExclusion));
     downloadText(`pdv-nexus-relatorio-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv;charset=utf-8");
     setMessage("Relatório operacional exportado em CSV.");
   };

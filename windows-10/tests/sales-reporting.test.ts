@@ -5,6 +5,7 @@ import {
   type ReportSale
 } from "../apps/pdv-demo/src/salesReporting.js";
 
+import { changeSaleReportExclusion } from "../apps/pdv-demo/src/reportTraining.js";
 import { buildSalesPdf, buildSalesXlsx, type ExportContext } from "../apps/pdv-demo/src/reportDocuments.js";
 import { saveReportFavorite, removeReportFavorite, parseReportFavorites,
   previousComparablePeriod, comparisonDelta } from "../apps/pdv-demo/src/reportPreferences.js";
@@ -236,4 +237,88 @@ test("P3: relatórios volumosos não perdem valores nem misturam terminais", () 
   const files = unpackStoredZip(xlsx);
   assert.match(files.get("xl/worksheets/sheet3.xml") ?? "", /r="1201"/);
   assert.equal(exportSalesReportCsv(report, "sales").split("\r\n").length, 1202);
+});
+
+test("marca e empreendimento são canônicos na venda, CSV e filtros históricos", () => {
+  const branded = sale({
+    items: [{ id:"A", productCode:"001", productName:"Farinha", brand:"ABRINCO", producer:"Cooperativa Norte", unitLabel:"UN", quantity:1, totalPrice:12 }],
+    netTotal:12, payments:[{method:"PIX",amount:12}]
+  });
+  const other = sale({
+    number:"124", items:[{ id:"B", productCode:"002", productName:"Farinha", brand:"COOAFATRE", producer:"Cooperativa Sul",unitLabel:"UN",quantity:2,totalPrice:20 }],
+    netTotal:20,payments:[{method:"DEBITO",amount:20}]
+  });
+  const result = buildSalesReport([branded,other],[],[]);
+  assert.equal(result.products.length,2);
+  assert.deepEqual(result.lines.map(row=>[row.productName,row.brand,row.producer]),[
+    ["Farinha","ABRINCO","Cooperativa Norte"],["Farinha","COOAFATRE","Cooperativa Sul"]
+  ]);
+  assert.equal(buildSalesReport([branded,other],[],[],{brand:"abrinco"}).salesCount,1);
+  assert.equal(buildSalesReport([branded,other],[],[],{producer:"Cooperativa Sul"}).revenue,20);
+  const csv=exportSalesReportCsv(result,"lines");
+  assert.match(csv,/empreendimento/);
+  assert.match(csv,/marca/);
+  assert.match(csv,/Cooperativa Norte/);
+  const groups=exportSalesReportCsv(result,"products");
+  assert.match(groups,/ABRINCO/);
+  const xlsx=buildSalesXlsx(result,{storeName:"Mercado",generatedAt:"14/10/2026",filters:{},view:"lines"});
+  const files=unpackStoredZip(xlsx);
+  assert.match(files.get("xl/worksheets/sheet2.xml")||"",/Cooperativa Norte/);
+  assert.match(files.get("xl/worksheets/sheet4.xml")||"",/COOAFATRE/);
+});
+
+test("marca ausente no histórico não é inventada com base no cadastro atual",()=>{
+  const result=buildSalesReport([sale()],[],[]);
+  assert.ok(result.lines.every(line=>line.brand===""&&line.producer===""));
+  assert.equal(result.salesCount,1);
+});
+
+test("vendas de treinamento não aparecem em nenhum total gerencial nem nas exportações",()=>{
+  const first=sale({number:"111",reportExclusion:{reason:"Simulação com cliente",excludedAt:"2026-10-14T12:00:00.000Z",excludedBy:"GER-001"}});
+  const real=sale({number:"112"});
+  const report=buildSalesReport([first,real],[],[]);
+  assert.equal(report.salesCount,1);
+  assert.equal(report.revenue,30);
+  assert.equal(report.sales[0].number,"112");
+  assert.equal(report.lines.length,2);
+  assert.equal(report.payments.reduce((sum,p)=>sum+p.total,0),30);
+  assert.equal(report.products.reduce((sum,p)=>sum+p.total,0),30);
+  assert.ok(!exportSalesReportCsv(report,"sales").includes('"111"'));
+  assert.ok(!exportSalesReportCsv(report,"lines").includes('"111"'));
+  const workbook=unpackStoredZip(buildSalesXlsx(report,
+    {storeName:"Loja",generatedAt:"14/10/2026",filters:{},view:"sales"}));
+  assert.ok(!(workbook.get("xl/worksheets/sheet3.xml")||"").includes(">111<"));
+});
+
+test("desconsiderar e reincluir é reversível, auditado e não altera venda original",()=>{
+  const original=sale({number:"888"});
+  const identity={number:original.number,finalizedAt:original.finalizedAt,terminalId:original.terminalId};
+  const actor={id:"GER-001",role:"manager",active:true};
+  const excluded=changeSaleReportExclusion([original],identity,"exclude",actor,
+    "Venda simulada no treinamento","2026-10-14T11:20:00.000Z");
+  assert.equal(excluded[0].reportExclusion?.reason,"Venda simulada no treinamento");
+  assert.equal(excluded[0].netTotal,original.netTotal);
+  assert.deepEqual(excluded[0].payments,original.payments);
+  assert.deepEqual(excluded[0].items,original.items);
+  assert.equal(buildSalesReport(excluded,[],[]).salesCount,0);
+  assert.deepEqual(original, sale({number:"888"}));
+  const restored=changeSaleReportExclusion(excluded,identity,"restore",actor,
+    "Reinclusão após conferência","2026-10-14T11:25:00.000Z");
+  assert.equal(restored[0].reportExclusion,undefined);
+  assert.deepEqual(restored[0].reportExclusionEvents?.map(e=>e.action),["exclude","restore"]);
+  assert.equal(buildSalesReport(restored,[],[]).salesCount,1);
+});
+
+test("somente gestor ativo consegue desconsiderar vendas e exige motivo",()=>{
+  const original=sale({number:"987"});
+  const identity={number:original.number,finalizedAt:original.finalizedAt,terminalId:original.terminalId};
+  const ts="2026-10-14T11:20:00.000Z";
+  assert.throws(()=>changeSaleReportExclusion([original],identity,"exclude",
+    {id:"OP-001",role:"cashier",active:true},"Treinamento",ts),/Somente um gerente/);
+  assert.throws(()=>changeSaleReportExclusion([original],identity,"exclude",
+    {id:"GER-001",role:"manager",active:false},"Treinamento",ts),/Somente um gerente/);
+  assert.throws(()=>changeSaleReportExclusion([original],identity,"exclude",
+    {id:"GER-001",role:"manager",active:true},"",ts),/motivo/);
+  assert.throws(()=>changeSaleReportExclusion([original],{...identity,terminalId:"OUTRO"},"exclude",
+    {id:"GER-001",role:"manager",active:true},"Treinamento",ts),/não foi encontrada/);
 });
