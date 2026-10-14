@@ -39,7 +39,7 @@ export function reportDate(raw: string): string {
   const iso = /^(\d{4}-\d{2}-\d{2})/.exec(raw.trim());
   return iso ? iso[1] : "";
 }
-export function allocateReportAmounts(sale: ReportSale): number[] {
+export function allocateReportAmounts(sale: Pick<ReportSale, "items" | "netTotal">): number[] {
   const gross = sale.items.map(i => Math.max(0, asCents(i.totalPrice)));
   const total = gross.reduce((a, b) => a + b, 0);
   const net = Math.max(0, asCents(sale.netTotal));
