@@ -3,6 +3,7 @@ import { effectiveItemTenders, verifiedStoredItemPayments, type AllocationSale }
 export interface ReportSale {
   number: string; finalizedAt: string; seller?: string; customerId?: string; terminalId?: string;
   status?: "completed" | "cancelled"; netTotal: number; reportExclusion?: { reason: string; excludedAt: string; excludedBy: string };
+  reportExclusionEvents?: Array<{action: "exclude" | "restore"; reason: string; excludedBy: string; excludedAt: string}>;
   items: Array<{ id?: string; productCode: string; productName: string; brand?: string; producer?: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
   payments: Array<{ method: string; amount: number }>;
   paymentSummary?: { changeDue?: number };
