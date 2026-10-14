@@ -343,6 +343,11 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
         Atenção: {report.unmatched.length} venda(s) com diferença entre pagamentos registrados (descontado o troco identificado) e valor líquido.
         Diferença acumulada: {currency(report.tenderDifference)}. Confira vendas: {report.unmatched.slice(0, 8).join(", ")}.
       </p>}
+      {report.unidentifiedItemPayments.length > 0 && <p className="nexus-reports__notice" role="status">
+        {report.unidentifiedItemPayments.length} venda(s) sem identificação confiável do pagamento por item.
+        As formas de pagamento da venda continuam disponíveis no resumo, mas não são atribuídas aos produtos sem registro explícito.
+        Confira: {report.unidentifiedItemPayments.slice(0, 8).join(", ")}.
+      </p>}
       {report.missingItems.length > 0 && <p className="nexus-reports__warning" role="alert">
         {report.missingItems.length} venda(s) sem itens registrados: {report.missingItems.join(", ")}. O valor aparece no faturamento, mas não no agrupamento por produtos.
       </p>}
@@ -357,7 +362,7 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
       <div className="nexus-reports__table-wrap">
         <table className="nexus-reports__table">
           {view === "lines" && <>
-            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento(s) da venda</th><th>Operador</th><th>Situação</th></tr></thead>
+            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento do item</th><th>Operador</th><th>Situação</th></tr></thead>
             <tbody>{report.lines.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + r.productCode + "/" + i}>
               <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td>
               <td>{number(r.quantity)}</td><td>{currency(r.unitPrice)}</td><td>{currency(r.discount)}</td>
@@ -408,7 +413,7 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
         <strong>Total válido: {currency(detailSale.total)}</strong>
       </section>}
       <div className="nexus-reports__footer">
-        <p>Pagamento misto é registrado por venda. O total do produto nunca é duplicado entre formas de pagamento.</p>
+        <p>Pagamentos por item aparecem apenas quando registrados e conciliados, ou quando a venda possui uma única forma. Vendas mistas antigas permanecem sem associação por item.</p>
         {view !== "lines" && <button type="button" className="nexus-reports__secondary" onClick={() => download("lines")}>Baixar itens detalhados (CSV)</button>}
       </div>
       {message && <p className="nexus-reports__feedback" role="status">{message}</p>}
