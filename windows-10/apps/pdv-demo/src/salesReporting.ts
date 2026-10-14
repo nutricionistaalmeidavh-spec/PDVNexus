@@ -2,8 +2,8 @@
 import { effectiveItemTenders, verifiedStoredItemPayments, type AllocationSale } from "./saleItemPayments";
 export interface ReportSale {
   number: string; finalizedAt: string; seller?: string; customerId?: string; terminalId?: string;
-  status?: "completed" | "cancelled"; netTotal: number;
-  items: Array<{ id?: string; productCode: string; productName: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
+  status?: "completed" | "cancelled"; netTotal: number; reportExclusion?: { reason: string; excludedAt: string; excludedBy: string };
+  items: Array<{ id?: string; productCode: string; productName: string; brand?: string; producer?: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
   payments: Array<{ method: string; amount: number }>;
   paymentSummary?: { changeDue?: number };
   itemPaymentAllocations?: Array<{ itemId: string; method: string; quantity: number; amount: number }>;
@@ -12,18 +12,18 @@ export type ReportView = "lines" | "sales" | "products" | "payments" | "operator
 export interface ReportFilters {
   from?: string; to?: string; query?: string;
   status?: "completed" | "cancelled" | "all";
-  paymentMethod?: string; operator?: string; productCode?: string;
+  paymentMethod?: string; operator?: string; productCode?: string; brand?: string; producer?: string;
 }
 export interface ReportLine {
   date: string; number: string; terminalId: string; operator: string; customer: string; status: string;
-  productCode: string; productName: string; unit: string; quantity: number;
+  productCode: string; productName: string; brand: string; producer: string; unit: string; quantity: number;
   unitPrice: number; gross: number; discount: number; net: number; payments: string;
 }
 export interface ReportSaleRow {
   date: string; number: string; terminalId: string; operator: string; customer: string; status: string;
   quantity: number; payments: string; total: number;
 }
-export interface ReportGroup { key: string; label: string; quantity: number; count: number; total: number }
+export interface ReportGroup { key: string; label: string; brand?: string; producer?: string; quantity: number; count: number; total: number }
 export interface ReportResult {
   lines: ReportLine[]; sales: ReportSaleRow[]; products: ReportGroup[];
   payments: ReportGroup[]; operators: ReportGroup[];
@@ -75,13 +75,15 @@ export function buildSalesReport(
     const key = [sale.terminalId ?? "", sale.number, sale.finalizedAt].join("|");
     indexed.set(key, { sale, status });
   };
-  for (const sale of completed) add(sale, sale.status === "cancelled" ? "cancelled" : "completed");
-  for (const sale of cancelled) add(sale, "cancelled");
+  for (const sale of completed) if (!sale.reportExclusion) add(sale, sale.status === "cancelled" ? "cancelled" : "completed");
+  for (const sale of cancelled) if (!sale.reportExclusion) add(sale, "cancelled");
   const filterStatus = filters.status ?? "completed";
   const query = norm(filters.query ?? "");
   const payment = norm(filters.paymentMethod ?? "");
   const operator = norm(filters.operator ?? "");
   const productCode = norm(filters.productCode ?? "");
+  const brand = norm(filters.brand ?? "");
+  const producer = norm(filters.producer ?? "");
   const selected = [...indexed.values()].filter(({ sale, status }) => {
     if (filterStatus !== "all" && filterStatus !== status) return false;
     const date = reportDate(sale.finalizedAt);
@@ -89,15 +91,17 @@ export function buildSalesReport(
     if (payment && !sale.payments.some(p => norm(p.method) === payment && asCents(p.amount) > 0)) return false;
     if (operator && norm(sale.seller ?? "") !== operator) return false;
     if (productCode && !sale.items.some(i => norm(i.productCode) === productCode)) return false;
+    if (brand && !sale.items.some(i => norm(i.brand ?? "") === brand)) return false;
+    if (producer && !sale.items.some(i => norm(i.producer ?? "") === producer)) return false;
     if (query) {
       const terms = [sale.number, sale.seller ?? "", names.get(sale.customerId ?? "") ?? sale.customerId ?? "",
-        ...sale.items.flatMap(i => [i.productCode, i.productName])];
+        ...sale.items.flatMap(i => [i.productCode, i.productName, i.brand ?? "", i.producer ?? ""])];
       if (!terms.some(t => norm(t).includes(query))) return false;
     }
     return true;
   }).sort((a, b) => reportDate(b.sale.finalizedAt).localeCompare(reportDate(a.sale.finalizedAt)) || b.sale.finalizedAt.localeCompare(a.sale.finalizedAt));
   const lines: ReportLine[] = [], sales: ReportSaleRow[] = [];
-  const products = new Map<string, { label: string; cents: number; quantity: number; ids: Set<string> }>();
+  const products = new Map<string, { label: string; brand: string; producer: string; cents: number; quantity: number; ids: Set<string> }>();
   const payments = new Map<string, { label: string; cents: number; ids: Set<string> }>();
   const operators = new Map<string, { label: string; cents: number; ids: Set<string> }>();
   const unmatched: string[] = [], missingItems: string[] = [], unidentifiedItemPayments: string[] = [];
@@ -146,7 +150,7 @@ export function buildSalesReport(
       payShares.forEach((share, shareIndex) => {
         const grossPart = grossByIndex[shareIndex] ?? 0;
         lines.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller,
-          customer, status, productCode: item.productCode, productName: item.productName,
+          customer, status, productCode: item.productCode, productName: item.productName, brand: item.brand ?? "", producer: item.producer ?? "",
           unit: item.unitLabel ?? "UN", quantity: share.qty, unitPrice: item.unitPrice ?? 0,
           gross: asAmount(grossPart), discount: asAmount(grossPart - share.net),
           net: active ? asAmount(share.net) : 0, payments: share.method });
@@ -154,7 +158,7 @@ export function buildSalesReport(
       if (!active) return;
       quantity += item.quantity;
       const key = item.productCode || item.productName;
-      const group = products.get(key) ?? { label: item.productName, cents: 0, quantity: 0, ids: new Set<string>() };
+      const group = products.get(key) ?? { label: item.productName, brand: item.brand ?? "", producer: item.producer ?? "", cents: 0, quantity: 0, ids: new Set<string>() };
       group.cents += net; group.quantity += item.quantity; group.ids.add(id);
       products.set(key, group);
     });
@@ -172,9 +176,9 @@ export function buildSalesReport(
     const group = operators.get(seller) ?? { label: seller, cents: 0, ids: new Set<string>() };
     group.cents += asCents(sale.netTotal); group.ids.add(id); operators.set(seller, group);
   }
-  const groupResults = (map: Map<string, { label: string; cents: number; ids: Set<string>; quantity?: number }>) =>
+  const groupResults = (map: Map<string, { label: string; brand?: string; producer?: string; cents: number; ids: Set<string>; quantity?: number }>) =>
     [...map.entries()].map(([key, g]) => ({
-      key, label: g.label, quantity: g.quantity ?? 0, count: g.ids.size, total: asAmount(g.cents)
+      key, label: g.label, brand: g.brand, producer: g.producer, quantity: g.quantity ?? 0, count: g.ids.size, total: asAmount(g.cents)
     })).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
   return { lines, sales, products: groupResults(products), payments: groupResults(payments),
     operators: groupResults(operators), salesCount, cancelledCount, revenue: asAmount(revenue),
@@ -193,9 +197,9 @@ function writeCsv(headers: string[], rows: Array<Array<string | number>>) {
 export function exportSalesReportCsv(report: ReportResult, view: ReportView): string {
   if (view === "lines") return writeCsv(
     ["data", "venda", "operador", "cliente", "status", "codigo", "produto", "unidade", "quantidade",
-      "preco_unitario", "bruto", "desconto", "total_liquido", "pagamento_do_item"],
+      "marca", "empreendimento", "preco_unitario", "bruto", "desconto", "total_liquido", "pagamento_do_item"],
     report.lines.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.productCode, r.productName,
-      r.unit, String(r.quantity).replace(".", ","), money(r.unitPrice), money(r.gross),
+      r.unit, String(r.quantity).replace(".", ","), r.brand, r.producer, money(r.unitPrice), money(r.gross),
       money(r.discount), money(r.net), r.payments])
   );
   if (view === "sales") return writeCsv(
@@ -204,6 +208,6 @@ export function exportSalesReportCsv(report: ReportResult, view: ReportView): st
       String(r.quantity).replace(".", ","), r.payments, money(r.total)])
   );
   const groups = view === "products" ? report.products : view === "payments" ? report.payments : report.operators;
-  return writeCsv(["agrupamento", "vendas", ...(view === "products" ? ["quantidade"] : []), "total"],
-    groups.map(g => [g.label, g.count, ...(view === "products" ? [String(g.quantity).replace(".", ",")] : []), money(g.total)]));
+  return writeCsv(["agrupamento", ...(view === "products" ? ["marca", "empreendimento"] : []), "vendas", ...(view === "products" ? ["quantidade"] : []), "total"],
+    groups.map(g => [g.label, ...(view === "products" ? [g.brand ?? "", g.producer ?? ""] : []), g.count, ...(view === "products" ? [String(g.quantity).replace(".", ",")] : []), money(g.total)]));
 }
