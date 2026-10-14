@@ -13,7 +13,8 @@ export interface ItemPaymentAssignment {
 export interface ItemPaymentAllocation extends ItemPaymentAssignment {
   amount: number;
 }
-export interface AllocationSale extends ReportSale {
+export interface AllocationSale extends Omit<ReportSale, "finalizedAt" | "items"> {
+  finalizedAt?: string;
   items: Array<ReportSale["items"][number] & { id: string }>;
   paymentItemAssignments?: ItemPaymentAssignment[];
   itemPaymentAllocations?: ItemPaymentAllocation[];
@@ -31,7 +32,7 @@ const same = (a: string, b: string) => normalized(a) === normalized(b);
 const isCash = (method: string, cashMethodNames: readonly string[]) =>
   ["DINHEIRO", "A VISTA", "ESPÉCIE", "ESPECIE", "CASH", ...cashMethodNames].some(m => same(m, method));
 
-export function effectiveItemTenders(sale: ReportSale, cashMethodNames: readonly string[] = []) {
+export function effectiveItemTenders(sale: Pick<ReportSale, "payments" | "paymentSummary" | "netTotal">, cashMethodNames: readonly string[] = []) {
   const result = new Map<string, { method: string; cents: number }>();
   let change = Math.max(0, cents(sale.paymentSummary?.changeDue ?? 0));
   for (const payment of sale.payments) {
@@ -49,7 +50,7 @@ export function effectiveItemTenders(sale: ReportSale, cashMethodNames: readonly
   }
   return result;
 }
-function tenderError(tenders: Map<string, { method: string; cents: number }>, sale: ReportSale): string | undefined {
+function tenderError(tenders: Map<string, { method: string; cents: number }>, sale: Pick<ReportSale, "netTotal">): string | undefined {
   const total = [...tenders.values()].reduce((sum, tender) => sum + tender.cents, 0);
   return total === cents(sale.netTotal)
     ? undefined : "Os valores recebidos, descontado o troco, não conciliam com o total da venda.";
