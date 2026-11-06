@@ -72,7 +72,7 @@
 
 /* Barcode / code entry */
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
-  grid-template-columns: minmax(220px, 1fr) 92px 92px 64px !important;
+  grid-template-columns: minmax(150px, 1fr) 82px 126px 92px 64px !important;
   gap: 6px !important;
   padding: 27px 9px 9px !important;
   border-radius: 4px !important;

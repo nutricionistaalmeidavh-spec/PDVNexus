@@ -6,7 +6,8 @@ const source = fs.readFileSync(new URL("../apps/pdv-demo/src/PdvDemoApp.tsx", im
 
 test("caixa exibe acao clara para iniciar venda sem depender apenas de tecla F2", () => {
   assert.match(source, />Nova venda \(F2\)<\/button>/);
-  assert.match(source, /Para começar, clique em Nova venda/);
+  assert.match(source, /aria-label="Iniciar nova venda"/);
+  assert.match(source, /Pressione F2 ou clique em Nova venda/);
   assert.match(source, /role="status" aria-live="polite"/);
   assert.doesNotMatch(source, /cashierSubtitle:\s*\{\s*display:\s*"none"/);
 });

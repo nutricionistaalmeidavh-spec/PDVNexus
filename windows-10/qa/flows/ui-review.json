@@ -20,6 +20,11 @@
       "name": "initial-sale-cta-visible"
     },
     {
+      "action": "expectVisible",
+      "selector": "button[aria-label=\"Iniciar nova venda\"]",
+      "name": "initial-sale-cta-accessible"
+    },
+    {
       "action": "waitFor",
       "selector": "[data-cashier-layout=\"dense-v2\"]",
       "name": "dense-cashier-layout",
