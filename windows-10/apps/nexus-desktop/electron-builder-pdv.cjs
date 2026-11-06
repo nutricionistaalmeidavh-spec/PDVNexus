@@ -10,7 +10,7 @@ module.exports = {
     ...(base.extraMetadata || {}),
     version: release.version,
     pdvUpdateChannel: "windows10-x64",
-    pdvUpdateManifestUrl: release.manifestUrl,
+    pdvUpdateManifestUrl: release.manifestUrl, // vazio nesta linha: nao contactar canal legado
     pdvTelemetryEndpoint: String(process.env.PDV_TELEMETRY_ENDPOINT || DEFAULT_PDV_TELEMETRY_ENDPOINT).trim()
   }
 };

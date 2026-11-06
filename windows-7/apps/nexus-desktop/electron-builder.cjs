@@ -8,9 +8,9 @@ const appMap = {
     rendererDir: "../meu-engenheiro/dist"
   },
   "pdv-demo": {
-    appId: "com.nexuscore.pdv",
-    productName: "PDV Nexus",
-    artifactName: "PDV-Nexus-Setup-${version}.${ext}",
+    appId: "com.artisys.pdvnexus.nova",
+    productName: "PDV Nexus Nova",
+    artifactName: "PDV-Nexus-Nova-Setup-${version}.${ext}",
     rendererDir: "../pdv-demo/dist"
   },
   "oficina-demo": {
@@ -65,6 +65,6 @@ module.exports = {
     allowElevation: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "PDV Nexus"
+    shortcutName: selectedKey === "pdv-demo" ? "PDV Nexus Nova" : selected.productName
   }
 };

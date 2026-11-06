@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "2.0.2",
-  "manifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
+  "version": "2.1.0",
+  "manifestUrl": "",
   "telemetryEndpoint": "https://pdvnexus.nutricionistaalmeidavh.workers.dev",
   "distribution": {
     "googleDrive": {
@@ -9,5 +9,7 @@
       "previousFolderName": "anterior",
       "remoteName": "artisys-qa-drive"
     }
-  }
+  },
+  "legacyManifestUrl": "https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json",
+  "distributionChannel": "pdv-nova-manual"
 }

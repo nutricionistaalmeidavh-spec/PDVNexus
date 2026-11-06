@@ -6,7 +6,7 @@ module.exports = {
     ...(base.extraMetadata || {}),
     pdvUpdateChannel: "windows7-x64"
   },
-  artifactName: "PDV-Nexus-Windows-7-Setup-${version}.${ext}",
+  artifactName: "PDV-Nexus-Nova-Windows-7-Setup-${version}.${ext}",
   directories: { ...base.directories, output: "dist-desktop/pdv-demo-windows-7" },
   win: {
     ...base.win,

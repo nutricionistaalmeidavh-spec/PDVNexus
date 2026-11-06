@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.event.workflow_run.head_branch == 'main'
+    if: ${{ false }} # Canal de atualizacao antigo congelado; proibida publicacao automatica
     runs-on: ubuntu-latest
     concurrency:
       group: pdv-release-${{ github.event.workflow_run.head_sha }}

@@ -15,7 +15,7 @@ Repositorio organizado por compatibilidade de sistema operacional.
 - A edicao Windows 7 fixa o Electron 22, ultima linha usada pelo projeto para compatibilidade com esse sistema.
 - No Windows 7, `node:sqlite` nao esta disponivel; por isso a persistencia desktop usa `pdv-nexus-data.json`.
 - O driver `serialport` e fixado em `10.5.0` no Windows 7 e usa a serie 13 no Windows 10.
-- O instalador do Windows 7 possui configuracao propria e gera o artefato `PDV-Nexus-Windows-7-Setup-*`.
+- O instalador do Windows 7 possui configuracao propria e gera o artefato `PDV-Nexus-Nova-Windows-7-Setup-*`.
 
 Cada edicao possui seu proprio `package.json`, lockfile, codigo-fonte, testes e instrucoes. Instale e execute os comandos dentro da pasta da edicao desejada.
 
