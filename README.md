@@ -33,3 +33,11 @@ npm run test:pdv-payments
 ```
 
 Os instaladores e demais arquivos gerados nao sao versionados; devem ser produzidos localmente pelos scripts de cada edicao.
+
+## Nova Edição (isolada dos clientes antigos)
+
+A partir da versão 2.0.3, os builds Windows 7, 8 x86 e 10+ usam a identidade `br.com.artisys.pdvnexus.nova`, o nome de instalação **PDV Nexus Nova Edição** e instaladores `PDV-Nexus-Nova-Edicao-*`. A instalação legada e seus dados permanecem intactos. Os dados **não são copiados automaticamente**; a eventual importação deve ser explícita, após backup e validação.
+
+Os novos instaladores consultam apenas `pdv-nova-release.json`, separado do manifesto legado `pdv-release.json`. Enquanto o manifesto da Nova Edição contiver `artifacts: {}` e a versão 2.0.3, nenhum upgrade é oferecido. A publicação automática do canal legado está bloqueada em `.github/workflows/publish-pdv-release.yml` para não alterar `releases/latest/download/latest.json`, utilizado pelos clientes existentes. Não criar uma nova GitHub Release que passe a ser a `releases/latest` deste repositório. Antes de disponibilizar atualização para a Nova Edição, criar uma distribuição pública **independente** (por exemplo, outro repositório ou hospedagem estática gratuita), validar SHA-256, QA e receber aprovação explícita. A branch de desenvolvimento gera apenas artefatos de QA, não uma publicação de produção.
+
+Verificação do isolamento: `cd windows-10 && npm ci && npm run test:pdv-upgrade`. Os testes adicionais conferem as três arquiteturas, nomes, app IDs, manifestos e congelamento do canal antigo.
