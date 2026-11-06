@@ -14,6 +14,12 @@
       "name": "new-pdv-brand"
     },
     {
+      "action": "expectVisible",
+      "text": "Nova venda (F2)",
+      "exact": true,
+      "name": "initial-sale-cta-visible"
+    },
+    {
       "action": "waitFor",
       "selector": "[data-cashier-layout=\"dense-v2\"]",
       "name": "dense-cashier-layout",
@@ -71,6 +77,34 @@
     {
       "action": "screenshot",
       "name": "02-produtos"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Os 5 produtos iniciais são exemplos para conhecer o sistema. Você pode cadastrar quantos produtos precisar, sem limite de cinco.",
+      "exact": true,
+      "name": "example-products-not-limit"
+    },
+    {
+      "action": "click",
+      "text": "Novo produto",
+      "exact": true,
+      "name": "open-new-product-form"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Cadastrar produto",
+      "exact": true,
+      "name": "product-create-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "02a-cadastro-de-produto"
+    },
+    {
+      "action": "click",
+      "text": "Recolher cadastro",
+      "exact": true,
+      "name": "close-product-form"
     },
     {
       "action": "click",
