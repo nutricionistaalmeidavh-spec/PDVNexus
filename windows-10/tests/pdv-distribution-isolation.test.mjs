@@ -50,3 +50,11 @@ test("fluxos reais não apagam registros antigos para limitar tamanho de arrays"
     assert.doesNotMatch(db, /maxCompletedSales \?\? 100/);
   }
 });
+
+test("o caixa orienta a primeira venda e o catálogo diferencia resultados visíveis do total", () => {
+  for (const os of ["windows-10", "windows-7"]) {
+    const app = read(`../../${os}/apps/pdv-demo/src/PdvDemoApp.tsx`);
+    assert.match(app, /Primeira venda: abra o caixa/);
+    assert.match(app, /Mostrando \{productList\.length\} de \{catalogProducts\.length\} produtos cadastrados/);
+  }
+});
