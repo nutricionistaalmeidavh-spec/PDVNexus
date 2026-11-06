@@ -7,6 +7,7 @@ on:
       - ".github/workflows/qa-windows10-pdv.yml"
       - ".github/workflows/publish-pdv-release.yml"
       - "pdv-release.json"
+      - "pdv-nova-release.json"
       - "windows-10/**"
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - ".github/workflows/qa-windows10-pdv.yml"
       - ".github/workflows/publish-pdv-release.yml"
       - "pdv-release.json"
+      - "pdv-nova-release.json"
       - "windows-10/**"
   workflow_dispatch:
 
