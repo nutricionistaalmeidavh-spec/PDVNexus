@@ -94,6 +94,31 @@ test("completePdvSale stores the reusable payment summary on the finalized sale"
   assert.equal(result.completedSale.paymentSummary.creditTotal, 50);
 });
 
+test("completePdvSale mantém todas as 125 vendas históricas ao concluir a próxima", () => {
+  const completedSales = Array.from({ length: 125 }, (_, index) => ({
+    number: String(index + 1).padStart(6, "0"),
+    finalizedAt: "2026-10-01T12:00:00.000Z",
+    netTotal: 10,
+    items: [],
+    payments: []
+  }));
+  const result = completePdvSale({
+    finalizedAt: "2026-11-06T20:00:00.000Z",
+    completedSales,
+    products: [{ productCode: "00101", productName: "Teclado", stock: 5 }],
+    customer: { id: "CLI-002", name: "Joao Santos", creditLimit: 500, creditUsed: 0 },
+    sale: {
+      number: "000126",
+      discountPercent: 0,
+      items: [{ productCode: "00101", productName: "Teclado", quantity: 1, unitPrice: 10 }],
+      payments: [{ method: "A VISTA", amount: 10 }]
+    }
+  });
+  assert.equal(result.completedSales.length, 126);
+  assert.equal(result.completedSales[0].number, "000126");
+  assert.equal(result.completedSales[125].number, "000125");
+});
+
 test("applyPdvStockMovement updates stock and records the balance after movement", () => {
   const result = applyPdvStockMovement({
     products: [{ productCode: "00101", productName: "Teclado", stock: 5, minStock: 2 }],

@@ -40,3 +40,13 @@ test("pipeline gera somente artefatos novos e não publica nada no canal legado"
     assert.ok(workflow.includes(filename));
   }
 });
+
+test("fluxos reais não apagam registros antigos para limitar tamanho de arrays", () => {
+  for (const os of ["windows-10", "windows-7"]) {
+    const app = read(`../../${os}/apps/pdv-demo/src/PdvDemoApp.tsx`);
+    const db = read(`../../${os}/packages/database/src/pdv.ts`);
+    assert.doesNotMatch(app, /maxCompletedSales: 100/);
+    assert.doesNotMatch(app, /\.slice\(0, (?:50|100|200)\)/);
+    assert.doesNotMatch(db, /maxCompletedSales \?\? 100/);
+  }
+});
