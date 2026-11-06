@@ -3,7 +3,7 @@
   "steps": [
     { "action": "waitFor", "selector": "input[placeholder*=\"Bipe\"]", "name": "caixa-pronto", "timeoutMs": 20000 },
     { "action": "clickIfVisible", "text": "Abrir caixa", "exact": true, "name": "abrir-caixa-se-necessario", "holdMs": 400 },
-    { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda-rastreio", "holdMs": 500 },
+    { "action": "click", "selector": "button[aria-label=\"Iniciar nova venda\"]", "name": "nova-venda-rastreio", "holdMs": 500 },
     { "action": "expectVisible", "text": "Venda aberta. Adicione produtos.", "exact": true, "name": "venda-vazia" },
 
     { "action": "desktopStoreSet", "key": "nexus-core:pdv-label-batches:v1", "name": "seed-lote-vencido", "value": {
@@ -63,7 +63,7 @@
     { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "batches.1.remainingQuantity", "expected": 4, "name": "lote-b-baixou-exato" },
     { "action": "expectDesktopStoreJson", "key": "nexus-core:pdv-label-batches:v1", "path": "saleAllocations.0.trackingMode", "expected": "confirmed", "name": "rastreio-confirmado" },
 
-    { "action": "click", "selector": "button:has-text(\"Nova venda\")", "name": "nova-venda-ean", "holdMs": 350 },
+    { "action": "click", "selector": "button[aria-label=\"Iniciar nova venda\"]", "name": "nova-venda-ean", "holdMs": 350 },
     { "action": "fill", "selector": "input[placeholder*=\"Bipe\"]", "value": "7894900011110", "name": "scan-ean-generico" },
     { "action": "press", "selector": "input[placeholder*=\"Bipe\"]", "key": "Enter", "name": "confirmar-ean-generico", "holdMs": 450 },
     { "action": "expectVisible", "text": "1 UN x R$ 12,00", "exact": true, "name": "produto-ean-no-carrinho" },
