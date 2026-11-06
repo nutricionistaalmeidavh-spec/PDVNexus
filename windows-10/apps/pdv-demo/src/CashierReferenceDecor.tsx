@@ -48,20 +48,19 @@ export function CashierReferenceDecor() {
       ensureIcon(clientCard, "client");
       ensureIcon(sellerCard, "seller");
 
-      const itemArea = shell.querySelector("main > section > section > aside > div:nth-of-type(2)");
-      const itemRows = itemArea ? Array.from(itemArea.children).filter((child) => Boolean(child.querySelector("div strong"))) : [];
-      const quantityNode = shell.querySelector("main > section > section > div:first-child > div:nth-child(1) > div:last-child > div:last-child strong");
-      const quantity = (quantityNode?.textContent?.trim() || "0.000").replace(".", ",");
-      const itemAreaText = itemArea?.textContent || "";
-      const saleActive = Boolean(itemArea) && !itemAreaText.includes("Pressione F2");
-      const next = { items: itemRows.length, quantity, saleActive };
+      // Read canonical sale data from React state exposed by the cashier, never count DOM decorations.
+      const itemArea = shell.querySelector('[data-pdv-order-items="true"]');
+      const items = Number(itemArea?.getAttribute("data-pdv-item-count") ?? 0);
+      const quantity = (itemArea?.getAttribute("data-pdv-item-quantity") ?? "0.000").replace(".", ",");
+      const saleActive = itemArea?.getAttribute("data-pdv-sale-active") === "true";
+      const next = { items: Number.isFinite(items) ? items : 0, quantity, saleActive };
 
       setMetrics((current) => current.items === next.items && current.quantity === next.quantity && current.saleActive === next.saleActive ? current : next);
     };
 
     apply();
     const observer = new MutationObserver(apply);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled"] });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled", "data-pdv-item-count", "data-pdv-item-quantity", "data-pdv-sale-active"] });
     window.addEventListener("hashchange", apply);
 
     return () => {
