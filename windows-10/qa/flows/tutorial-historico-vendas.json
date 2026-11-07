@@ -1,0 +1,110 @@
+{
+  "id": "pdv-tutorial-real-historico-vendas",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "desktopStoreSet",
+      "key": "nexus-core:pdv-store:v1",
+      "name": "seed-relatorio",
+      "value": {
+        "completedSales": [
+          {
+            "number": "000101",
+            "openedAt": "18/09/2026, 10:00:00",
+            "customerId": "CLI-001",
+            "seller": "Operador Caixa",
+            "discountPercent": 0,
+            "items": [
+              {
+                "id": "I-1",
+                "productCode": "00101",
+                "productName": "Teclado com fio",
+                "unitLabel": "UN",
+                "quantity": 1,
+                "unitPrice": 100,
+                "totalPrice": 100,
+                "source": "catalog"
+              }
+            ],
+            "payments": [
+              {
+                "method": "PIX",
+                "amount": 100
+              }
+            ],
+            "finalizedAt": "18/09/2026, 10:05:00",
+            "netTotal": 100,
+            "paymentSummary": {
+              "status": "paid",
+              "total": 100,
+              "paidTotal": 100,
+              "remainingTotal": 0,
+              "changeDue": 0,
+              "creditTotal": 0,
+              "immediateTotal": 100
+            }
+          }
+        ]
+      }
+    },
+    {
+      "action": "reload",
+      "name": "reload-seed"
+    },
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/vendas\"]",
+      "name": "financeiro-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/vendas\"]",
+      "name": "open-financeiro",
+      "holdMs": 650
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/vendas",
+      "name": "financeiro-route",
+      "holdMs": 500
+    },
+    {
+      "action": "expectVisible",
+      "text": "Relatórios e dashboard",
+      "exact": true,
+      "name": "dashboard",
+      "holdMs": 500
+    },
+    {
+      "action": "expectVisible",
+      "text": "Ticket médio",
+      "exact": true,
+      "name": "ticket",
+      "holdMs": 500
+    },
+    {
+      "action": "screenshot",
+      "name": "relatorios-dashboard"
+    },
+    {
+      "action": "click",
+      "text": "Itens vendidos",
+      "exact": true,
+      "name": "consultar-itens-vendidos",
+      "holdMs": 900
+    },
+    {
+      "action": "expectVisible",
+      "text": "Exportar CSV detalhado",
+      "exact": true,
+      "name": "historico-disponivel",
+      "holdMs": 500
+    }
+  ]
+}
