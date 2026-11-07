@@ -34,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ollama-personas-${{ github.ref }}
+  group: ollama-personas-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -114,15 +114,9 @@ jobs:
           & $env:OLLAMA_EXE pull $model
           if ($LASTEXITCODE -ne 0) { throw "Falha download modelo local" }
           & $env:OLLAMA_EXE list
-
-      - name: Executar clientes virtuais no Electron (sequencial)
-        env:
-          OLLAMA_NO_CLOUD: "1"
-        run: |
-          $model = "${{ inputs.model || 'qwen3:1.7b' }}"
           $count = "${{ inputs.count || '10' }}"
           node qa/run-ollama-personas.mjs --config qa/ollama-personas.config.json --output qa-ollama-artifacts --count $count --model $model
-          if ($LASTEXITCODE -ne 0) { throw "Um ou mais objetivos de persona falharam. Veja report.md nos artefatos." }
+          if ($LASTEXITCODE -ne 0) { throw "Uma ou mais personas falharam; veja qa-ollama-artifacts/report.md" }
 
       - name: Relatorio no resumo do GitHub Actions
         if: always()

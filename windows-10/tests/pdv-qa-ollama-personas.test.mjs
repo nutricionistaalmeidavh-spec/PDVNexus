@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { readPersonaConfig, parseDecision, goalAchieved, buildPrompt } from "../qa/ollama-persona-core.mjs";
 
@@ -38,4 +39,13 @@ test("prompt inclui os controles e objetivo, nao executa codigo arbitrario", () 
   const prompt=buildPrompt(config.personas[0],{route:"#/caixa",controls,indicators:{}},[],12);
   assert.match(prompt,/Controles visiveis/);
   assert.match(prompt,/comerciante|Comerciante/);
+});
+
+test("Ollama e agentes executam no mesmo step (processo nao morre entre etapas)", () => {
+  const yml = readFileSync(new URL("../../.github/workflows/qa-ollama-personas.yml", import.meta.url), "utf8");
+  const step = yml.split("      - name: Inicializar Ollama local e baixar modelo")[1]?.split("      - name: Relatorio no resumo")[0];
+  assert.ok(step, "step Ollama ausente");
+  assert.match(step, /Start-Process -FilePath/);
+  assert.match(step, /node qa\/run-ollama-personas\.mjs/);
+  assert.equal((yml.match(/node qa\/run-ollama-personas\.mjs/g) || []).length, 1);
 });
