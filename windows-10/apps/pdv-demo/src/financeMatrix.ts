@@ -10,6 +10,7 @@ export interface PdvFinanceSource {
   amount: number;
   method: string;
   paidAt: string;
+  operatorName?: string;
 }
 export interface PdvFinanceRow {
   key: string;
@@ -59,7 +60,7 @@ export function buildPdvFinanceRows(input: {
   const customers = new Map((input.customers ?? []).map(row => [row.id, row.name]));
   const sources = (kind: "purchase" | "sale" | "expense", reference: string): PdvFinanceSource[] =>
     ledger.settlements.filter(row => row.kind === kind && row.referenceId === reference)
-      .map(row => ({ id: row.id, amount: row.amount, method: row.method, paidAt: row.paidAt }));
+      .map(row => ({ id: row.id, amount: row.amount, method: row.method, paidAt: row.paidAt, operatorName:row.operatorName }));
 
   const payable: PdvFinanceRow[] = ledger.purchases
     .filter(row => row.status === "received")

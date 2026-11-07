@@ -78,6 +78,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const [expenseCategory, setExpenseCategory] = useState("Operacional");
   const [expenseDueDate, setExpenseDueDate] = useState("");
   const [expensePaidNow, setExpensePaidNow] = useState(false);
+  const [expenseMethod, setExpenseMethod] = useState("PIX");
   const summary = useMemo(() => summarizeCommercial({ ledger, sales, creditMethods }), [ledger, sales, creditMethods]);
   const receivables = useMemo(() => sales.filter((sale) => saleOpenBalance(ledger, sale, creditMethods) > 0), [ledger, sales, creditMethods]);
   const payables = useMemo(() => ledger.purchases.filter((p) => purchaseOpenBalance(ledger, p) > 0), [ledger]);
@@ -114,7 +115,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   });
   const settle = () => protect(() => {
     const payment = { id: id("PAG"), referenceId: settlementReference, amount: numberInput(settlementAmount),
-      method: settlementMethod, paidAt: timestamp() };
+      method: settlementMethod, paidAt: timestamp(), operatorId:operator?.id, operatorName:operator?.name };
     const next = settlementKind === "purchase" ? settlePayable(ledger,payment) :
       settlementKind === "expense" ? settleExpense(ledger,payment) :
       settleReceivable(ledger, payment, sales, creditMethods);
@@ -123,9 +124,10 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   });
   const expense = () => protect(() => {
     const row: CommercialExpense = { id: id("DES"), description: expenseDescription, amount: numberInput(expenseAmount),
-      category: expenseCategory, occurredAt: timestamp(), dueDate:expenseDueDate, trackPayment:true };
+      category: expenseCategory, occurredAt: timestamp(), dueDate:expenseDueDate, trackPayment:true,
+      createdById:operator?.id, createdByName:operator?.name };
     const created=registerExpense(ledger,row);
-    onLedgerChange(expensePaidNow ? settleExpense(created,{id:id("PAG"),referenceId:row.id,amount:row.amount,method:"DINHEIRO",paidAt:timestamp()}) : created);
+    onLedgerChange(expensePaidNow ? settleExpense(created,{id:id("PAG"),referenceId:row.id,amount:row.amount,method:expenseMethod,paidAt:timestamp(),operatorId:operator?.id,operatorName:operator?.name}) : created);
     setExpenseAmount("");setExpenseDescription("");setExpenseDueDate("");setExpensePaidNow(false);
   });
   const selectedPurchase = ledger.purchases.find((p) => p.id === settlementReference);
@@ -275,12 +277,13 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <label style={{ display: "grid", gap: 5 }}>Categoria<input style={guidedFieldStyle} value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} placeholder="Operacional" /></label>
         <label style={{ display: "grid", gap: 5 }}>Valor (R$)<input style={guidedFieldStyle} inputMode="decimal" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} placeholder="0,00" /></label>
         <label style={{ display: "grid", gap: 5 }}>Vencimento<input type="date" aria-label="Vencimento da despesa" style={guidedFieldStyle} value={expenseDueDate} onChange={(e)=>setExpenseDueDate(e.target.value)} /></label>
-        <label style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={expensePaidNow} onChange={e=>setExpensePaidNow(e.target.checked)}/>Despesa já paga em dinheiro, registrar quitação agora</label>
+        <label style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={expensePaidNow} onChange={e=>setExpensePaidNow(e.target.checked)}/>Despesa já paga: registrar quitação agora</label>
+        {expensePaidNow?<label style={{display:"grid",gap:5}}>Forma de pagamento<select style={guidedFieldStyle} value={expenseMethod} onChange={e=>setExpenseMethod(e.target.value)}><option>PIX</option><option>DINHEIRO</option><option>TRANSFERENCIA</option><option>CARTAO</option></select></label>:null}
       </> : <>
         <p><strong>{expenseDescription}</strong> · {expenseCategory}</p>
         <strong>Valor: {currency(expenseValue)}</strong>
         <p>Vencimento: <strong>{expenseDueDate}</strong></p>
-        <p>Baixa: <strong>{expensePaidNow?"Confirmar saída em dinheiro":"Permanece pendente até baixa posterior"}</strong></p>
+        <p>Baixa: <strong>{expensePaidNow?"Confirmar saída via "+expenseMethod:"Permanece pendente até baixa posterior"}</strong></p>
       </>}
     </PdvGuidedDialog> : null}
   </section>;

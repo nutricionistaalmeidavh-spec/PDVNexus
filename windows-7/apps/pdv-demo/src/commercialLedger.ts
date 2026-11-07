@@ -32,6 +32,8 @@ export interface CommercialSettlement {
   paidAt: string;
   method: string;
   kind: "purchase" | "sale" | "expense";
+  operatorId?: string;
+  operatorName?: string;
 }
 export interface CommercialExpense {
   id: string;
@@ -42,6 +44,8 @@ export interface CommercialExpense {
   /** Optional on old records: legacy expenses are not automatically treated as paid or pending. */
   dueDate?: string;
   trackPayment?: boolean;
+  createdById?: string;
+  createdByName?: string;
 }
 export interface CommercialLedger {
   suppliers: CommercialSupplier[];

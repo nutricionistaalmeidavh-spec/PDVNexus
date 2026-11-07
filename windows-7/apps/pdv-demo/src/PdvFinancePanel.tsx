@@ -70,7 +70,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
  const sources=(row:PdvFinanceRow)=>row.sources.length?row.sources.map(source=>
    <div key={source.id} style={{...styleBox,padding:10,background:"#f8fbff"}}>
      <strong>{money(source.amount)} · {source.method}</strong>
-     <small>{source.id} · {source.paidAt}</small>
+     <small>{source.id} · {source.paidAt}{source.operatorName?" · "+source.operatorName:""}</small>
    </div>):<p style={{margin:0,fontSize:12,color:"#64748b"}}>Nenhuma baixa vinculada. O valor original permanece registrado.</p>;
  if(!allowed)return <section data-pdv-finance-panel="true" style={styleBox} role="status">
    <h2 style={{margin:0}}>Acesso restrito ao Financeiro</h2>
@@ -81,7 +81,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
      <div><h2 style={{margin:0,fontSize:20}}>Financeiro</h2>
        <p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>Compras recebidas, crediário e despesas — sem saldos paralelos e com funcionamento offline.</p></div>
      <div style={rowLayout}><button type="button" onClick={onOpenExpense} style={compactButton}>+ Nova despesa</button>
-       <button type="button" onClick={()=>onOpenSettlement("purchase")} style={guidedPrimaryStyle}>+ Registrar baixa</button></div>
+       <button type="button" onClick={()=>onOpenSettlement("purchase")} style={guidedPrimaryStyle}>Registrar pagamento ou recebimento parcial</button></div>
    </div>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
      {summaryCards.map(item=><div key={item.key} data-pdv-finance-kpi={item.key} style={styleBox}>
