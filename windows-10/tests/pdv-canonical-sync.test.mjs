@@ -28,3 +28,16 @@ test("Windows 7 canonical JSON store must also require revision and token, never
   assert.match(legacy,/Token de sincroniza[cç][aã]o obrigat[oó]rio/i);
   assert.doesNotMatch(legacy,/if \(!token\) return true/);
 });
+
+test("desktop IPC also requires optimistic concurrency, not only HTTP sync", () => {
+ const preload = fs.readFileSync(new URL("../apps/nexus-desktop/preload.cjs",import.meta.url),"utf8");
+ const runtime = fs.readFileSync(new URL("../packages/desktop-runtime/src/index.ts",import.meta.url),"utf8");
+ const app = fs.readFileSync(new URL("../apps/pdv-demo/src/PdvDemoApp.tsx",import.meta.url),"utf8");
+ assert.match(source, /"nexus-pdv-store:save", \(_event, storeKey, snapshotJson, expectedRevision\)/);
+ assert.match(source, /savePdvStoreSnapshot\(storeKey, snapshotJson, expectedRevision\)/);
+ assert.match(preload, /save: \(storeKey, snapshotJson, expectedRevision\)/);
+ assert.match(runtime, /save\(storeKey: string, snapshotJson: string, expectedRevision: number\)/);
+ assert.match(app, /lastPersistedRevisionRef/);
+ assert.match(app, /desktopStoreBridge\.save\(PDV_STORE_KEY, nextSnapshot, lastPersistedRevisionRef\.current\)/);
+ assert.match(app, /REVISION_CONFLICT/);
+});
