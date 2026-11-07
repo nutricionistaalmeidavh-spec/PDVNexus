@@ -19,6 +19,22 @@ export async function readPersonaConfig(filename) {
   return validateConfig(JSON.parse(await readFile(filename, "utf8")));
 }
 
+export function buildDecisionSchema(controls) {
+  const allowedIds = controls.filter(c => !c.disabled && Number.isSafeInteger(c.id)).map(c => c.id);
+  if (!allowedIds.length) throw new Error("Nenhum controle disponivel para a decisao");
+  return {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["click", "fill", "press", "select", "done"] },
+      elementId: { type: "integer", enum: allowedIds },
+      value: { type: "string" },
+      key: { type: "string" },
+      reason: { type: "string" }
+    },
+    required: ["action", "elementId", "value", "key", "reason"]
+  };
+}
+
 export function parseDecision(message, controls) {
   let data;
   try { data = JSON.parse(message); } catch { throw new Error("LLM nao retornou JSON valido"); }
