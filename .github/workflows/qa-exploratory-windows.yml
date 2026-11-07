@@ -8,6 +8,8 @@ on:
       - "windows-10/qa/run-exploratory-matrix.mjs"
       - "windows-10/qa/exploratory-metrics.mjs"
       - "windows-10/tests/pdv-qa-exploratory-metrics.test.mjs"
+      - "windows-10/qa/business-flows.json"
+      - "windows-10/apps/pdv-demo/src/PdvDemoApp.tsx"
   pull_request:
     branches: [main]
     paths:
@@ -15,6 +17,8 @@ on:
       - "windows-10/qa/run-exploratory-matrix.mjs"
       - "windows-10/qa/exploratory-metrics.mjs"
       - "windows-10/tests/pdv-qa-exploratory-metrics.test.mjs"
+      - "windows-10/qa/business-flows.json"
+      - "windows-10/apps/pdv-demo/src/PdvDemoApp.tsx"
   workflow_dispatch:
     inputs:
       seeds:
