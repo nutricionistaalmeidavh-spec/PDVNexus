@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "../tools/artisys-qa/node_modules/playwright/index.mjs";
 import { PDV_BUSINESS_BASELINE, MAIN_PDV_STORE_KEY } from "./pdv-business-baseline.mjs";
-import { CONTROL_SELECTOR, readPersonaConfig, parseDecision, buildPrompt, goalAchieved, buildDecisionSchema } from "./ollama-persona-core.mjs";
+import { CONTROL_SELECTOR, readPersonaConfig, parseDecision, buildPrompt, goalAchieved, buildDecisionSchema, selectPersonaControls } from "./ollama-persona-core.mjs";
 
 const cwd = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(cwd, "..");
@@ -32,7 +32,7 @@ async function nextDecision(persona, state, history, maxSteps, model) {
   const prompt = buildPrompt(persona, state, history, maxSteps);
   let error;
   let rejection = "";
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const body = {
         model, stream: false, think: false, keep_alive: "2m",
@@ -70,7 +70,7 @@ async function observe(page, persona) {
       disabled: Boolean(el.disabled),
       options
     };
-  }).filter(Boolean).slice(0, 100));
+  }).filter(Boolean));
   const pageState = await page.evaluate(async (key) => {
     let store = null;
     try {
@@ -88,13 +88,7 @@ async function observe(page, persona) {
   // IDs curtos e consecutivos para o LLM; domIndex preserva indice real do locator.
   // Personas de navegacao recebem exclusivamente os links do menu, evitando que
   // modelos CPU pequenos confundam o destino com botoes do caixa.
-  const menuOnly = ["route", "routeText"].includes(persona.goal.kind);
-  const candidates = menuOnly
-    ? allControls.filter((c) => c.tag === "A" && c.href.startsWith("#/"))
-    : allControls.slice(0, 60);
-  const controls = candidates.map((control, index) => ({
-    ...control, domIndex: control.id, id: index + 1
-  }));
+  const controls = selectPersonaControls(allControls, persona.goal);
   return {
     ...pageState,
     controls,
@@ -160,7 +154,10 @@ async function runPersona(persona, model, maxSteps) {
     await page.evaluate(async ({ key, baseline }) => {
       const raw = JSON.stringify(baseline);
       window.localStorage.setItem(key, raw);
-      if (window.nexusDesktop?.pdvStore?.save) await window.nexusDesktop.pdvStore.save(key, raw);
+      if (window.nexusDesktop?.pdvStore?.save) {
+        const current = await window.nexusDesktop.pdvStore.load(key);
+        await window.nexusDesktop.pdvStore.save(key, raw, Number(current?.revision ?? 0));
+      }
     }, { key: MAIN_PDV_STORE_KEY, baseline: PDV_BUSINESS_BASELINE });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('a[href="#/caixa"]', { timeout: 25000 });
