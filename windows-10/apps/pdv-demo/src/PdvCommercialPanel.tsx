@@ -90,7 +90,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível concluir a operação."); return false; }
   };
   const createSupplier = () => protect(() => {
-    const next: CommercialSupplier = { id: id("FOR"), name: supplierName.trim(), document: supplierDocument.trim(), phone: supplierPhone.trim(), createdAt: timestamp() };
+    const next: CommercialSupplier = { id: id("FOR"), name: supplierName.trim(), document: supplierDocument.trim(), phone: supplierPhone.trim(), createdAt: timestamp(), createdById:operator?.id, createdByName:operator?.name };
     onLedgerChange(registerSupplier(ledger, next));
     setSupplierName(""); setSupplierDocument(""); setSupplierPhone(""); setSupplierId(next.id);
   });
@@ -105,6 +105,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const savePurchase = () => protect(() => {
     const purchase: CommercialPurchase = {
       id: id("COM"), supplierId, orderedAt: timestamp(), dueDate: dueDate || undefined,
+      createdById:operator?.id,createdByName:operator?.name,
       status: "draft", items: purchaseLines,
       invoiceRef: purchaseReference.trim() || undefined
     };
@@ -112,7 +113,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     setPurchaseLines([]);setPurchaseReference("");setDueDate("");
   });
   const receipt = (purchaseId: string) => protect(() => {
-    onPurchaseReceived(receivePurchase({ ledger, catalog, movements, purchaseId, receivedAt: timestamp() }));
+    onPurchaseReceived(receivePurchase({ ledger, catalog, movements, purchaseId, receivedAt: timestamp(), operator }));
   });
   const settle = () => protect(() => {
     const payment = { id: id("PAG"), referenceId: settlementReference, amount: numberInput(settlementAmount),

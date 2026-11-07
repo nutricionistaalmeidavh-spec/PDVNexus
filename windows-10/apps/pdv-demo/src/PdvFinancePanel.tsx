@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { summarizeCommercial, type CommercialLedger, type CommercialSale } from "./commercialLedger";
+import { summarizeCommercial, buildCommercialAuditTrail, type CommercialLedger, type CommercialSale } from "./commercialLedger";
 import { PdvGuidedDialog, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
 import {
  buildPdvFinanceRows, filterPdvFinanceRows, buildPdvFinanceKanban,
@@ -22,7 +22,7 @@ const downloadFile=(content:string|Uint8Array,name:string,type:string)=>{
  const url=URL.createObjectURL(new Blob([content as BlobPart],{type}));
  const link=document.createElement("a");link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
-type FinanceTab="matrix"|"kanban"|"cashflow"|"reports";
+type FinanceTab="matrix"|"kanban"|"cashflow"|"reports"|"audit";
 type Props={
  ledger:CommercialLedger;
  sales:CommercialSale[];
@@ -43,6 +43,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
  const rows=useMemo(()=>buildPdvFinanceRows({ledger,sales,creditMethods,customers}),[ledger,sales,creditMethods,customers]);
  const filtered=useMemo(()=>filterPdvFinanceRows(rows,filters),[rows,filters]);
  const board=useMemo(()=>buildPdvFinanceKanban(filtered,todayLocal()),[filtered]);
+ const audit=useMemo(()=>buildCommercialAuditTrail(ledger),[ledger]);
  const report=useMemo(()=>buildPdvFinanceReport({ledger,sales,creditMethods,from:filters.from,to:filters.to}),[ledger,sales,creditMethods,filters.from,filters.to]);
  const selected=rows.find(row=>row.key===detail);
  const selectedTotal=filtered.reduce((sum,row)=>sum+(row.open??0),0);
@@ -92,7 +93,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
    <p style={{fontSize:11,color:"#64748b",margin:0}}>Indicadores acima: histórico completo. Filtros abaixo: matriz, Kanban, fluxo por período e relatórios.</p>
    <div style={{...styleBox,gap:12}}>
      <nav aria-label="Modo de visualização financeira" style={rowLayout}>
-       {([["matrix","Matriz financeira"],["kanban","Kanban"],["cashflow","Fluxo de caixa"],["reports","Relatórios"]] as Array<[FinanceTab,string]>)
+       {([["matrix","Matriz financeira"],["kanban","Kanban"],["cashflow","Fluxo de caixa"],["reports","Relatórios"],["audit","Auditoria"]] as Array<[FinanceTab,string]>)
          .map(([id,label])=><button key={id} type="button" aria-pressed={tab===id} onClick={()=>setTab(id)}
            style={{...compactButton,background:tab===id?"#1d4ed8":"#f6f9fd",color:tab===id?"#fff":"#1b4d8d"}}>
            {label}</button>)}
@@ -124,7 +125,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
            <tbody>{filtered.map(row=><tr key={row.key}>
              <td style={{...moneyTableCell,textAlign:"left",position:"sticky",left:0,zIndex:2,background:"#fff"}}>
                <button type="button" title="Abrir origem do lançamento" style={{border:0,background:"transparent",color:"#1653a2",cursor:"pointer",textAlign:"left"}}
-                 onClick={()=>setDetail(row.key)}><strong style={{display:"block"}}>{row.party}</strong><small>{row.reference}</small></button></td>
+                 onClick={()=>setDetail(row.key)}><strong style={{display:"block"}}>{row.party}</strong><small>{row.reference}{row.installmentLabel?" · Parcela "+row.installmentLabel:""}</small></button></td>
              <td style={{...moneyTableCell,textAlign:"left"}}>{labels[row.kind]}</td>
              {(["original","settled","open"] as const).map(key=><td key={key} style={moneyTableCell}>
                {row[key]===null?"—":<button type="button" title={"Ver origem de "+row.reference} onClick={()=>setDetail(row.key)}
@@ -150,7 +151,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
              onClick={()=>setDetail(row.key)} style={{textAlign:"left",border:"1px solid #dce5ee",borderRadius:9,background:"#fff",padding:11,
              display:"grid",gap:6,cursor:"pointer"}}>
              <strong style={{fontSize:12,color:"#182d4c"}}>{row.party}</strong>
-             <span style={{fontSize:11,color:"#63758a"}}>{row.reference} · {labels[row.kind]}</span>
+             <span style={{fontSize:11,color:"#63758a"}}>{row.reference}{row.installmentLabel?" · Parcela "+row.installmentLabel:""} · {labels[row.kind]}</span>
              <strong style={{fontSize:16,color:"#164883"}}>{row.open===null?"Sem controle de baixa":money(row.open)}</strong>
              <span style={{fontSize:11,color:"#67788e"}}>{row.dueDate?"Vence "+formatDay(row.dueDate):"Vencimento não informado"} · {statuses[row.status]}</span>
            </button>)}
@@ -174,6 +175,27 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
          </div>
        </div>)}</div>:<p style={{fontSize:12,color:"#64748b"}}>Não há movimentações confirmadas no período informado.</p>}
        <small>{report.missingDueDates} obrigação(ões) sem vencimento · {report.untrackedExpenses} despesa(s) históricas sem baixa rastreada.</small>
+     </div>:null}
+     {tab==="audit"?<div style={{display:"grid",gap:10}}>
+       <strong>Auditoria financeira — eventos de origem</strong>
+       <p style={{margin:0,fontSize:11,color:"#64748b"}}>Eventos derivados do histórico canônico. Para dados legados sem identificação, o operador aparece como não registrado; não há edição de eventos nesta tela.</p>
+       <div style={{overflow:"auto",maxHeight:520,border:"1px solid #e3eaf2",borderRadius:8}}>
+         <table data-pdv-finance-audit="true" style={{width:"100%",minWidth:740,borderCollapse:"collapse",fontSize:12}}>
+           <thead><tr>{["Data","Evento","Documento","Operador","Valor","Forma"].map(t=>
+             <th key={t} style={{...moneyTableCell,textAlign:"left",background:"#eef3f9",position:"sticky",top:0}}>{t}</th>)}</tr></thead>
+           <tbody>{audit.filter(e=>{
+              const day=e.performedAt.slice(0,10);
+              return (!filters.from||day>=filters.from)&&(!filters.to||day<=filters.to);
+            }).map(event=><tr key={event.id}>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.performedAt}</td>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.action}</td>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.referenceId}</td>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.operatorName??"Não registrado (legado)"}</td>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.amount===undefined?"—":money(event.amount)}</td>
+             <td style={{...moneyTableCell,textAlign:"left"}}>{event.method??"—"}</td>
+            </tr>)}</tbody>
+         </table>
+       </div>
      </div>:null}
      {tab==="reports"?<div style={{display:"grid",gap:13}}>
        <div style={{...rowLayout,justifyContent:"space-between"}}>
@@ -206,7 +228,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
        {selected.open!==null&&selected.open>0?<button type="button" style={guidedPrimaryStyle} onClick={()=>launch(selected)}>Registrar baixa deste documento</button>:null}</>}>
      <div style={{...styleBox,background:"#f7fbff"}}>
        <strong>{selected.party}</strong>
-       <span style={{fontSize:12}}>Documento: {selected.reference}</span>
+       <span style={{fontSize:12}}>Documento: {selected.reference}{selected.installmentLabel?" · Parcela "+selected.installmentLabel:""}</span>
        <span style={{fontSize:12}}>Vencimento: {formatDay(selected.dueDate)}</span>
        <span style={{fontSize:12}}>Valor original: <strong>{money(selected.original)}</strong></span>
        <span style={{fontSize:12}}>Liquidado: <strong>{selected.settled===null?"Não controlado":money(selected.settled)}</strong></span>
