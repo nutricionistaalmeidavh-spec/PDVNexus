@@ -210,6 +210,86 @@
     },
     {
       "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
+      "name": "open-canonical-gestao"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/gestao",
+      "name": "gestao-route"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Gestão comercial",
+      "exact": true,
+      "name": "commercial-dashboard"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Cadastrar fornecedor",
+      "exact": true,
+      "name": "supplier-registration"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Nova compra · adicionar itens",
+      "exact": true,
+      "name": "purchase-entry-form"
+    },
+    {
+      "action": "screenshot",
+      "name": "05a-compras-fornecedores"
+    },
+    {
+      "action": "click",
+      "text": "Contas e despesas",
+      "exact": true,
+      "name": "open-payables"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Registrar pagamento ou recebimento parcial",
+      "exact": true,
+      "name": "ledger-settlements"
+    },
+    {
+      "action": "screenshot",
+      "name": "05b-financeiro-gerencial"
+    },
+    {
+      "action": "click",
+      "text": "Lucratividade",
+      "exact": true,
+      "name": "open-commercial-profit"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Lucro bruto apurado",
+      "exact": true,
+      "name": "gross-profit-no-fake-margin"
+    },
+    {
+      "action": "screenshot",
+      "name": "05c-lucratividade"
+    },
+    {
+      "action": "click",
+      "text": "Preparação fiscal",
+      "exact": true,
+      "name": "open-fiscal-readiness"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Preparação de emissão fiscal NFC-e / NF-e",
+      "exact": true,
+      "name": "fiscal-readiness-gated"
+    },
+    {
+      "action": "screenshot",
+      "name": "05d-fiscal-preparacao"
+    },
+    {
+      "action": "click",
       "selector": "a[href=\"#/administracao\"]",
       "name": "open-administracao"
     },
