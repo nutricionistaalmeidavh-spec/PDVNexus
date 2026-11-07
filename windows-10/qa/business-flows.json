@@ -757,6 +757,18 @@
           "name": "pagamento-a-prazo"
         },
         {
+          "action": "fill",
+          "selector": "input[aria-label=\"Vencimento da venda a prazo\"]",
+          "value": "2026-11-20",
+          "name": "informar-vencimento-a-prazo"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Parcelas do crediário\"]",
+          "value": "3",
+          "name": "selecionar-3-parcelas"
+        },
+        {
           "action": "press",
           "selector": "input[placeholder*=\"Bipe\"]",
           "key": "F8",
@@ -793,6 +805,27 @@
           "path": "registeredCustomers.1.creditUsed",
           "expected": 384.99,
           "name": "credito-utilizado"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "completedSales.0.installments.0.amount",
+          "expected": 33.34,
+          "name": "primeira-parcela-valor"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "completedSales.0.installments.1.dueDate",
+          "expected": "2026-12-20",
+          "name": "segunda-parcela-vencimento"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "completedSales.0.installments.2.amount",
+          "expected": 33.33,
+          "name": "terceira-parcela-valor"
         }
       ]
     },
@@ -872,6 +905,12 @@
           "text": "A PRAZO",
           "exact": true,
           "name": "pagamento-a-prazo"
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Vencimento da venda a prazo\"]",
+          "value": "2026-11-20",
+          "name": "informar-vencimento-a-prazo"
         },
         {
           "action": "expectVisible",
@@ -2171,6 +2210,35 @@
         },
         {
           "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-security-before-finance"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Selecionar operador para entrar\"]",
+          "value": "GER-001",
+          "name": "select-existing-manager"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "123456",
+          "name": "manager-seeded-pin"
+        },
+        {
+          "action": "click",
+          "text": "Entrar",
+          "exact": true,
+          "name": "authenticate-existing-manager"
+        },
+        {
+          "action": "expectVisible",
+          "text": "Gerente autenticado.",
+          "exact": false,
+          "name": "manager-authenticated-confirmation"
+        },
+        {
+          "action": "click",
           "selector": "a[href=\"#/financeiro\"]",
           "name": "open-financeiro"
         },
@@ -2256,6 +2324,29 @@
           "selector": "a[href=\"#/administracao\"]",
           "name": "admin-link",
           "timeoutMs": 20000
+        },
+        {
+          "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-security-for-manager"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Selecionar operador para entrar\"]",
+          "value": "GER-001",
+          "name": "select-manager-login"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "123456",
+          "name": "enter-test-manager-pin"
+        },
+        {
+          "action": "click",
+          "text": "Entrar",
+          "exact": true,
+          "name": "authenticate-seeded-manager"
         },
         {
           "action": "click",

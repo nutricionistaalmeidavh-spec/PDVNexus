@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import {
   emptyCommercialLedger, normalizeCommercialLedger,
   purchaseOpenBalance, purchaseTotal, receivePurchase, registerExpense, registerPurchase,
+  expenseOpenBalance, settleExpense, registerRecurringExpenses,
   registerSupplier, saleGrossProfit, saleOpenBalance, settlePayable, settleReceivable,
   summarizeCommercial,
   type CommercialCatalogProduct, type CommercialExpense, type CommercialLedger,
@@ -9,6 +10,7 @@ import {
 } from "./commercialLedger";
 import type { PdvStockMovement } from "../../../packages/database/src/pdv";
 import { PdvGuidedDialog, guidedFieldStyle, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
+import { PdvFinancePanel } from "./PdvFinancePanel";
 
 type Props<P extends CommercialCatalogProduct> = {
   ledger: CommercialLedger;
@@ -17,6 +19,9 @@ type Props<P extends CommercialCatalogProduct> = {
   sales: CommercialSale[];
   creditMethods: string[];
   allowed: boolean;
+  customers?: ReadonlyArray<{id:string;name:string}>;
+  operator?: {id:string;name:string};
+  storeName?: string;
   mode?: "gestao" | "financeiro";
   onLedgerChange: (next: CommercialLedger) => void;
   onPurchaseReceived: (change: { ledger: CommercialLedger; catalog: P[]; movements: PdvStockMovement[] }) => void;
@@ -47,7 +52,7 @@ function downloadCsv(rows: string[][], filename: string) {
 }
 
 export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Props<P>) {
-  const { ledger, catalog, movements, sales, creditMethods, allowed, mode = "gestao", onLedgerChange, onPurchaseReceived } = props;
+  const { ledger, catalog, movements, sales, creditMethods, allowed, customers, operator, storeName, mode = "gestao", onLedgerChange, onPurchaseReceived } = props;
   const [view, setView] = useState<"compras" | "financeiro" | "relatorios">("compras");
   const activeView = mode === "financeiro" ? "financeiro" : view;
   const [message, setMessage] = useState("");
@@ -64,23 +69,28 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [purchaseReference, setPurchaseReference] = useState("");
-  const [settlementKind, setSettlementKind] = useState<"purchase" | "sale">("purchase");
+  const [settlementKind, setSettlementKind] = useState<"purchase" | "sale" | "expense">("purchase");
   const [settlementReference, setSettlementReference] = useState("");
   const [settlementAmount, setSettlementAmount] = useState("");
   const [settlementMethod, setSettlementMethod] = useState("PIX");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("Operacional");
+  const [expenseDueDate, setExpenseDueDate] = useState("");
+  const [expensePaidNow, setExpensePaidNow] = useState(false);
+  const [expenseMethod, setExpenseMethod] = useState("PIX");
+  const [expenseRepeatMonths, setExpenseRepeatMonths] = useState(1);
   const summary = useMemo(() => summarizeCommercial({ ledger, sales, creditMethods }), [ledger, sales, creditMethods]);
   const receivables = useMemo(() => sales.filter((sale) => saleOpenBalance(ledger, sale, creditMethods) > 0), [ledger, sales, creditMethods]);
   const payables = useMemo(() => ledger.purchases.filter((p) => purchaseOpenBalance(ledger, p) > 0), [ledger]);
+  const expensePayables = useMemo(() => ledger.expenses.filter((e) => (expenseOpenBalance(ledger,e) ?? 0)>0), [ledger]);
   const protect = (fn: () => void): boolean => {
     if (!allowed) { setMessage("Seu perfil não tem permissão para alterar o financeiro."); return false; }
     try { fn(); setMessage("Operação aceita no armazenamento local do PDV."); return true; }
     catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível concluir a operação."); return false; }
   };
   const createSupplier = () => protect(() => {
-    const next: CommercialSupplier = { id: id("FOR"), name: supplierName.trim(), document: supplierDocument.trim(), phone: supplierPhone.trim(), createdAt: timestamp() };
+    const next: CommercialSupplier = { id: id("FOR"), name: supplierName.trim(), document: supplierDocument.trim(), phone: supplierPhone.trim(), createdAt: timestamp(), createdById:operator?.id, createdByName:operator?.name };
     onLedgerChange(registerSupplier(ledger, next));
     setSupplierName(""); setSupplierDocument(""); setSupplierPhone(""); setSupplierId(next.id);
   });
@@ -95,6 +105,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const savePurchase = () => protect(() => {
     const purchase: CommercialPurchase = {
       id: id("COM"), supplierId, orderedAt: timestamp(), dueDate: dueDate || undefined,
+      createdById:operator?.id,createdByName:operator?.name,
       status: "draft", items: purchaseLines,
       invoiceRef: purchaseReference.trim() || undefined
     };
@@ -102,44 +113,58 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     setPurchaseLines([]);setPurchaseReference("");setDueDate("");
   });
   const receipt = (purchaseId: string) => protect(() => {
-    onPurchaseReceived(receivePurchase({ ledger, catalog, movements, purchaseId, receivedAt: timestamp() }));
+    onPurchaseReceived(receivePurchase({ ledger, catalog, movements, purchaseId, receivedAt: timestamp(), operator }));
   });
   const settle = () => protect(() => {
     const payment = { id: id("PAG"), referenceId: settlementReference, amount: numberInput(settlementAmount),
-      method: settlementMethod, paidAt: timestamp() };
-    const next = settlementKind === "purchase" ? settlePayable(ledger, payment) :
+      method: settlementMethod, paidAt: timestamp(), operatorId:operator?.id, operatorName:operator?.name };
+    const next = settlementKind === "purchase" ? settlePayable(ledger,payment) :
+      settlementKind === "expense" ? settleExpense(ledger,payment) :
       settleReceivable(ledger, payment, sales, creditMethods);
     onLedgerChange(next);
     setSettlementAmount("");
   });
   const expense = () => protect(() => {
     const row: CommercialExpense = { id: id("DES"), description: expenseDescription, amount: numberInput(expenseAmount),
-      category: expenseCategory, occurredAt: timestamp() };
-    onLedgerChange(registerExpense(ledger, row));
-    setExpenseAmount("");setExpenseDescription("");
+      category: expenseCategory, occurredAt: timestamp(), dueDate:expenseDueDate, trackPayment:true,
+      createdById:operator?.id, createdByName:operator?.name };
+    const created=registerRecurringExpenses(ledger,row,expenseRepeatMonths);
+    const firstExpenseId=expenseRepeatMonths===1?row.id:row.id+"-1";
+    onLedgerChange(expensePaidNow ? settleExpense(created,{id:id("PAG"),referenceId:firstExpenseId,amount:row.amount,method:expenseMethod,paidAt:timestamp(),operatorId:operator?.id,operatorName:operator?.name}) : created);
+    setExpenseAmount("");setExpenseDescription("");setExpenseDueDate("");setExpensePaidNow(false);setExpenseRepeatMonths(1);
   });
   const selectedPurchase = ledger.purchases.find((p) => p.id === settlementReference);
   const selectedSale = sales.find((s) => s.number === settlementReference);
+  const selectedExpense = ledger.expenses.find((e) => e.id === settlementReference);
   const settlementBalance = settlementKind === "purchase"
     ? (selectedPurchase ? purchaseOpenBalance(ledger, selectedPurchase) : 0)
+    : settlementKind === "expense" ? (selectedExpense ? expenseOpenBalance(ledger,selectedExpense) ?? 0 : 0)
     : (selectedSale ? saleOpenBalance(ledger, selectedSale, creditMethods) : 0);
   const settlementValue = numberInput(settlementAmount);
   const canSettle = allowed && Boolean(settlementReference) && Number.isFinite(settlementValue)
     && settlementValue > 0 && settlementValue <= settlementBalance;
   const expenseValue = numberInput(expenseAmount);
-  const canExpense = allowed && expenseDescription.trim().length > 0 && Number.isFinite(expenseValue) && expenseValue > 0;
+  const canExpense = allowed && expenseDescription.trim().length > 0 && Number.isFinite(expenseValue) && expenseValue > 0
+    && /^\d{4}-\d{2}-\d{2}$/.test(expenseDueDate);
   const receiptPurchase = ledger.purchases.find((p) => p.id === receiptPurchaseId);
   const purchaseValue = purchaseLines.reduce((total, line) => total + line.quantity * line.unitCost, 0);
   const closeDialog = () => { setDialog(null); setReviewStep("form"); setReceiptPurchaseId(""); };
+  const openFinanceSettlement = (kind: "purchase" | "sale" | "expense", reference = "") => {
+    if (!allowed) return;
+    setSettlementKind(kind); setSettlementReference(reference); setSettlementAmount("");
+    setReviewStep("form"); setDialog("settlement");
+  };
+  const openFinanceExpense = () => { if(allowed){setReviewStep("form");setDialog("expense");} };
   const tabs: Array<typeof view> = mode === "financeiro" ? [] : ["compras", "relatorios"];
   const tabLabel: Record<typeof view,string> = { compras:"Compras e fornecedores", financeiro:"Contas e despesas",
     relatorios:"Lucratividade" };
 
+  if (!allowed) return <section data-pdv-commercial-panel="true" role="status" style={box}><h2>Acesso restrito</h2><p>A gestão e os dados financeiros exigem perfil de gerente ou administrador ativo.</p></section>;
   return <section data-pdv-commercial-panel="true" style={{ display: "grid", gap: 14 }}>
-    <div style={{ ...split, justifyContent: "space-between" }}>
-      <div><h2 style={{ margin: 0 }}>{mode === "financeiro" ? "Financeiro" : "Gestão comercial"}</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
+    {mode === "gestao" ? <div style={{ ...split, justifyContent: "space-between" }}>
+      <div><h2 style={{ margin: 0 }}>Gestão comercial</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
       <div style={{ fontSize: 12, color: "#475569" }}>Armazenamento local canônico</div>
-    </div>
+    </div> : null}
     {mode === "gestao" ? <div style={split}>{tabs.map((t) => <button key={t} type="button" onClick={() => { setView(t);setMessage(""); }} aria-pressed={view === t}
       style={{ ...action, background: view === t ? "#1d4ed8" : "#e2e8f0", color: view === t ? "#fff" : "#0f172a" }}>{tabLabel[t]}</button>)}</div> : null}
     {message ? <div role="status" style={{ background: "#eef2ff", color: "#1e3a8a", padding: 10, borderRadius: 6 }}>{message}</div> : null}
@@ -179,22 +204,9 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         </tr>)}</tbody></table></div></div>
     </> : null}
 
-    {activeView === "financeiro" ? <>
-      <div style={{ ...split }}>
-        <div style={{ ...box, flex: "1 1 220px" }}>A pagar<strong style={{ fontSize: 22 }}>{currency(summary.payableOpen)}</strong></div>
-        <div style={{ ...box, flex: "1 1 220px" }}>A receber<strong style={{ fontSize: 22 }}>{currency(summary.receivableOpen)}</strong></div>
-        <div style={{ ...box, flex: "1 1 220px" }}>Despesas registradas<strong style={{ fontSize: 22 }}>{currency(summary.expensesTotal)}</strong></div>
-      </div>
-      <div style={box}><strong>Registrar pagamento ou recebimento parcial</strong>
-        <div style={split}>
-          <button disabled={!allowed} style={action} onClick={() => { setReviewStep("form");setDialog("settlement"); }}>Registrar pagamento ou recebimento</button>
-          <button disabled={!allowed} style={{ ...action, background: "#334155" }} onClick={() => { setReviewStep("form");setDialog("expense"); }}>Nova despesa</button>
-        </div>
-        <small style={{ color: "#64748b" }}>As baixas pertencem aos documentos originais. Revise o valor e o saldo antes de confirmar.</small>
-      </div>
-      <div style={box}><strong>Últimas baixas</strong>{ledger.settlements.slice(-20).reverse().map((p) => <div key={p.id} style={split}>
-        <span>{p.kind === "purchase" ? "Pagamento" : "Recebimento"} · {p.referenceId}</span><strong>{currency(p.amount)}</strong><small>{p.method}</small></div>)}</div>
-    </> : null}
+    {activeView === "financeiro" ? <PdvFinancePanel ledger={ledger} sales={sales} creditMethods={creditMethods}
+      customers={customers} allowed={allowed} storeName={storeName}
+      onOpenSettlement={openFinanceSettlement} onOpenExpense={openFinanceExpense} /> : null}
 
     {activeView === "relatorios" ? <>
       <div style={split}>
@@ -231,17 +243,18 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
       <strong>Compra {receiptPurchase.id} · {currency(purchaseTotal(receiptPurchase))}</strong>
       {receiptPurchase.items.map((line) => <p key={line.productCode} style={{ margin: 0 }}>{catalog.find((p) => p.productCode === line.productCode)?.productName ?? line.productCode} · {line.quantity} unidade(s) · {currency(line.unitCost)} por unidade</p>)}
     </PdvGuidedDialog> : null}
-    {dialog === "settlement" ? <PdvGuidedDialog title={settlementKind === "purchase" ? "Pagar fornecedor" : "Receber venda a prazo"}
+    {dialog === "settlement" ? <PdvGuidedDialog title={settlementKind === "purchase" ? "Pagar fornecedor" : settlementKind === "expense" ? "Pagar despesa" : "Receber venda a prazo"}
       description="Escolha o documento original e informe quanto foi efetivamente pago. O saldo será recalculado a partir das baixas registradas."
       step={reviewStep === "form" ? "Financeiro · Etapa 1 de 2" : "Financeiro · Etapa 2 de 2"} onClose={closeDialog}
       actions={reviewStep === "form" ? <><button type="button" style={guidedSecondaryStyle} onClick={closeDialog}>Cancelar</button><button type="button" disabled={!canSettle} style={guidedPrimaryStyle} onClick={() => setReviewStep("review")}>Revisar baixa</button></> :
         <><button type="button" style={guidedSecondaryStyle} onClick={() => setReviewStep("form")}>Voltar</button><button type="button" disabled={!canSettle} style={guidedPrimaryStyle} onClick={() => { if (settle()) closeDialog(); }}>Confirmar baixa</button></>}>
       {reviewStep === "form" ? <>
-        <label style={{ display: "grid", gap: 5 }}>Tipo de operação<select style={guidedFieldStyle} value={settlementKind} onChange={(e) => {setSettlementKind(e.target.value as "purchase" | "sale");setSettlementReference("");setSettlementAmount("");}}>
-          <option value="purchase">Pagamento a fornecedor</option><option value="sale">Recebimento de cliente</option></select></label>
+        <label style={{ display: "grid", gap: 5 }}>Tipo de operação<select style={guidedFieldStyle} value={settlementKind} onChange={(e) => {setSettlementKind(e.target.value as "purchase" | "sale" | "expense");setSettlementReference("");setSettlementAmount("");}}>
+          <option value="purchase">Pagamento a fornecedor</option><option value="sale">Recebimento de cliente</option><option value="expense">Pagamento de despesa</option></select></label>
         <label style={{ display: "grid", gap: 5 }}>Documento com saldo em aberto<select style={guidedFieldStyle} value={settlementReference} onChange={(e) => {setSettlementReference(e.target.value);setSettlementAmount("");}}>
           <option value="">Selecione um documento</option>
           {settlementKind === "purchase" ? payables.map((p) => <option value={p.id} key={p.id}>{p.id} · {currency(purchaseOpenBalance(ledger,p))}</option>) :
+            settlementKind === "expense" ? expensePayables.map((e)=><option value={e.id} key={e.id}>{e.description} · {currency(expenseOpenBalance(ledger,e)??0)}</option>) :
             receivables.map((s) => <option value={s.number} key={s.number}>{s.number} · {currency(saleOpenBalance(ledger,s,creditMethods))}</option>)}
         </select></label>
         <label style={{ display: "grid", gap: 5 }}>Valor da baixa (R$)<input aria-label="Valor da baixa" style={guidedFieldStyle} inputMode="decimal" value={settlementAmount} onChange={(e) => setSettlementAmount(e.target.value)} placeholder="0,00" /></label>
@@ -266,9 +279,16 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <label style={{ display: "grid", gap: 5 }}>Descrição<input style={guidedFieldStyle} value={expenseDescription} onChange={(e) => setExpenseDescription(e.target.value)} placeholder="Ex.: Energia elétrica" /></label>
         <label style={{ display: "grid", gap: 5 }}>Categoria<input style={guidedFieldStyle} value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} placeholder="Operacional" /></label>
         <label style={{ display: "grid", gap: 5 }}>Valor (R$)<input style={guidedFieldStyle} inputMode="decimal" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} placeholder="0,00" /></label>
+        <label style={{ display: "grid", gap: 5 }}>Vencimento<input type="date" aria-label="Vencimento da despesa" style={guidedFieldStyle} value={expenseDueDate} onChange={(e)=>setExpenseDueDate(e.target.value)} /></label>
+        <label style={{display:"grid",gap:5}}>Recorrência mensal<select style={guidedFieldStyle} value={expenseRepeatMonths} onChange={e=>setExpenseRepeatMonths(Number(e.target.value))}><option value={1}>Somente este mês</option><option value={3}>Próximos 3 meses</option><option value={6}>Próximos 6 meses</option><option value={12}>Próximos 12 meses</option></select></label>
+        <label style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={expensePaidNow} onChange={e=>setExpensePaidNow(e.target.checked)}/>Despesa já paga: registrar quitação agora</label>
+        {expensePaidNow?<label style={{display:"grid",gap:5}}>Forma de pagamento<select style={guidedFieldStyle} value={expenseMethod} onChange={e=>setExpenseMethod(e.target.value)}><option>PIX</option><option>DINHEIRO</option><option>TRANSFERENCIA</option><option>CARTAO</option></select></label>:null}
       </> : <>
         <p><strong>{expenseDescription}</strong> · {expenseCategory}</p>
         <strong>Valor: {currency(expenseValue)}</strong>
+        <p>Vencimento: <strong>{expenseDueDate}</strong></p>
+        <p>Obrigações: <strong>{expenseRepeatMonths} competência(s) mensais, registradas agora. Nenhum pagamento futuro automático.</strong></p>
+        <p>Baixa: <strong>{expensePaidNow?"Confirmar saída via "+expenseMethod:"Permanece pendente até baixa posterior"}</strong></p>
       </>}
     </PdvGuidedDialog> : null}
   </section>;

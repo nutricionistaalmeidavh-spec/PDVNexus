@@ -215,9 +215,9 @@
     },
     {
       "action": "expectVisible",
-      "text": "Formas de pagamento",
+      "text": "Acesso restrito",
       "exact": true,
-      "name": "payment-methods-visible"
+      "name": "cashier-payment-methods-restricted"
     },
     {
       "action": "screenshot",
@@ -237,6 +237,40 @@
     {
       "action": "screenshot",
       "name": "04d-fechamento-caixa"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
+      "name": "cashier-gestao-is-restricted"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Acesso restrito",
+      "exact": true,
+      "name": "cashier-cannot-see-financial-data"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/configuracoes\"]",
+      "name": "configure-first-manager-for-qa"
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+      "value": "QA-test-manager-only-2026",
+      "name": "set-manager-test-pin"
+    },
+    {
+      "action": "click",
+      "text": "Configurar gerente inicial",
+      "exact": true,
+      "name": "bootstrap-manager-local-qa"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Gerente inicial configurado.",
+      "exact": false,
+      "name": "bootstrap-manager-confirmation"
     },
     {
       "action": "click",
@@ -380,9 +414,82 @@
     },
     {
       "action": "expectVisible",
-      "text": "A pagar",
-      "exact": false,
-      "name": "financeiro-saldos-a-pagar"
+      "name": "financeiro-saldos-a-pagar",
+      "selector": "[data-pdv-finance-kpi=\"payable\"]"
+    },
+    {
+      "action": "click",
+      "text": "Kanban",
+      "exact": true,
+      "name": "open-finance-kanban"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-kanban=\"true\"]",
+      "name": "finance-kanban-columns"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-kanban-column=\"vencidas\"]",
+      "name": "finance-overdue-lane"
+    },
+    {
+      "action": "screenshot",
+      "name": "08b-financeiro-kanban"
+    },
+    {
+      "action": "click",
+      "text": "Relatórios",
+      "exact": true,
+      "name": "open-finance-reports"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Excel XLSX",
+      "exact": true,
+      "name": "finance-xlsx-export"
+    },
+    {
+      "action": "expectVisible",
+      "text": "PDF",
+      "exact": true,
+      "name": "finance-pdf-export"
+    },
+    {
+      "action": "screenshot",
+      "name": "08c-financeiro-relatorios"
+    },
+    {
+      "action": "click",
+      "text": "Matriz financeira",
+      "exact": true,
+      "name": "return-to-finance-matrix"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-finance-panel=\"true\"] table",
+      "name": "finance-matrix-visible"
+    },
+    {
+      "action": "click",
+      "text": "Auditoria",
+      "exact": true,
+      "name": "open-finance-audit"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-finance-audit=\"true\"]",
+      "name": "finance-audit-source-table"
+    },
+    {
+      "action": "screenshot",
+      "name": "08d-financeiro-auditoria"
+    },
+    {
+      "action": "click",
+      "text": "Matriz financeira",
+      "exact": true,
+      "name": "return-finance-matrix-from-audit"
     },
     {
       "action": "screenshot",

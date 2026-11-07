@@ -9,6 +9,8 @@ export interface CommercialSupplier {
   document?: string;
   phone?: string;
   createdAt: string;
+  createdById?: string;
+  createdByName?: string;
 }
 export interface PurchaseLine {
   productCode: string;
@@ -24,6 +26,10 @@ export interface CommercialPurchase {
   items: PurchaseLine[];
   receivedAt?: string;
   invoiceRef?: string;
+  createdById?: string;
+  createdByName?: string;
+  receivedById?: string;
+  receivedByName?: string;
 }
 export interface CommercialSettlement {
   id: string;
@@ -31,7 +37,9 @@ export interface CommercialSettlement {
   amount: number;
   paidAt: string;
   method: string;
-  kind: "purchase" | "sale";
+  kind: "purchase" | "sale" | "expense";
+  operatorId?: string;
+  operatorName?: string;
 }
 export interface CommercialExpense {
   id: string;
@@ -39,6 +47,13 @@ export interface CommercialExpense {
   amount: number;
   category: string;
   occurredAt: string;
+  /** Optional on old records: legacy expenses are not automatically treated as paid or pending. */
+  dueDate?: string;
+  trackPayment?: boolean;
+  createdById?: string;
+  createdByName?: string;
+  seriesId?: string;
+  seriesIndex?: number;
 }
 export interface CommercialLedger {
   suppliers: CommercialSupplier[];
@@ -63,13 +78,23 @@ export interface CommercialSaleItem {
   totalPrice?: number;
   unitCostAtSale?: number;
 }
+/** Canonical installment schedule for a credit sale, stored with the completed sale. */
+export interface CommercialSaleInstallment {
+  number: number;
+  dueDate: string;
+  amount: number;
+}
 export interface CommercialSale {
   number: string;
   finalizedAt: string;
+  /** Optional: old credit sales did not register a due date. */
+  dueDate?: string;
   netTotal: number;
   discountPercent?: number;
   items: CommercialSaleItem[];
   payments: Array<{ method: string; amount: number }>;
+  paymentSummary?: { changeDue?: number };
+  installments?: CommercialSaleInstallment[];
 }
 export interface CommercialSummary {
   purchasesTotal: number;
@@ -107,6 +132,44 @@ export function normalizeCommercialLedger(value: unknown): CommercialLedger {
     expenses: Array.isArray(obj.expenses) ? obj.expenses : []
   };
 }
+export interface CommercialAuditRecord {
+  id: string;
+  action: "supplier-created" | "purchase-created" | "purchase-received" | "expense-created" |
+    "purchase-settled" | "sale-settled" | "expense-settled";
+  referenceId: string;
+  performedAt: string;
+  operatorId?: string;
+  operatorName?: string;
+  amount?: number;
+  method?: string;
+}
+/** Read-only audit view derived from canonical events. Legacy rows have no invented operator. */
+export function buildCommercialAuditTrail(ledger: CommercialLedger): CommercialAuditRecord[] {
+  const events: CommercialAuditRecord[]=[];
+  for(const supplier of ledger.suppliers)
+    events.push({id:"SUP:"+supplier.id,action:"supplier-created",referenceId:supplier.id,
+      performedAt:supplier.createdAt,operatorId:supplier.createdById,operatorName:supplier.createdByName});
+  for(const purchase of ledger.purchases){
+    events.push({id:"COM:"+purchase.id,action:"purchase-created",referenceId:purchase.id,
+      performedAt:purchase.orderedAt,operatorId:purchase.createdById,operatorName:purchase.createdByName,
+      amount:purchaseTotal(purchase)});
+    if(purchase.status==="received" && purchase.receivedAt)
+      events.push({id:"REC:"+purchase.id,action:"purchase-received",referenceId:purchase.id,
+        performedAt:purchase.receivedAt,operatorId:purchase.receivedById,operatorName:purchase.receivedByName,
+        amount:purchaseTotal(purchase)});
+  }
+  for(const expense of ledger.expenses)
+    events.push({id:"DES:"+expense.id,action:"expense-created",referenceId:expense.id,
+      performedAt:expense.occurredAt,operatorId:expense.createdById,operatorName:expense.createdByName,
+      amount:expense.amount});
+  for(const payment of ledger.settlements)
+    events.push({id:"SET:"+payment.id,
+      action:payment.kind==="purchase"?"purchase-settled":payment.kind==="sale"?"sale-settled":"expense-settled",
+      referenceId:payment.referenceId,performedAt:payment.paidAt,operatorId:payment.operatorId,
+      operatorName:payment.operatorName,amount:payment.amount,method:payment.method});
+  return events.sort((a,b)=>b.performedAt.localeCompare(a.performedAt)||a.id.localeCompare(b.id));
+}
+
 export function purchaseTotal(purchase: CommercialPurchase) {
   return money(purchase.items.reduce((sum, row) => sum + row.quantity * row.unitCost, 0));
 }
@@ -139,6 +202,7 @@ export function receivePurchase<T extends CommercialCatalogProduct>(input: {
   movements: PdvStockMovement[];
   purchaseId: string;
   receivedAt: string;
+  operator?: { id: string; name: string };
 }): { ledger: CommercialLedger; catalog: T[]; movements: PdvStockMovement[] } {
   const purchase = input.ledger.purchases.find((p) => p.id === input.purchaseId);
   if (!purchase) throw new Error("Compra não encontrada.");
@@ -178,7 +242,7 @@ export function receivePurchase<T extends CommercialCatalogProduct>(input: {
     ledger: {
       ...input.ledger,
       purchases: input.ledger.purchases.map((p) => p.id === purchase.id ?
-        { ...p, status: "received" as const, receivedAt: input.receivedAt } : p)
+        { ...p, status: "received" as const, receivedAt: input.receivedAt, receivedById:input.operator?.id, receivedByName:input.operator?.name } : p)
     }
   };
 }
@@ -205,6 +269,26 @@ export function settlePayable(ledger: CommercialLedger, payment: Omit<Commercial
   if (money(payment.amount) > balance) throw new Error("Pagamento excede saldo a pagar.");
   return { ...ledger, settlements: [...ledger.settlements, { ...payment, amount: money(payment.amount), kind: "purchase" }] };
 }
+/** Deterministic monthly titles. First due day is an anchor; February is clamped, March returns to original day. */
+export function buildCreditInstallments(total: number, firstDueDate: string, count: number): CommercialSaleInstallment[] {
+  if (!Number.isInteger(count) || count < 1 || count > 12) throw new Error("Informe de 1 a 12 parcelas.");
+  const cents = Math.round(total * 100);
+  if (!Number.isFinite(total) || cents < count) throw new Error("Valor insuficiente: cada parcela precisa ter pelo menos um centavo.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDueDate)) throw new Error("Data de vencimento inválida.");
+  const [year, month, day] = firstDueDate.split("-").map(Number);
+  if (year < 2000 || month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate())
+    throw new Error("Data de vencimento inválida.");
+  const base = Math.floor(cents / count), remainder = cents % count;
+  return Array.from({ length: count }, (_, index) => {
+    const absolute = year * 12 + month - 1 + index;
+    const y = Math.floor(absolute / 12), m = absolute % 12 + 1;
+    const maxDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const d = Math.min(day, maxDay);
+    return { number: index + 1, dueDate: [y, String(m).padStart(2,"0"), String(d).padStart(2,"0")].join("-"),
+      amount: (base + (index < remainder ? 1 : 0)) / 100 };
+  });
+}
+
 export function saleCreditTotal(sale: CommercialSale, creditMethods: string[]): number {
   const methods = new Set(creditMethods.map((method) => method.toLocaleLowerCase("pt-BR").trim()));
   return money(sale.payments.filter((p) => methods.has(p.method.toLocaleLowerCase("pt-BR").trim())).reduce((sum, p) => sum + p.amount, 0));
@@ -221,14 +305,49 @@ export function settleReceivable(ledger: CommercialLedger, payment: Omit<Commerc
   if (money(payment.amount) > balance) throw new Error("Recebimento excede saldo a receber.");
   return { ...ledger, settlements: [...ledger.settlements, { ...payment, amount: money(payment.amount), kind: "sale" }] };
 }
+/** Legacy expenses without trackPayment have no known liquidation status. */
+export function expenseOpenBalance(ledger: CommercialLedger, expense: CommercialExpense): number | null {
+  if (!expense.trackPayment) return null;
+  return Math.max(0, money(expense.amount - settlementsSum(ledger, "expense", expense.id)));
+}
+export function settleExpense(ledger: CommercialLedger, payment: Omit<CommercialSettlement, "kind">): CommercialLedger {
+  validateSettlement(ledger,payment);
+  const expense = ledger.expenses.find(row=>row.id===payment.referenceId);
+  if (!expense) throw new Error("Despesa não encontrada.");
+  const balance = expenseOpenBalance(ledger,expense);
+  if (balance===null) throw new Error("Despesa histórica sem controle de pagamento; rastreamento não habilitado.");
+  if (money(payment.amount)>balance) throw new Error("Pagamento excede saldo da despesa.");
+  return {...ledger,settlements:[...ledger.settlements,{...payment,amount:money(payment.amount),kind:"expense"}]};
+}
 export function registerExpense(ledger: CommercialLedger, expense: CommercialExpense): CommercialLedger {
   unique(ledger.expenses, expense.id);
   required(expense.id, "identificador da despesa");
   required(expense.description, "descrição da despesa");
   required(expense.occurredAt, "data da despesa");
   positive(expense.amount, "Valor da despesa");
+  if (expense.trackPayment && !/^\d{4}-\d{2}-\d{2}$/.test(expense.dueDate ?? "")) throw new Error("Informe o vencimento da despesa controlada (AAAA-MM-DD).");
   return { ...ledger, expenses: [...ledger.expenses, { ...expense, amount: money(expense.amount) }] };
 }
+
+/** Future obligations are created upfront, locally, with independent IDs; never auto-pay them. */
+export function registerRecurringExpenses(ledger:CommercialLedger,expense:CommercialExpense,months:number):CommercialLedger {
+  if(!Number.isInteger(months)||months<1||months>12)throw new Error("A recorrência deve ter de 1 a 12 meses.");
+  if(!expense.trackPayment||!/^\d{4}-\d{2}-\d{2}$/.test(expense.dueDate??""))throw new Error("Recorrência requer controle de pagamento e vencimento.");
+  const [year,month,day]=expense.dueDate!.split("-").map(Number);
+  if(month<1||month>12||day<1||day>new Date(Date.UTC(year,month,0)).getUTCDate())throw new Error("Vencimento inválido para recorrência.");
+  let next=ledger;
+  for(let i=0;i<months;i++){
+    const total=year*12+(month-1)+i;
+    const y=Math.floor(total/12),m=total%12+1;
+    const clampedDay=Math.min(day,new Date(Date.UTC(y,m,0)).getUTCDate());
+    const date=[y,String(m).padStart(2,"0"),String(clampedDay).padStart(2,"0")].join("-");
+    const row={...expense,id:months===1?expense.id:`${expense.id}-${i+1}`,dueDate:date,
+      seriesId:months===1?undefined:expense.id,seriesIndex:months===1?undefined:i+1};
+    next=registerExpense(next,row);
+  }
+  return next;
+}
+
 export function saleGrossProfit(sale: CommercialSale): { revenue: number; cost: number | null; grossProfit: number | null } {
   const revenue = money(sale.netTotal);
   if (sale.items.some((item) => item.unitCostAtSale === undefined ||
