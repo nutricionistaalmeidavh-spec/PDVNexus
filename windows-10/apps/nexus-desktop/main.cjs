@@ -339,6 +339,9 @@ function loadPdvStoreSnapshot(storeKey) {
 }
 
 function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error("REVISION_REQUIRED: leitura canônica obrigatória antes de gravar.");
+  }
   const startedAt = Date.now();
   const key = String(storeKey ?? "default");
   appendPdvSqliteLog("save.start", `store=${key}`);
@@ -776,8 +779,8 @@ ipcMain.handle("nexus-pdv-store:load", (_event, storeKey) => {
   return loadPdvStoreSnapshot(storeKey);
 });
 
-ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson) => {
-  return savePdvStoreSnapshot(storeKey, snapshotJson);
+ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson, expectedRevision) => {
+  return savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision);
 });
 
 ipcMain.handle("app-store:status", () => ({

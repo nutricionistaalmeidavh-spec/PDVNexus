@@ -159,6 +159,7 @@ async function runPdvPersistenceWithRetry<T>(operation: () => Promise<T>, attemp
       return await operation();
     } catch (error) {
       lastError = error;
+      if (error instanceof Error && /REVISION_CONFLICT|REVISION_REQUIRED/.test(error.message)) throw error;
       if (attempt < attempts) {
         await new Promise<void>((resolve) => window.setTimeout(resolve, PDV_STORE_RETRY_DELAY_MS * attempt));
       }
@@ -176,6 +177,7 @@ export function PdvDemoApp() {
   const persistenceSaveActiveRef = useRef(false);
   const pendingPersistenceSnapshotRef = useRef("");
   const lastPersistedSnapshotRef = useRef("");
+  const lastPersistedRevisionRef = useRef(0);
   const savedConfig = initialStore.deviceConfig;
   const savedExtensions = normalizePdvExtensions(initialStore.extensions);
   const [sale, setSale] = useState<SaleState | null>(null);
@@ -344,21 +346,24 @@ export function PdvDemoApp() {
       setDesktopStoreStatus(`Armazenamento canônico ativo neste computador (${status.machineName}). Arquivo: ${status.path}`);
       if (row?.snapshotJson) {
         lastPersistedSnapshotRef.current = row.snapshotJson;
+        if (!Number.isSafeInteger(row.revision) || row.revision < 0) throw new Error("Revisão do banco inválida; gravação bloqueada.");
+        lastPersistedRevisionRef.current = row.revision;
         const imported = parsePdvSnapshot(row.snapshotJson);
         setCatalogProducts(imported.catalogProducts); setRegisteredCustomers(imported.registeredCustomers); setCompletedSales(imported.completedSales); setCashSession(imported.cashSession); setPaymentOptions(imported.paymentOptions);
         const importedExtensions = normalizePdvExtensions(imported.extensions);
         setInventoryMovements(importedExtensions.inventoryMovements); setCashClosings(importedExtensions.cashClosings); setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig); setLastReceiptText(importedExtensions.lastReceiptText); setUsers(importedExtensions.users); setCurrentOperatorId(importedExtensions.currentOperatorId); setAuditLogs(importedExtensions.auditLogs); setCancelledSales(importedExtensions.cancelledSales); setTerminalConfig(importedExtensions.terminalConfig); setTefConfig(importedExtensions.tefConfig); setTefTransactions(importedExtensions.tefTransactions); setAutoBackupConfig(importedExtensions.autoBackupConfig); setAutoBackups(importedExtensions.autoBackups); setStoreSettings(importedExtensions.storeSettings); setPromotionGroups(importedExtensions.promotionGroups); setCommercialLedger(importedExtensions.commercialLedger); setPersistenceState("ready"); return;
       }
       const initialSnapshot = buildPdvSnapshotJson();
-      await runPdvPersistenceWithRetry(
+      const initialSave = await runPdvPersistenceWithRetry(
         () => withPdvPersistenceTimeout(
-          desktopStoreBridge.save(PDV_STORE_KEY, initialSnapshot),
+          desktopStoreBridge.save(PDV_STORE_KEY, initialSnapshot, 0),
           PDV_STORE_SAVE_TIMEOUT_MS,
           "Tempo esgotado ao preparar o banco local do PDV."
         ),
         2
       );
       lastPersistedSnapshotRef.current = initialSnapshot;
+      lastPersistedRevisionRef.current = initialSave.revision;
       if (!cancelled) setPersistenceState("ready");
     })().catch((error) => {
       setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao abrir SQLite desktop.");
@@ -380,19 +385,28 @@ export function PdvDemoApp() {
         while (pendingPersistenceSnapshotRef.current && pendingPersistenceSnapshotRef.current !== lastPersistedSnapshotRef.current) {
           const nextSnapshot = pendingPersistenceSnapshotRef.current;
           try {
-            await runPdvPersistenceWithRetry(
+            const persisted = await runPdvPersistenceWithRetry(
               () => withPdvPersistenceTimeout(
-                desktopStoreBridge.save(PDV_STORE_KEY, nextSnapshot),
+                desktopStoreBridge.save(PDV_STORE_KEY, nextSnapshot, lastPersistedRevisionRef.current),
                 PDV_STORE_SAVE_TIMEOUT_MS,
                 "Tempo esgotado ao salvar os dados locais do PDV."
               ),
               3
             );
+            lastPersistedRevisionRef.current = persisted.revision;
             lastPersistedSnapshotRef.current = nextSnapshot;
           } catch (error) {
             const message = error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.";
-            setDesktopStoreStatus(`Falha temporária ao salvar no SQLite: ${message}`);
-            setLastEvent("O PDV continua aberto. Foi criado um backup de emergência enquanto o banco local se recupera.");
+            const isConflict = message.includes("REVISION_CONFLICT");
+            if (isConflict) {
+              // A concurrent terminal wrote first. Freeze checkout until data is reloaded.
+              setPersistenceState("error");
+              setDesktopStoreStatus("Conflito entre caixas: os dados do servidor mudaram. Nenhum cadastro ou venda foi sobrescrito. Reabra o PDV após verificar o backup de emergência.");
+              setLastEvent("Conflito de revisão. Operações bloqueadas para proteger a fonte canônica.");
+            } else {
+              setDesktopStoreStatus(`Falha temporária ao salvar no SQLite: ${message}`);
+              setLastEvent("O PDV continua aberto. Foi criado um backup de emergência enquanto o banco local se recupera.");
+            }
             try {
               await desktopPdvBackupBridge?.write({
                 snapshotJson: nextSnapshot,
