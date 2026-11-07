@@ -263,9 +263,9 @@
     },
     {
       "action": "expectVisible",
-      "text": "Lucro bruto apurado",
+      "text": "Lucratividade por venda",
       "exact": false,
-      "name": "gross-profit-no-fake-margin"
+      "name": "gross-profit-visible"
     },
     {
       "action": "screenshot",
