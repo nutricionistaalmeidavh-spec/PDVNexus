@@ -40,6 +40,8 @@ export interface CommercialSettlement {
   kind: "purchase" | "sale" | "expense";
   operatorId?: string;
   operatorName?: string;
+  /** Explicit settlement of this credit installment; ordinary payments remain FIFO. */
+  installmentNumber?: number;
 }
 export interface CommercialExpense {
   id: string;
@@ -60,6 +62,20 @@ export interface CommercialLedger {
   purchases: CommercialPurchase[];
   settlements: CommercialSettlement[];
   expenses: CommercialExpense[];
+  financeActions?: CommercialFinanceAction[];
+}
+export interface CommercialFinanceAction {
+  id:string;
+  action:"due-date-updated" | "tracking-enabled";
+  kind:"purchase" | "sale" | "expense";
+  referenceId:string;
+  installmentNumber?:number;
+  performedAt:string;
+  operatorId:string;
+  operatorName:string;
+  reason:string;
+  previousDueDate?:string;
+  dueDate?:string;
 }
 export interface CommercialCatalogProduct {
   productCode: string;
@@ -129,13 +145,14 @@ export function normalizeCommercialLedger(value: unknown): CommercialLedger {
     suppliers: Array.isArray(obj.suppliers) ? obj.suppliers : [],
     purchases: Array.isArray(obj.purchases) ? obj.purchases : [],
     settlements: Array.isArray(obj.settlements) ? obj.settlements : [],
-    expenses: Array.isArray(obj.expenses) ? obj.expenses : []
+    expenses: Array.isArray(obj.expenses) ? obj.expenses : [],
+    ...(Array.isArray(obj.financeActions)?{financeActions:obj.financeActions}: {})
   };
 }
 export interface CommercialAuditRecord {
   id: string;
   action: "supplier-created" | "purchase-created" | "purchase-received" | "expense-created" |
-    "purchase-settled" | "sale-settled" | "expense-settled";
+    "purchase-settled" | "sale-settled" | "expense-settled" | "due-date-updated" | "tracking-enabled";
   referenceId: string;
   performedAt: string;
   operatorId?: string;
@@ -162,6 +179,9 @@ export function buildCommercialAuditTrail(ledger: CommercialLedger): CommercialA
     events.push({id:"DES:"+expense.id,action:"expense-created",referenceId:expense.id,
       performedAt:expense.occurredAt,operatorId:expense.createdById,operatorName:expense.createdByName,
       amount:expense.amount});
+  for(const action of ledger.financeActions??[])
+    events.push({id:"FIN:"+action.id,action:action.action,referenceId:action.referenceId,
+      performedAt:action.performedAt,operatorId:action.operatorId,operatorName:action.operatorName});
   for(const payment of ledger.settlements)
     events.push({id:"SET:"+payment.id,
       action:payment.kind==="purchase"?"purchase-settled":payment.kind==="sale"?"sale-settled":"expense-settled",
@@ -293,6 +313,51 @@ export function saleCreditTotal(sale: CommercialSale, creditMethods: string[]): 
   const methods = new Set(creditMethods.map((method) => method.toLocaleLowerCase("pt-BR").trim()));
   return money(sale.payments.filter((p) => methods.has(p.method.toLocaleLowerCase("pt-BR").trim())).reduce((sum, p) => sum + p.amount, 0));
 }
+
+export interface SaleInstallmentBalance {
+  number: number;
+  dueDate?: string;
+  amount: number;
+  open: number;
+  settled: number;
+  sources: Array<CommercialSettlement & { amount: number }>;
+}
+/** Applies existing receipts chronologically: directed installment receipts then generic FIFO. */
+export function buildSaleInstallmentBalances(
+  ledger: CommercialLedger, sale: CommercialSale, creditMethods: string[]
+): SaleInstallmentBalance[] {
+  const total=saleCreditTotal(sale, creditMethods);
+  if(total<=0)return [];
+  const schedule=sale.installments;
+  const valid=Array.isArray(schedule)&&schedule.length>0&&
+    schedule.every((item,index)=>item.number===index+1&&Number.isFinite(item.amount)&&item.amount>0&&
+      /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate))&&
+    Math.round(schedule.reduce((sum,item)=>sum+item.amount,0)*100)===Math.round(total*100);
+  const titles=valid?schedule!:[{number:1,amount:total,dueDate:sale.dueDate}];
+  const result:SaleInstallmentBalance[]=titles.map(title=>({
+    number:title.number,amount:money(title.amount),dueDate:title.dueDate,
+    open:money(title.amount),settled:0,sources:[]
+  }));
+  for(const settlement of ledger.settlements){
+    if(settlement.kind!=="sale"||settlement.referenceId!==sale.number)continue;
+    let remaining=money(settlement.amount);
+    const target=settlement.installmentNumber===undefined?null:
+      result.find(item=>item.number===settlement.installmentNumber);
+    if(settlement.installmentNumber!==undefined&&!target)continue; // old malformed record: do not assign to another title
+    const eligible=target?[target]:result;
+    for(const title of eligible){
+      if(remaining<=0)break;
+      const applied=money(Math.min(remaining,title.open));
+      if(applied<=0)continue;
+      title.open=money(title.open-applied);
+      title.settled=money(title.settled+applied);
+      title.sources.push({...settlement,amount:applied});
+      remaining=money(remaining-applied);
+    }
+  }
+  return result;
+}
+
 export function saleOpenBalance(ledger: CommercialLedger, sale: CommercialSale, creditMethods: string[]): number {
   return Math.max(0, money(saleCreditTotal(sale, creditMethods) - settlementsSum(ledger, "sale", sale.number)));
 }
@@ -303,6 +368,12 @@ export function settleReceivable(ledger: CommercialLedger, payment: Omit<Commerc
   if (!sale) throw new Error("Venda não encontrada.");
   const balance = saleOpenBalance(ledger, sale, creditMethods);
   if (money(payment.amount) > balance) throw new Error("Recebimento excede saldo a receber.");
+  if(payment.installmentNumber!==undefined){
+    const title=buildSaleInstallmentBalances(ledger,sale,creditMethods)
+      .find(item=>item.number===payment.installmentNumber);
+    if(!sale.installments?.length || !title)throw new Error("Parcela informada não existe no crediário.");
+    if(money(payment.amount)>title.open)throw new Error("Recebimento excede saldo desta parcela.");
+  }
   return { ...ledger, settlements: [...ledger.settlements, { ...payment, amount: money(payment.amount), kind: "sale" }] };
 }
 /** Legacy expenses without trackPayment have no known liquidation status. */
