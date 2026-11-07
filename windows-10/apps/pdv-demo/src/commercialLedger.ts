@@ -72,6 +72,12 @@ export interface CommercialSaleItem {
   totalPrice?: number;
   unitCostAtSale?: number;
 }
+/** Canonical installment schedule for a credit sale, stored with the completed sale. */
+export interface CommercialSaleInstallment {
+  number: number;
+  dueDate: string;
+  amount: number;
+}
 export interface CommercialSale {
   number: string;
   finalizedAt: string;
@@ -81,6 +87,7 @@ export interface CommercialSale {
   discountPercent?: number;
   items: CommercialSaleItem[];
   payments: Array<{ method: string; amount: number }>;
+  installments?: CommercialSaleInstallment[];
 }
 export interface CommercialSummary {
   purchasesTotal: number;
@@ -216,6 +223,26 @@ export function settlePayable(ledger: CommercialLedger, payment: Omit<Commercial
   if (money(payment.amount) > balance) throw new Error("Pagamento excede saldo a pagar.");
   return { ...ledger, settlements: [...ledger.settlements, { ...payment, amount: money(payment.amount), kind: "purchase" }] };
 }
+/** Deterministic monthly titles. First due day is an anchor; February is clamped, March returns to original day. */
+export function buildCreditInstallments(total: number, firstDueDate: string, count: number): CommercialSaleInstallment[] {
+  if (!Number.isInteger(count) || count < 1 || count > 12) throw new Error("Informe de 1 a 12 parcelas.");
+  const cents = Math.round(total * 100);
+  if (!Number.isFinite(total) || cents < count) throw new Error("Valor insuficiente: cada parcela precisa ter pelo menos um centavo.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDueDate)) throw new Error("Data de vencimento inválida.");
+  const [year, month, day] = firstDueDate.split("-").map(Number);
+  if (year < 2000 || month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate())
+    throw new Error("Data de vencimento inválida.");
+  const base = Math.floor(cents / count), remainder = cents % count;
+  return Array.from({ length: count }, (_, index) => {
+    const absolute = year * 12 + month - 1 + index;
+    const y = Math.floor(absolute / 12), m = absolute % 12 + 1;
+    const maxDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const d = Math.min(day, maxDay);
+    return { number: index + 1, dueDate: [y, String(m).padStart(2,"0"), String(d).padStart(2,"0")].join("-"),
+      amount: (base + (index < remainder ? 1 : 0)) / 100 };
+  });
+}
+
 export function saleCreditTotal(sale: CommercialSale, creditMethods: string[]): number {
   const methods = new Set(creditMethods.map((method) => method.toLocaleLowerCase("pt-BR").trim()));
   return money(sale.payments.filter((p) => methods.has(p.method.toLocaleLowerCase("pt-BR").trim())).reduce((sum, p) => sum + p.amount, 0));

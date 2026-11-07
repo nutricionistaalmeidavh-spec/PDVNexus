@@ -16,6 +16,8 @@ export interface PdvFinanceRow {
   key: string;
   kind: PdvFinanceKind;
   reference: string;
+  /** Optional for sales with a canonical installment schedule. */
+  installmentLabel?: string;
   party: string;
   date: string;
   dueDate?: string;
@@ -77,19 +79,43 @@ export function buildPdvFinanceRows(input: {
       };
     });
 
-  const receivable: PdvFinanceRow[] = sales.map(sale => {
+  const receivable: PdvFinanceRow[] = sales.flatMap(sale => {
     const original = saleCreditTotal(sale, creditMethods);
-    if (original <= 0) return null;
-    const open = saleOpenBalance(ledger, sale, creditMethods);
-    const settled = money(original - open);
+    if (original <= 0) return [];
     const customerId = (sale as CommercialSale & { customerId?: string }).customerId;
-    return {
-      key: `receivable:${sale.number}`, kind: "receivable" as const, reference: sale.number,
-      party: (customerId ? customers.get(customerId) : undefined) ?? (customerId ? `Cliente ${customerId}` : "Cliente não informado"),
-      date: sale.finalizedAt, dueDate: sale.dueDate, original, settled, open, status: statusFor(open, settled),
-      sources: sources("sale", sale.number)
-    };
-  }).filter((row): row is NonNullable<typeof row> => row !== null);
+    const party = (customerId ? customers.get(customerId) : undefined) ??
+      (customerId ? "Cliente " + customerId : "Cliente não informado");
+    // Old sales and incomplete imports remain a single credit title, without invented maturity.
+    const documented = sale.installments;
+    const useSchedule = Array.isArray(documented) && documented.length > 0 &&
+      documented.every((item,i) => item.number===i+1 && item.amount>0 &&
+        Number.isFinite(item.amount) && pdvFinanceDay(item.dueDate)===item.dueDate) &&
+      Math.round(documented.reduce((sum,item)=>sum+item.amount,0)*100)===Math.round(original*100);
+    const titles = useSchedule ? documented! : [{number:1,amount:original,dueDate:sale.dueDate}];
+    const payments = sources("sale",sale.number);
+    let cursor=0, paymentRemaining=payments[0]?.amount ?? 0;
+    return titles.map((title,index) => {
+      let open=money(title.amount);
+      const allocations:PdvFinanceSource[]=[];
+      while (open>0 && cursor<payments.length) {
+        if(paymentRemaining<=0){cursor++;paymentRemaining=payments[cursor]?.amount??0;continue;}
+        const applied=money(Math.min(open,paymentRemaining));
+        if(applied<=0)break;
+        allocations.push({...payments[cursor],amount:applied});
+        open=money(open-applied);
+        paymentRemaining=money(paymentRemaining-applied);
+      }
+      const settled=money(title.amount-open);
+      const installmentLabel = useSchedule ? String(title.number)+"/"+String(titles.length) : undefined;
+      return {
+        key:"receivable:"+sale.number+(useSchedule?":installment:"+String(index+1):""),
+        kind:"receivable" as const, reference:sale.number, party,
+        installmentLabel, date:sale.finalizedAt, dueDate:title.dueDate,
+        original:money(title.amount), settled, open, status:statusFor(open,settled),
+        sources:allocations
+      };
+    });
+  });
 
   const expenses: PdvFinanceRow[] = ledger.expenses.map(row => {
     const open=expenseOpenBalance(ledger,row);
