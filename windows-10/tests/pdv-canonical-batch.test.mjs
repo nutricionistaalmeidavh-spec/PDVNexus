@@ -16,3 +16,14 @@ for (const root of ["../","../../windows-7/"]) {
     assert.match(app, /extensions: \{ \.\.\.preservedPdvExtensionsRef\.current,/);
   });
 }
+
+test("canonical batch updates notify active checkout to reconcile its SQLite revision", () => {
+  for (const root of ["../","../../windows-7/"]) {
+    const batch = fs.readFileSync(new URL(root + "apps/pdv-demo/src/productLabelBatchStore.ts", import.meta.url), "utf8");
+    const app = fs.readFileSync(new URL(root + "apps/pdv-demo/src/PdvDemoApp.tsx", import.meta.url), "utf8");
+    assert.match(batch, /nexus-pdv:canonical-external-write/);
+    assert.match(app, /nexus-pdv:canonical-external-write/);
+    assert.match(app, /lastPersistedRevisionRef\.current = row\.revision/);
+    assert.match(app, /preservedPdvExtensionsRef\.current =/);
+  }
+});
