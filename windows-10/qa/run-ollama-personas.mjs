@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "../tools/artisys-qa/node_modules/playwright/index.mjs";
 import { PDV_BUSINESS_BASELINE, MAIN_PDV_STORE_KEY } from "./pdv-business-baseline.mjs";
-import { CONTROL_SELECTOR, readPersonaConfig, parseDecision, buildPrompt, goalAchieved } from "./ollama-persona-core.mjs";
+import { CONTROL_SELECTOR, readPersonaConfig, parseDecision, buildPrompt, goalAchieved, buildDecisionSchema } from "./ollama-persona-core.mjs";
 
 const cwd = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(cwd, "..");
@@ -28,18 +28,6 @@ async function jsonFetch(url, request, timeoutMs = 90000) {
   }
 }
 
-const schema = {
-  type: "object",
-  properties: {
-    action: { type: "string", enum: ["click", "fill", "press", "select", "done"] },
-    elementId: { type: "integer" },
-    value: { type: "string" },
-    key: { type: "string" },
-    reason: { type: "string" }
-  },
-  required: ["action", "elementId", "value", "key", "reason"]
-};
-
 async function nextDecision(persona, state, history, maxSteps, model) {
   const prompt = buildPrompt(persona, state, history, maxSteps);
   let error;
@@ -48,7 +36,7 @@ async function nextDecision(persona, state, history, maxSteps, model) {
     try {
       const body = {
         model, stream: false, think: false, keep_alive: "2m",
-        format: schema, options: { temperature: 0, num_predict: 160, num_ctx: 8192 },
+        format: buildDecisionSchema(state.controls), options: { temperature: 0, num_predict: 160, num_ctx: 8192 },
         messages: [
           { role: "system", content: "Voce age somente sobre controles visiveis do PDV ficticio. Responda exclusivamente JSON conforme schema. Nunca invente conclusao." },
           { role: "user", content: prompt + (attempt ? "\nSUA RESPOSTA ANTERIOR FOI INVALIDA: " + rejection + ". Escolha exclusivamente um elementId deste conjunto: " + state.controls.map((c) => c.id).join(", ") + "." : "") }
