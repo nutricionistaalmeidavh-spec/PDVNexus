@@ -1,5 +1,5 @@
 import {
-  purchaseOpenBalance, purchaseTotal, saleCreditTotal, saleOpenBalance, expenseOpenBalance,
+  purchaseOpenBalance, purchaseTotal, saleCreditTotal, saleOpenBalance, expenseOpenBalance, buildSaleInstallmentBalances,
   type CommercialLedger, type CommercialSale
 } from "./commercialLedger";
 
@@ -80,41 +80,22 @@ export function buildPdvFinanceRows(input: {
     });
 
   const receivable: PdvFinanceRow[] = sales.flatMap(sale => {
-    const original = saleCreditTotal(sale, creditMethods);
-    if (original <= 0) return [];
-    const customerId = (sale as CommercialSale & { customerId?: string }).customerId;
-    const party = (customerId ? customers.get(customerId) : undefined) ??
-      (customerId ? "Cliente " + customerId : "Cliente não informado");
-    // Old sales and incomplete imports remain a single credit title, without invented maturity.
-    const documented = sale.installments;
-    const useSchedule = Array.isArray(documented) && documented.length > 0 &&
-      documented.every((item,i) => item.number===i+1 && item.amount>0 &&
-        Number.isFinite(item.amount) && pdvFinanceDay(item.dueDate)===item.dueDate) &&
-      Math.round(documented.reduce((sum,item)=>sum+item.amount,0)*100)===Math.round(original*100);
-    const titles = useSchedule ? documented! : [{number:1,amount:original,dueDate:sale.dueDate}];
-    const payments = sources("sale",sale.number);
-    let cursor=0, paymentRemaining=payments[0]?.amount ?? 0;
-    return titles.map((title,index) => {
-      let open=money(title.amount);
-      const allocations:PdvFinanceSource[]=[];
-      while (open>0 && cursor<payments.length) {
-        if(paymentRemaining<=0){cursor++;paymentRemaining=payments[cursor]?.amount??0;continue;}
-        const applied=money(Math.min(open,paymentRemaining));
-        if(applied<=0)break;
-        allocations.push({...payments[cursor],amount:applied});
-        open=money(open-applied);
-        paymentRemaining=money(paymentRemaining-applied);
-      }
-      const settled=money(title.amount-open);
-      const installmentLabel = useSchedule ? String(title.number)+"/"+String(titles.length) : undefined;
-      return {
-        key:"receivable:"+sale.number+(useSchedule?":installment:"+String(index+1):""),
-        kind:"receivable" as const, reference:sale.number, party,
-        installmentLabel, date:sale.finalizedAt, dueDate:title.dueDate,
-        original:money(title.amount), settled, open, status:statusFor(open,settled),
-        sources:allocations
-      };
-    });
+    const original=saleCreditTotal(sale,creditMethods);
+    if(original<=0)return [];
+    const customerId=(sale as CommercialSale & {customerId?:string}).customerId;
+    const party=(customerId?customers.get(customerId):undefined)??
+      (customerId?"Cliente "+customerId:"Cliente não informado");
+    const hasSchedule=Array.isArray(sale.installments)&&sale.installments.length>0 &&
+      Math.round(sale.installments.reduce((n,x)=>n+x.amount,0)*100)===Math.round(original*100);
+    return buildSaleInstallmentBalances(ledger,sale,creditMethods).map((title,index)=>({
+      key:"receivable:"+sale.number+(hasSchedule?":installment:"+(index+1):""),
+      kind:"receivable" as const, reference:sale.number,party,
+      installmentLabel:hasSchedule?(index+1)+"/"+sale.installments!.length:undefined,
+      date:sale.finalizedAt,dueDate:title.dueDate,original:title.amount,
+      settled:title.settled,open:title.open,status:statusFor(title.open,title.settled),
+      sources:title.sources.map(src=>({id:src.id,amount:src.amount,method:src.method,
+        paidAt:src.paidAt,operatorName:src.operatorName}))
+    }));
   });
 
   const expenses: PdvFinanceRow[] = ledger.expenses.map(row => {
@@ -147,7 +128,7 @@ export function filterPdvFinanceRows(rows: readonly PdvFinanceRow[], filters: Pd
 
 export type PdvKanbanColumnId = "vencidas" | "a_vencer" | "parciais" | "liquidadas" | "sem_vencimento" | "registradas";
 export interface PdvFinanceKanbanColumn { id:PdvKanbanColumnId; title:string; rows:PdvFinanceRow[] }
-/** Every item occurs exactly once. Dragging never generates a settlement: only source events change its status. */
+/** Each title belongs to one canonical lane. Partial payments take priority over its due-date lane. */
 export function buildPdvFinanceKanban(rows: readonly PdvFinanceRow[], today: string): PdvFinanceKanbanColumn[] {
   const columns:PdvFinanceKanbanColumn[]=[
     {id:"vencidas",title:"Vencidas",rows:[]},
@@ -161,9 +142,9 @@ export function buildPdvFinanceKanban(rows: readonly PdvFinanceRow[], today: str
     let target:PdvKanbanColumnId;
     if (row.status==="registrada") target="registradas";
     else if (row.open===0) target="liquidadas";
+    else if (row.status==="parcial") target="parciais";
     else if (row.dueDate && row.dueDate<today) target="vencidas";
     else if (row.dueDate) target="a_vencer";
-    else if (row.status==="parcial") target="parciais";
     else target="sem_vencimento";
     columns.find(column=>column.id===target)!.rows.push(row);
   }
