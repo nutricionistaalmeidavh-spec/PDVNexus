@@ -30,16 +30,15 @@ Limites 100/200 eliminados da persistência. Paginação de tela não afeta expo
 5. Esse mecanismo oferece proteção contra perda de atualização, **não substitui um protocolo distribuído de comandos operacionais**; conflitos devem ser recarregados e revalidados antes da reaplicação por um cliente.
 6. A atualização do instalador já vendido continua isolada; nenhuma release nova deve ocupar o canal legado `releases/latest`.
 
-## Fiscal: preparação, não emissão
+## Limite do produto: PDV não fiscal
 
-- Cadastro da empresa já define CNPJ; preparação fiscal no módulo usa **o mesmo CNPJ**, sem criar outro cadastro, e guarda apenas UF, IE e regime tributário. Estados inicialmente expostos: SP/PR/MG/RJ/SC/RS.
-- O sistema **não** possui, nesta implementação, integração autorizada SEFAZ, assinatura de XML com certificado A1, distribuição de documento autorizado, certificado/CSC ou suporte homologado a contingência. Não gera NFC-e com validade fiscal, protocolo, XML assinado ou DANFE fiscal.
-- O gate `buildFiscalReadiness` retorna `issuanceEnabled: false` até existir um adapter efetivo com credenciamento, certificado e homologação. Jamais converter cupom não fiscal em NFC-e por troca de rótulo.
-- Os padrões exigem atualização contínua. Em 06/11/2026 o portal oficial listava NT 2025.002 v1.53 (RTC, 30/10/2026), NT 2026.008 v1.01 (30/10/2026), NT 2026.007 v1.11 (30/10/2026), e Pacote de Schemas 010g v1.03 (26/10/2026). Referência: https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=04BIflQt1aY%3D e https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=BMPFMBoln3w%3D .
-- NF-e e NFC-e para produção ainda exigem implementação de XML, assinatura, transporte e resposta oficial, regras fiscais por produto/UF, testes de homologação e autorização; o cliente deve fornecer seus dados fiscais e credenciais sem inseri-los no repositório.
+- O **PDV Nexus é não fiscal**: registra vendas, compras, pagamentos, estoque, caixa e relatórios gerenciais, sem emissão de NF-e ou NFC-e.
+- Os comprovantes de venda seguem identificados como **CUPOM NÃO FISCAL**. Não existe cadastro, certificado ou fluxo de credenciamento fiscal no módulo comercial.
+- Informações da empresa usadas em recibos permanecem no cadastro canônico da loja; não são duplicadas em perfis de emissão.
+- As integrações de emissão fiscal do **ArtiSys Oficina** são um projeto distinto e não devem ser copiadas ou habilitadas no PDV Nexus.
 
 ## Testes
 
 `cd windows-10 && npm ci && npm run test:pdv-payments && npm run test:pdv-upgrade && npm run typecheck`.
 
-E2E captura as abas de compras, contas, lucratividade e preparação fiscal via Electron em `qa/flows/ui-review.json`. Não publicar nem mesclar antes de QA verde e aprovação.
+E2E captura as abas de compras, contas e lucratividade via Electron em `qa/flows/ui-review.json`. Não publicar nem mesclar antes de QA verde e aprovação.
