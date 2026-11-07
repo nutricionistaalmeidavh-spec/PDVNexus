@@ -101,10 +101,16 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
       const value = resolveRuntimeTokens(step.value);
       await page.evaluate(async ({ key, value, mainPdvStoreKey }) => {
         const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-        window.localStorage.setItem(key, serialized);
         const desktop = window.nexusDesktop;
         const bridge = key === mainPdvStoreKey ? desktop?.pdvStore : desktop?.store;
+        if (key === mainPdvStoreKey && bridge?.save) {
+          // QA fixtures follow production optimistic concurrency; never bypass the canonical revision.
+          const row = await bridge.load(key);
+          await bridge.save(key, serialized, row?.revision ?? 0);
+          return;
+        }
         if (bridge?.save) await bridge.save(key, serialized);
+        window.localStorage.setItem(key, serialized);
       }, { key: step.key, value, mainPdvStoreKey: MAIN_PDV_STORE_KEY });
       break;
     }
