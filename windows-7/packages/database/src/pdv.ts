@@ -811,7 +811,7 @@ export function authorizePdvAction(input: PdvActionAuthorizationInput): PdvActio
   const operatorCanAuthorize = sensitiveRoles.has(input.operator.role);
   const manager = operatorCanAuthorize
     ? input.operator
-    : input.users.find((user) => user.active && sensitiveRoles.has(user.role) && user.managerPassword === input.managerPassword);
+    : input.users.find((user) => user.active && sensitiveRoles.has(user.role) && !!input.managerPassword?.trim() && !!(user.password ?? user.managerPassword) && (user.password ?? user.managerPassword) === input.managerPassword);
 
   if (!manager) {
     throw new Error("Autorizacao de gerente necessaria.");
