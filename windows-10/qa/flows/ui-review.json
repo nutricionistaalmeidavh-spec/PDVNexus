@@ -220,9 +220,8 @@
     },
     {
       "action": "expectVisible",
-      "text": "Gestão comercial",
-      "exact": true,
-      "name": "commercial-dashboard"
+      "name": "commercial-dashboard",
+      "selector": "[data-pdv-commercial-panel=\"true\"] h2"
     },
     {
       "action": "expectVisible",
