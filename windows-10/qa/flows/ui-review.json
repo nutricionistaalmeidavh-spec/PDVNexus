@@ -271,8 +271,7 @@
     },
     {
       "action": "click",
-      "text": "Contas e despesas",
-      "exact": true,
+      "selector": "a[href=\"#/financeiro\"]",
       "name": "open-payables"
     },
     {
@@ -284,6 +283,11 @@
     {
       "action": "screenshot",
       "name": "05b-financeiro-gerencial"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
+      "name": "return-to-commercial-for-profit"
     },
     {
       "action": "click",
