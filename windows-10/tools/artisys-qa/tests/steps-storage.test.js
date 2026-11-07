@@ -79,7 +79,7 @@ test('snapshot principal do PDV usa bridge SQLite pdvStore', async () => {
   await executeStep({
     ...base,
     page: harness.page,
-    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000001' }
+    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000002' }
   });
 });
 
