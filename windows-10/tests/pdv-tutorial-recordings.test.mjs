@@ -28,6 +28,7 @@ test('seis tutoriais usam ações reais do aplicativo e não sequências de imag
       assert.ok(actions.includes('fill') || actions.includes('press') || actions.includes('selectOption'), name);
     }
     assert.ok(!actions.every(action => ['screenshot', 'waitFor', 'waitForTimeout'].includes(action)), name);
+    assert.ok(!actions.includes('desktopStoreSet'), 'sem mutação direta do banco: ' + name);
     assert.ok(definition.durationTargetSec >= 25, name);
   }
 });
@@ -36,6 +37,6 @@ test('os tutoriais críticos validam transações, persistência ou fechamento',
   const read = name => JSON.parse(fs.readFileSync(path.join(qa, manifest.demos[name].file), 'utf8'));
   assert.ok(read('produto-primeira-venda').steps.some(x => x.name === 'finalizar-venda-tutorial'));
   assert.ok(read('abrir-fechar-caixa').steps.some(x => x.name === 'fechamento-conferido'));
-  assert.ok(read('cliente-cadastro').steps.some(x => x.name === 'cliente-persistido'));
-  assert.ok(read('consulta-ajuste-estoque').steps.some(x => x.name === 'estoque-entrada'));
+  assert.ok(read('cliente-cadastro').steps.some(x => x.name === 'cliente-visivel'));
+  assert.ok(read('consulta-ajuste-estoque').steps.some(x => x.name === 'confirmar-movimento'));
 });
