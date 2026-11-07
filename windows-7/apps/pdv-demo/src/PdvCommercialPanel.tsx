@@ -1,9 +1,9 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import {
-  buildFiscalReadiness, emptyCommercialLedger, normalizeCommercialLedger,
+  emptyCommercialLedger, normalizeCommercialLedger,
   purchaseOpenBalance, purchaseTotal, receivePurchase, registerExpense, registerPurchase,
   registerSupplier, saleGrossProfit, saleOpenBalance, settlePayable, settleReceivable,
-  summarizeCommercial, updateCommercialFiscalProfile,
+  summarizeCommercial,
   type CommercialCatalogProduct, type CommercialExpense, type CommercialLedger,
   type CommercialPurchase, type CommercialSale, type CommercialSupplier, type PurchaseLine
 } from "./commercialLedger";
@@ -16,7 +16,6 @@ type Props<P extends CommercialCatalogProduct> = {
   sales: CommercialSale[];
   creditMethods: string[];
   allowed: boolean;
-  issuerCnpj: string;
   onLedgerChange: (next: CommercialLedger) => void;
   onPurchaseReceived: (change: { ledger: CommercialLedger; catalog: P[]; movements: PdvStockMovement[] }) => void;
 };
@@ -46,12 +45,9 @@ function downloadCsv(rows: string[][], filename: string) {
 }
 
 export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Props<P>) {
-  const { ledger, catalog, movements, sales, creditMethods, issuerCnpj, allowed, onLedgerChange, onPurchaseReceived } = props;
-  const [view, setView] = useState<"compras" | "financeiro" | "relatorios" | "fiscal">("compras");
+  const { ledger, catalog, movements, sales, creditMethods, allowed, onLedgerChange, onPurchaseReceived } = props;
+  const [view, setView] = useState<"compras" | "financeiro" | "relatorios">("compras");
   const [message, setMessage] = useState("");
-  const [fiscalUf, setFiscalUf] = useState(ledger.fiscalProfile.uf);
-  const [fiscalStateRegistration, setFiscalStateRegistration] = useState(ledger.fiscalProfile.stateRegistration);
-  const [fiscalTaxRegime, setFiscalTaxRegime] = useState(ledger.fiscalProfile.taxRegime);
   const [supplierName, setSupplierName] = useState("");
   const [supplierDocument, setSupplierDocument] = useState("");
   const [supplierPhone, setSupplierPhone] = useState("");
@@ -72,7 +68,6 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const summary = useMemo(() => summarizeCommercial({ ledger, sales, creditMethods }), [ledger, sales, creditMethods]);
   const receivables = useMemo(() => sales.filter((sale) => saleOpenBalance(ledger, sale, creditMethods) > 0), [ledger, sales, creditMethods]);
   const payables = useMemo(() => ledger.purchases.filter((p) => purchaseOpenBalance(ledger, p) > 0), [ledger]);
-  const fiscal = buildFiscalReadiness({ issuerCnpj, uf: ledger.fiscalProfile.uf, certificateConfigured: false, homologated: false });
   const protect = (fn: () => void) => {
     if (!allowed) { setMessage("Seu perfil não tem permissão para alterar o financeiro."); return; }
     try { fn(); setMessage("Operação registrada para gravação no armazenamento local."); }
@@ -117,9 +112,9 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     onLedgerChange(registerExpense(ledger, row));
     setExpenseAmount("");setExpenseDescription("");
   });
-  const tabs: Array<typeof view> = ["compras", "financeiro", "relatorios", "fiscal"];
+  const tabs: Array<typeof view> = ["compras", "financeiro", "relatorios"];
   const tabLabel: Record<typeof view,string> = { compras:"Compras e fornecedores", financeiro:"Contas e despesas",
-    relatorios:"Lucratividade", fiscal:"Preparação fiscal" };
+    relatorios:"Lucratividade" };
 
   return <section data-pdv-commercial-panel="true" style={{ display: "grid", gap: 14 }}>
     <div style={{ ...split, justifyContent: "space-between" }}>
@@ -215,28 +210,5 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <small>Visualização: 80 vendas recentes. Exportação: todas as vendas do histórico canônico. Lucro bruto não é lucro líquido nem DRE; faltam impostos, despesas e taxas.</small></div>
     </> : null}
 
-    {view === "fiscal" ? <div style={box}><strong>Preparação de emissão fiscal NFC-e / NF-e</strong>
-      <p style={{ margin: 0 }}>CNPJ canônico da empresa: {issuerCnpj || "Não cadastrado em Configurações da Empresa"}.</p>
-      <div style={split}>
-        <select style={field} aria-label="UF fiscal" value={fiscalUf} onChange={(e) => setFiscalUf(e.target.value)}>
-          <option value="">Selecione a UF</option>
-          {["SP","PR","MG","RJ","SC","RS"].map(uf => <option key={uf} value={uf}>{uf}</option>)}
-        </select>
-        <input style={field} aria-label="Inscrição estadual" value={fiscalStateRegistration} onChange={(e) => setFiscalStateRegistration(e.target.value)} placeholder="Inscrição estadual" />
-        <select style={field} aria-label="Regime tributário" value={fiscalTaxRegime} onChange={(e) => setFiscalTaxRegime(e.target.value as "simples" | "normal" | "")}>
-          <option value="">Selecione regime</option><option value="simples">Simples Nacional</option><option value="normal">Regime normal</option>
-        </select>
-        <button disabled={!allowed} style={action} onClick={() => protect(() => {
-          onLedgerChange(updateCommercialFiscalProfile(ledger, {
-            uf: fiscalUf,
-            stateRegistration: fiscalStateRegistration,
-            taxRegime: fiscalTaxRegime
-          }));
-        })}>Salvar preparação fiscal</button>
-      </div>
-      <p style={{ margin: 0 }}>Situação: {fiscal.message}</p>
-      <p style={{ margin: 0 }}>A emissão real continua bloqueada até integração do emissor, credenciamento, certificado válido e homologação por UF.</p>
-      <small>Não são gerados XML autorizado, DANFE, protocolo SEFAZ ou documentos com validade fiscal nesta etapa. Nenhuma credencial é coletada ou armazenada aqui.</small>
-    </div> : null}
   </section>;
 }
