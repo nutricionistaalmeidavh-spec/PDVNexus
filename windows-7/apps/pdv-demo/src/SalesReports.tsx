@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReportSaleIdentity } from "./reportTraining";
 import { buildSalesPdf, buildSalesXlsx, type ExportContext } from "./reportDocuments";
 import {
   SALES_REPORT_FAVORITES_KEY, parseReportFavorites, saveReportFavorite, removeReportFavorite,
@@ -18,6 +19,8 @@ type Props = {
   cashMethodNames?: readonly string[];
   storeName?: string;
   allowed?: boolean;
+  canManageTraining?: boolean;
+  onReportInclusionChange?: (identity: ReportSaleIdentity, action: "exclude" | "restore", reason: string) => void;
 };
 
 const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -41,7 +44,7 @@ const tabs: { key: ReportView; label: string }[] = [
   { key: "sales", label: "Vendas" }
 ];
 
-export function SalesReports({ completedSales, cancelledSales, customers, cashMethodNames = [], storeName = "PDV Nexus", allowed = true }: Props) {
+export function SalesReports({ completedSales, cancelledSales, customers, cashMethodNames = [], storeName = "PDV Nexus", allowed = true, canManageTraining = false, onReportInclusionChange }: Props) {
   const [view, setView] = useState<ReportView>("lines");
   const [period, setPeriod] = useState("30");
   const [from, setFrom] = useState(daysAgo(29));
@@ -51,6 +54,10 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
   const [paymentMethod, setPaymentMethod] = useState("");
   const [operator, setOperator] = useState("");
   const [productCode, setProductCode] = useState("");
+  const [brand, setBrand] = useState("");
+  const [producer, setProducer] = useState("");
+  const [pendingTraining, setPendingTraining] = useState<{ identity: ReportSaleIdentity; action: "exclude" | "restore" } | null>(null);
+  const [trainingReason, setTrainingReason] = useState("");
   const [message, setMessage] = useState("");
 
   const [favorites, setFavorites] = useState<SalesReportFavorite[]>(() => {
@@ -79,18 +86,21 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
     return [...values.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [completedSales, cancelledSales]);
 
-  const filters: ReportFilters = { from, to, query, status, paymentMethod, operator, productCode };
+  const brands = useMemo(() => [...new Set([...completedSales,...cancelledSales].flatMap(s => s.items.map(i => i.brand ?? "").filter(Boolean)))].sort(), [completedSales, cancelledSales]);
+  const producers = useMemo(() => [...new Set([...completedSales,...cancelledSales].flatMap(s => s.items.map(i => i.producer ?? "").filter(Boolean)))].sort(), [completedSales, cancelledSales]);
+  const excludedSales = useMemo(() => completedSales.filter(s => !!s.reportExclusion), [completedSales]);
+  const filters: ReportFilters = { from, to, query, status, paymentMethod, operator, productCode, brand, producer };
   const report = useMemo(() => buildSalesReport(completedSales, cancelledSales, customers, filters, cashMethodNames),
-    [completedSales, cancelledSales, customers, from, to, query, status, paymentMethod, operator, productCode, cashMethodNames]);
+    [completedSales, cancelledSales, customers, from, to, query, status, paymentMethod, operator, productCode, brand, producer, cashMethodNames]);
 
   const comparable = previousComparablePeriod(from, to);
   const previousReport = useMemo(() => compareEnabled && comparable
     ? buildSalesReport(completedSales, cancelledSales, customers,
-      { from: comparable.from, to: comparable.to, query, status, paymentMethod, operator, productCode }, cashMethodNames)
+      { from: comparable.from, to: comparable.to, query, status, paymentMethod, operator, productCode, brand, producer }, cashMethodNames)
     : null, [compareEnabled, comparable?.from, comparable?.to, completedSales, cancelledSales, customers,
-      query, status, paymentMethod, operator, productCode, cashMethodNames]);
+      query, status, paymentMethod, operator, productCode, brand, producer, cashMethodNames]);
   useEffect(() => { setPage(1); setDetail(null); },
-    [from, to, query, status, paymentMethod, operator, productCode, view]);
+    [from, to, query, status, paymentMethod, operator, productCode, brand, producer, view]);
   const dataLength = view === "lines" ? report.lines.length : view === "sales" ? report.sales.length : report[view].length;
   const pageCount = Math.max(1, Math.ceil(dataLength / 100));
   const activePage = Math.min(page, pageCount);
@@ -149,6 +159,8 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
     setPaymentMethod(chosen.filters.paymentMethod || "");
     setOperator(chosen.filters.operator || "");
     setProductCode(chosen.filters.productCode || "");
+    setBrand(chosen.filters.brand || "");
+    setProducer(chosen.filters.producer || "");
     setPeriod("custom");
     setMessage("Filtros do favorito “" + chosen.name + "” aplicados.");
   };
@@ -221,6 +233,25 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
     workerRef.current?.terminate(); workerRef.current = null;
     setBusy(null);
     setMessage("Exportação cancelada; filtros e dados foram preservados.");
+  };
+  const beginTrainingChange = (identity: ReportSaleIdentity, action: "exclude" | "restore") => {
+    if (!canManageTraining || !onReportInclusionChange) return;
+    setPendingTraining({ identity, action });
+    setTrainingReason(action === "exclude" ? "Venda simulada durante treinamento" : "Reinclusão após revisão gerencial");
+    setMessage("");
+  };
+  const confirmTrainingChange = () => {
+    if (!pendingTraining || !canManageTraining || !onReportInclusionChange) return;
+    try {
+      onReportInclusionChange(pendingTraining.identity, pendingTraining.action, trainingReason);
+      setMessage(pendingTraining.action === "exclude"
+        ? "Venda removida dos relatórios gerenciais. Histórico, estoque e caixa não foram alterados."
+        : "Venda reincluída nos relatórios gerenciais.");
+      setPendingTraining(null);
+      setTrainingReason("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível alterar o relatório.");
+    }
   };
   const download = (target: ReportView) => exportDocument("csv", target);
   const noData = report.sales.length === 0;
@@ -307,6 +338,16 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
             {products.map(([code, name]) => <option key={code} value={code}>{name} ({code})</option>)}
           </select>
         </label>
+        <label>Marca
+          <select value={brand} onChange={e => setBrand(e.target.value)}><option value="">Todas</option>
+            {brands.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </label>
+        <label>Empreendimento / produtor
+          <select value={producer} onChange={e => setProducer(e.target.value)}><option value="">Todos</option>
+            {producers.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>
         <label className="nexus-reports__search">Buscar venda, cliente ou produto
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Nome, código, cliente, venda..." />
         </label>
@@ -362,25 +403,28 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
       <div className="nexus-reports__table-wrap">
         <table className="nexus-reports__table">
           {view === "lines" && <>
-            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento do item</th><th>Operador</th><th>Situação</th></tr></thead>
+            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Marca</th><th>Empreendimento</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento do item</th><th>Operador</th><th>Situação</th></tr></thead>
             <tbody>{report.lines.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + r.productCode + "/" + i}>
-              <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td>
+              <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td><td>{r.brand || "Não informada"}</td><td>{r.producer || "Não informado"}</td>
               <td>{number(r.quantity)}</td><td>{currency(r.unitPrice)}</td><td>{currency(r.discount)}</td>
               <td>{currency(r.net)}</td><td>{r.payments}</td><td>{r.operator}</td>
               <td>{r.status === "cancelled" ? "Cancelada" : "Concluída"}</td>
             </tr>)}</tbody>
           </>}
           {view === "sales" && <>
-            <thead><tr><th>Data</th><th>Venda</th><th>Operador</th><th>Cliente</th><th>Itens</th><th>Pagamento(s)</th><th>Situação</th><th>Válido</th><th>Detalhes</th></tr></thead>
+            <thead><tr><th>Data</th><th>Venda</th><th>Operador</th><th>Cliente</th><th>Itens</th><th>Pagamento(s)</th><th>Situação</th><th>Válido</th><th>Detalhes</th>{canManageTraining && <th>Treinamento</th>}</tr></thead>
             <tbody>{report.sales.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + i} onClick={() => setDetail({ number: r.number, date: r.date, terminalId: r.terminalId })} className="nexus-reports__clickable"><td>{r.date}</td>
               <td>#{r.number}</td><td>{r.operator}</td><td>{r.customer}</td><td>{number(r.quantity)}</td>
               <td>{r.payments}</td><td>{r.status === "cancelled" ? "Cancelada" : "Concluída"}</td>
-              <td>{currency(r.total)}</td><td><button type="button" className="nexus-reports__table-action" onClick={() => setDetail({ number: r.number, date: r.date, terminalId: r.terminalId })}>Ver itens</button></td></tr>)}</tbody>
+              <td>{currency(r.total)}</td><td><button type="button" className="nexus-reports__table-action" onClick={() => setDetail({ number: r.number, date: r.date, terminalId: r.terminalId })}>Ver itens</button></td>
+              {canManageTraining && <td>{r.status === "completed" ? <button type="button" className="nexus-reports__table-action"
+                onClick={(e) => { e.stopPropagation(); beginTrainingChange({ number:r.number, finalizedAt:r.date, terminalId:r.terminalId }, "exclude"); }}>Desconsiderar</button> : "—"}</td>}</tr>)}</tbody>
           </>}
           {view !== "lines" && view !== "sales" && <>
             <thead><tr><th>{view === "products" ? "Produto" : view === "payments" ? "Forma de pagamento" : "Operador"}</th>
-              <th>Vendas</th>{view === "products" && <th>Quantidade</th>}<th>Total</th></tr></thead>
+              {view === "products" && <><th>Marca</th><th>Empreendimento</th></>}<th>Vendas</th>{view === "products" && <th>Quantidade</th>}<th>Total</th></tr></thead>
             <tbody>{report[view].slice(offset, offset + 100).map(r => <tr key={r.key}><td><button type="button" className="nexus-reports__table-action" onClick={() => { if (view === "products") setProductCode(r.key); if (view === "payments") setPaymentMethod(r.key); if (view === "operators") setOperator(r.key); setView("sales"); }}>{r.label} · Ver vendas</button></td>
+              {view === "products" && <><td>{r.brand || "Não informada"}</td><td>{r.producer || "Não informado"}</td></>}
               <td>{r.count}</td>{view === "products" && <td>{number(r.quantity)}</td>}
               <td>{currency(r.total)}</td></tr>)}</tbody>
           </>}
@@ -412,8 +456,35 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
         </table>
         <strong>Total válido: {currency(detailSale.total)}</strong>
       </section>}
+      {canManageTraining && pendingTraining && <section className="nexus-reports__training-confirm" role="region" aria-label="Confirmação da venda de treinamento">
+        <strong>{pendingTraining.action === "exclude" ? "Desconsiderar venda nos relatórios" : "Reincluir venda nos relatórios"}</strong>
+        <p>Venda #{pendingTraining.identity.number}. A operação afeta somente relatórios gerenciais e exportações. Não cancela vendas, não devolve mercadorias ao estoque e não modifica pagamentos ou fechamento de caixa.</p>
+        <label>Motivo obrigatório (4 a 200 caracteres)
+          <input maxLength={200} value={trainingReason} onChange={e => setTrainingReason(e.target.value)}
+            placeholder={pendingTraining.action === "exclude" ? "Ex.: Venda simulada durante treinamento" : "Ex.: Venda real, reincluir no relatório"} />
+        </label>
+        <div className="nexus-reports__training-actions">
+          <button type="button" className="nexus-reports__secondary" onClick={() => { setPendingTraining(null); setTrainingReason(""); }}>Cancelar</button>
+          <button type="button" className="nexus-reports__primary" disabled={trainingReason.trim().length < 4}
+            onClick={confirmTrainingChange}>Confirmar {pendingTraining.action === "exclude" ? "exclusão dos relatórios" : "reinclusão"}</button>
+        </div>
+      </section>}
+      {canManageTraining && <details className="nexus-reports__training-archive">
+        <summary>Vendas desconsideradas dos relatórios ({excludedSales.length})</summary>
+        <p>Essas vendas continuam registradas no histórico operacional, incluindo seu estoque e recebimentos originais. Reinclua uma venda para devolvê-la aos totais e exportações gerenciais.</p>
+        {excludedSales.length ? <div className="nexus-reports__table-wrap">
+          <table className="nexus-reports__table"><thead><tr><th>Venda</th><th>Data</th><th>Valor original</th><th>Motivo</th><th>Operador</th><th>Ação</th></tr></thead>
+            <tbody>{excludedSales.map(s => <tr key={[s.terminalId ?? "",s.number,s.finalizedAt].join(":")}>
+              <td>#{s.number}</td><td>{s.finalizedAt}</td><td>{currency(s.netTotal)}</td>
+              <td>{s.reportExclusion?.reason}</td><td>{s.reportExclusion?.excludedBy}</td>
+              <td><button type="button" className="nexus-reports__table-action"
+                onClick={() => beginTrainingChange({ number: s.number, finalizedAt: s.finalizedAt, terminalId: s.terminalId }, "restore")}>Reincluir no relatório</button></td>
+            </tr>)}</tbody>
+          </table>
+        </div> : <p>Não há vendas desconsideradas.</p>}
+      </details>}
       <div className="nexus-reports__footer">
-        <p>Pagamentos por item aparecem apenas quando registrados e conciliados, ou quando a venda possui uma única forma. Vendas mistas antigas permanecem sem associação por item.</p>
+        <p>Marca e empreendimento são preservados conforme registrados na venda. Vendas marcadas como treinamento são omitidas apenas dos relatórios gerenciais; os registros operacionais permanecem intactos.</p>
         {view !== "lines" && <button type="button" className="nexus-reports__secondary" onClick={() => download("lines")}>Baixar itens detalhados (CSV)</button>}
       </div>
       {message && <p className="nexus-reports__feedback" role="status">{message}</p>}
