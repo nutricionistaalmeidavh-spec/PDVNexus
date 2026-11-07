@@ -1,13 +1,16 @@
+import { useState } from "react";
+
 type Props = {
   productReady: boolean;
   cashReady: boolean;
   onAddProduct: () => void;
-  onOpenCash: () => void;
+  onOpenCash: (initialAmount: string) => void;
   onStartSale: () => void;
   onDismiss: () => void;
 };
 
 export function PdvFirstUseGuide({ productReady, cashReady, onAddProduct, onOpenCash, onStartSale, onDismiss }: Props) {
+  const [initialAmount, setInitialAmount] = useState("0");
   return (
     <div data-pdv-first-use-guide="true" role="complementary" aria-label="Primeiros passos para usar o PDV" style={{
       position: "fixed", left: "max(16px, min(240px, 17vw))", bottom: "16px", zIndex: 1600,
@@ -21,7 +24,11 @@ export function PdvFirstUseGuide({ productReady, cashReady, onAddProduct, onOpen
       </div>
       <div style={{ display: "grid", gap: "8px" }}>
         <button type="button" onClick={onAddProduct} style={buttonStyle}>{productReady ? "✓ " : "1. "}Cadastrar um produto</button>
-        <button type="button" onClick={onOpenCash} disabled={cashReady} style={{ ...buttonStyle, opacity: cashReady ? .7 : 1 }}>{cashReady ? "✓ Caixa já aberto" : "2. Abrir o caixa"}</button>
+        {!cashReady ? <label style={{ display: "grid", gap: "4px", fontSize: "12px", color: "#334155", fontWeight: 700 }}>
+          Troco inicial (R$)
+          <input type="text" inputMode="decimal" aria-label="Troco inicial (R$)" value={initialAmount} onChange={(event) => setInitialAmount(event.target.value)} placeholder="Ex.: 150,00 (ou 0,00)" style={{ padding: "9px", border: "1px solid #cbd5e1", borderRadius: 6, width: "100%", boxSizing: "border-box" }} />
+        </label> : null}
+        <button type="button" onClick={() => onOpenCash(initialAmount)} disabled={cashReady} style={{ ...buttonStyle, opacity: cashReady ? .7 : 1 }}>{cashReady ? "✓ Caixa já aberto" : "2. Abrir o caixa"}</button>
         <button type="button" onClick={onStartSale} style={{ ...buttonStyle, background: "#2563eb", color: "#fff", borderColor: "#2563eb" }}>3. Iniciar primeira venda (F2)</button>
       </div>
       <p style={{ margin: "10px 0 0", fontSize: "11px", color: "#64748b" }}>Os cinco produtos de exemplo não são um limite de cadastro.</p>
