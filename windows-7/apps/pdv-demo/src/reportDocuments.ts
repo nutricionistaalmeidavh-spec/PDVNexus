@@ -134,8 +134,7 @@ function zipStored(files: Array<{ path: string; data: Uint8Array }>): Uint8Array
   for (const part of [...local, ...central, end]) { result.set(part, cursor); cursor += part.length; }
   return result;
 }
-export function buildSalesXlsx(report: ReportResult, context: ExportContext): Uint8Array {
-  const tables = reportWorkbookTables(report, context);
+export function buildWorkbookXlsx(tables: WorkbookTable[]): Uint8Array {
   const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
@@ -169,6 +168,10 @@ export function buildSalesXlsx(report: ReportResult, context: ExportContext): Ui
     { path: "xl/styles.xml", data: styles },
     ...tables.map((t, i) => ({ path: "xl/worksheets/sheet" + (i + 1) + ".xml", data: worksheet(t) }))
   ]);
+}
+
+export function buildSalesXlsx(report: ReportResult, context: ExportContext): Uint8Array {
+  return buildWorkbookXlsx(reportWorkbookTables(report,context));
 }
 
 /** A4 paginated standard PDF. Text is encoded as WinAnsi hex, preserving Portuguese characters. */
