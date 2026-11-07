@@ -246,7 +246,7 @@ export function registerExpense(ledger: CommercialLedger, expense: CommercialExp
   required(expense.description, "descrição da despesa");
   required(expense.occurredAt, "data da despesa");
   positive(expense.amount, "Valor da despesa");
-  if (expense.trackPayment && !/^\\d{4}-\\d{2}-\\d{2}$/.test(expense.dueDate ?? "")) throw new Error("Informe o vencimento da despesa controlada (AAAA-MM-DD).");
+  if (expense.trackPayment && !/^\d{4}-\d{2}-\d{2}$/.test(expense.dueDate ?? "")) throw new Error("Informe o vencimento da despesa controlada (AAAA-MM-DD).");
   return { ...ledger, expenses: [...ledger.expenses, { ...expense, amount: money(expense.amount) }] };
 }
 export function saleGrossProfit(sale: CommercialSale): { revenue: number; cost: number | null; grossProfit: number | null } {
