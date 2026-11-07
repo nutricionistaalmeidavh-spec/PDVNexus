@@ -1217,7 +1217,7 @@ export function completePdvSale<
     products: updatedProducts,
     customer: updatedCustomer,
     completedSale,
-    completedSales: [completedSale, ...completedSales].slice(0, maxCompletedSales)
+    completedSales: maxCompletedSales === undefined ? [completedSale, ...completedSales] : [completedSale, ...completedSales].slice(0, maxCompletedSales)
   };
 }
 
