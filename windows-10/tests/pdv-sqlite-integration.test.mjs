@@ -90,6 +90,7 @@ test("SQLite canônico preserva marca, empreendimento, custo da venda e exclusã
  const db=createDb();
  try {
   const payload=state(1);
+  payload.registeredCustomers[0].phone="16999998888";
   payload.catalogProducts[0].brand="ABRINCO";
   payload.catalogProducts[0].producer="Cooperativa Cerrado";
   payload.catalogProducts[0].costPrice=6.5;
@@ -100,6 +101,8 @@ test("SQLite canônico preserva marca, empreendimento, custo da venda e exclusã
   write(db,"loja",payload,new Date().toISOString(),0);
   const product=JSON.parse(db.prepare("SELECT payload_json FROM pdv_products WHERE store_key = 'loja'").get().payload_json);
   const sale=JSON.parse(db.prepare("SELECT payload_json FROM pdv_sales WHERE store_key = 'loja'").get().payload_json);
+  const customer=JSON.parse(db.prepare("SELECT payload_json FROM pdv_customers WHERE store_key = 'loja'").get().payload_json);
+  assert.equal(customer.phone,"16999998888");
   assert.equal(product.producer,"Cooperativa Cerrado");
   assert.equal(sale.reportExclusion.excludedBy,"GER-001");
   assert.equal(sale.items[0].unitCostAtSale,6.5);
