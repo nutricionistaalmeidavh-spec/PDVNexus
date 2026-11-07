@@ -1211,7 +1211,7 @@ export function completePdvSale<
   });
   const updatedCustomer = paymentSummary.creditTotal ? { ...customer, creditUsed: roundCurrency(customer.creditUsed + paymentSummary.creditTotal) } : customer;
   const completedSale = { ...sale, finalizedAt, netTotal, paymentSummary };
-  const maxCompletedSales = input.maxCompletedSales ?? 100;
+  const maxCompletedSales = input.maxCompletedSales;
 
   return {
     products: updatedProducts,
