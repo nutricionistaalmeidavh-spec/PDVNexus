@@ -44,3 +44,11 @@ test("fechamento cego exige PIN de gerente real, mesmo se o operador selecionado
   assert.throws(() => authorizePdvCashManager(users, "senhaerrada"), /gerente|PIN/i);
   assert.equal(authorizePdvCashManager(users, "gerente123").id, "GER-1");
 });
+
+test("conferência de modalidades adicionais não confunde cheque com dinheiro", () => {
+  const counted=buildPdvCashCount({ cash:"100",pix:"0",credit:"0",debit:"0",
+    extras:{CHEQUE:"50,25",OUTROS:"0"} });
+  assert.equal(counted.CHEQUE,50.25);
+  assert.equal(counted.OUTROS,0);
+  assert.throws(() => buildPdvCashCount({cash:"0",pix:"0",credit:"0",debit:"0",extras:{CHEQUE:""}}),/CHEQUE/);
+});
