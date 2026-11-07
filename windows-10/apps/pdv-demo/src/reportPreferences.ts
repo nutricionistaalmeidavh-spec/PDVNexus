@@ -20,6 +20,7 @@ export function normalizeReportFilters(filters: unknown): ReportFilters {
     from: date(input.from), to: date(input.to),
     query: clean(input.query), productCode: clean(input.productCode),
     paymentMethod: clean(input.paymentMethod), operator: clean(input.operator),
+    brand: clean(input.brand), producer: clean(input.producer),
     status: allowedStatus.includes(status) ? status as ReportFilters["status"] : "completed"
   };
 }
