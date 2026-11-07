@@ -380,8 +380,7 @@
     },
     {
       "action": "expectVisible",
-      "text": "A pagar",
-      "exact": false,
+      "selector": "[data-pdv-finance-kpi=\"payable\"]",
       "name": "financeiro-saldos-a-pagar"
     },
     {
