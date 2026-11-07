@@ -1,5 +1,5 @@
 import {
-  purchaseOpenBalance, purchaseTotal, saleCreditTotal, saleOpenBalance,
+  purchaseOpenBalance, purchaseTotal, saleCreditTotal, saleOpenBalance, expenseOpenBalance,
   type CommercialLedger, type CommercialSale
 } from "./commercialLedger";
 
@@ -57,7 +57,7 @@ export function buildPdvFinanceRows(input: {
 }): PdvFinanceRow[] {
   const { ledger, sales, creditMethods } = input;
   const customers = new Map((input.customers ?? []).map(row => [row.id, row.name]));
-  const sources = (kind: "purchase" | "sale", reference: string): PdvFinanceSource[] =>
+  const sources = (kind: "purchase" | "sale" | "expense", reference: string): PdvFinanceSource[] =>
     ledger.settlements.filter(row => row.kind === kind && row.referenceId === reference)
       .map(row => ({ id: row.id, amount: row.amount, method: row.method, paidAt: row.paidAt }));
 
@@ -85,16 +85,21 @@ export function buildPdvFinanceRows(input: {
     return {
       key: `receivable:${sale.number}`, kind: "receivable" as const, reference: sale.number,
       party: (customerId ? customers.get(customerId) : undefined) ?? (customerId ? `Cliente ${customerId}` : "Cliente não informado"),
-      date: sale.finalizedAt, original, settled, open, status: statusFor(open, settled),
+      date: sale.finalizedAt, dueDate: sale.dueDate, original, settled, open, status: statusFor(open, settled),
       sources: sources("sale", sale.number)
     };
   }).filter((row): row is NonNullable<typeof row> => row !== null);
 
-  const expenses: PdvFinanceRow[] = ledger.expenses.map(row => ({
-    key: `expense:${row.id}`, kind: "expense", reference: row.id,
-    party: row.description, date: row.occurredAt,
-    original: row.amount, settled: null, open: null, status: "registrada", sources: []
-  }));
+  const expenses: PdvFinanceRow[] = ledger.expenses.map(row => {
+    const open=expenseOpenBalance(ledger,row);
+    const settled=open===null?null:money(row.amount-open);
+    return {
+      key:`expense:${row.id}`,kind:"expense",reference:row.id,party:row.description,
+      date:row.occurredAt,dueDate:row.dueDate,original:row.amount,settled,open,
+      status:open===null?"registrada":statusFor(open,settled ?? 0),
+      sources:sources("expense",row.id)
+    };
+  });
   return [...payable, ...receivable, ...expenses].sort((a, b) =>
     (pdvFinanceDay(b.date) ?? "").localeCompare(pdvFinanceDay(a.date) ?? "") || a.key.localeCompare(b.key));
 }
@@ -111,4 +116,29 @@ export function filterPdvFinanceRows(rows: readonly PdvFinanceRow[], filters: Pd
     }
     return true;
   });
+}
+
+export type PdvKanbanColumnId = "vencidas" | "a_vencer" | "parciais" | "liquidadas" | "sem_vencimento" | "registradas";
+export interface PdvFinanceKanbanColumn { id:PdvKanbanColumnId; title:string; rows:PdvFinanceRow[] }
+/** Every item occurs exactly once. Dragging never generates a settlement: only source events change its status. */
+export function buildPdvFinanceKanban(rows: readonly PdvFinanceRow[], today: string): PdvFinanceKanbanColumn[] {
+  const columns:PdvFinanceKanbanColumn[]=[
+    {id:"vencidas",title:"Vencidas",rows:[]},
+    {id:"a_vencer",title:"A vencer",rows:[]},
+    {id:"parciais",title:"Parciais",rows:[]},
+    {id:"liquidadas",title:"Liquidadas",rows:[]},
+    {id:"sem_vencimento",title:"Sem vencimento",rows:[]},
+    {id:"registradas",title:"Registradas",rows:[]}
+  ];
+  for (const row of rows) {
+    let target:PdvKanbanColumnId;
+    if (row.status==="registrada") target="registradas";
+    else if (row.open===0) target="liquidadas";
+    else if (row.dueDate && row.dueDate<today) target="vencidas";
+    else if (row.dueDate) target="a_vencer";
+    else if (row.status==="parcial") target="parciais";
+    else target="sem_vencimento";
+    columns.find(column=>column.id===target)!.rows.push(row);
+  }
+  return columns;
 }
