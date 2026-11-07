@@ -78,7 +78,7 @@ async function runScenario(name,hash,seed) {
     await page.addScriptTag({path:axeScript});
     result.a11y=await page.evaluate(async()=>{
       const a=await window.axe.run(document,{runOnly:{type:"tag",values:["wcag2a","wcag2aa","wcag21a","wcag21aa"]}});
-      return a.violations.map(v=>({id:v.id,impact:v.impact,description:v.help,nodes:v.nodes.length}));
+      return a.violations.map(v=>({id:v.id,impact:v.impact,description:v.help,nodes:v.nodes.length,targets:v.nodes.slice(0,5).map(n=>({target:n.target,html:n.html.slice(0,200),summary:(n.failureSummary||"").slice(0,200)}))}));
     });
     await page.addScriptTag({path:gremlinsScript});
     const executed=await page.evaluate(async ({seed,actions})=>{

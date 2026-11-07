@@ -311,3 +311,25 @@
     font-size: 12px !important;
   }
 }
+
+
+/* P0 accessibility and readability: final CSS layer (overrides dense layout).
+   Keep payment layout/keyboard shortcuts unchanged; enlarge operable targets. */
+@media (min-width: 901px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(6) > button {
+    min-height: 34px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+  }
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"][data-cashier-layout="reference-v1"] main > section > section > aside:has(> div[data-sale-observation-anchor="true"]) > div:nth-of-type(7) {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    color: #334155 !important;
+  }
+}
+
+.pdv-density-root [data-shell="pdv-nexus"] :is(button, input, select, textarea, [role="region"]):focus-visible {
+  outline: 3px solid #f59e0b !important;
+  outline-offset: 2px !important;
+}

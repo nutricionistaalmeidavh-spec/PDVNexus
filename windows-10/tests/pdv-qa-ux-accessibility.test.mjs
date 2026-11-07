@@ -24,3 +24,14 @@ test("caixa usa fonte legivel para estado vazio, busca, categorias e status",()=
  assert.match(style("cashierEmptyState"),/color: "#334155"/);
  assert.match(style("cashierSurface"),/maxWidth: "1440px"/);
 });
+
+test("ajustes de leitura atingem a folha CSS final, nao apenas estilos inline sobrescritos",()=>{
+ const entry=readFileSync(new URL("../apps/pdv-demo/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../apps/pdv-demo/src/pdv-cashier-legibility-fix.css",import.meta.url),"utf8");
+ assert.match(entry,/import "\.\/pdv-cashier-legibility-fix\.css"/);
+ assert.match(css,/P0 accessibility and readability: final CSS layer/);
+ assert.match(css,/min-height: 34px !important/);
+ assert.match(css,/font-size: 12px !important/);
+ assert.match(css,/:focus-visible/);
+ assert.match(css,/outline: 3px solid #f59e0b/);
+});
