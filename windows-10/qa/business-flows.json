@@ -984,11 +984,11 @@
           "name": "delete-em-campo-nao-remove"
         },
         {
-          "action": "click",
-          "text": "Delete / Remover ultimo item",
-          "exact": true,
-          "name": "remover-ultima-por-botao",
-          "holdMs": 150
+          "action": "press",
+          "name": "remover-ultima-com-foco-fora-do-campo",
+          "holdMs": 150,
+          "selector": "a[href=\"#/caixa\"]",
+          "key": "Delete"
         },
         {
           "action": "expectVisible",
