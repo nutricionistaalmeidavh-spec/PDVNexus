@@ -73,3 +73,10 @@ test("Kanban QA arrasta entre colunas, grava vencimento e baixas na base canôni
  const qa=readFileSync(new URL("../tools/artisys-qa/src/steps.js",import.meta.url),"utf8");
  assert.match(qa,/case 'dragTo'/);
 });
+
+test("persistência SQLite reage a alterações isoladas do commercialLedger, sem depender de vendas ou estoque",()=>{
+ for (const edition of ["windows-10","windows-7"]) {
+  const app=readFileSync(new URL(`../../${edition}/apps/pdv-demo/src/PdvDemoApp.tsx`,import.meta.url),"utf8");
+  assert.match(app,/\[persistenceState, catalogProducts,[^\]]*commercialLedger\]\);/);
+ }
+});
