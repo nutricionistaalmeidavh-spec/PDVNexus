@@ -276,20 +276,20 @@
     },
     {
       "action": "click",
-      "selector": "a[href=\"#/financeiro\"]",
+      "selector": "a[href=\"#/vendas\"]",
       "name": "abrir-financeiro",
       "holdMs": 800
     },
     {
       "action": "expectVisible",
-      "text": "Resumo local das vendas finalizadas",
+      "text": "Resumo acumulado de vendas",
       "exact": true,
       "name": "financeiro-aberto",
       "holdMs": 350
     },
     {
       "action": "expectText",
-      "selector": ":nth-match(article:has(h2:has-text(\"Resumo local das vendas finalizadas\")) strong, 2)",
+      "selector": ":nth-match(article:has(h2:has-text(\"Resumo acumulado de vendas\")) strong, 2)",
       "expected": "100,89",
       "name": "financeiro-total-vendido",
       "holdMs": 250

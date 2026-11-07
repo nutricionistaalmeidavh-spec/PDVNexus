@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPdvCashCount, shouldHandlePdvHotkey } from "../apps/pdv-demo/src/cashierSafety";
+import { buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "../apps/pdv-demo/src/cashierSafety";
 
 test("fechamento: dinheiro, PIX, crédito e débito são conferidos individualmente", () => {
   assert.deepEqual(buildPdvCashCount({cash:"100,50",pix:"20",credit:"135.75",debit:"60"}), {
@@ -32,4 +32,23 @@ test("atalhos da operação funcionam com o leitor focado, sem confundir Delete 
   assert.equal(shouldHandlePdvHotkey("F6",context),true);
   assert.equal(shouldHandlePdvHotkey("F8",context),true);
   assert.equal(shouldHandlePdvHotkey("Delete",context),false);
+});
+
+test("fechamento cego exige PIN de gerente real, mesmo se o operador selecionado for gerente", () => {
+  const users = [
+    { id: "OP-1", name: "Caixa", role: "cashier" as const, active: true, password: "caixa123" },
+    { id: "GER-1", name: "Gerente", role: "manager" as const, active: true, managerPassword: "gerente123" }
+  ];
+  assert.throws(() => authorizePdvCashManager(users, ""), /PIN/);
+  assert.throws(() => authorizePdvCashManager(users, "caixa123"), /gerente|PIN/i);
+  assert.throws(() => authorizePdvCashManager(users, "senhaerrada"), /gerente|PIN/i);
+  assert.equal(authorizePdvCashManager(users, "gerente123").id, "GER-1");
+});
+
+test("conferência de modalidades adicionais não confunde cheque com dinheiro", () => {
+  const counted=buildPdvCashCount({ cash:"100",pix:"0",credit:"0",debit:"0",
+    extras:{CHEQUE:"50,25",OUTROS:"0"} });
+  assert.equal(counted.CHEQUE,50.25);
+  assert.equal(counted.OUTROS,0);
+  assert.throws(() => buildPdvCashCount({cash:"0",pix:"0",credit:"0",debit:"0",extras:{CHEQUE:""}}),/CHEQUE/);
 });

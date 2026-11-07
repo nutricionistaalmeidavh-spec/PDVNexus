@@ -301,6 +301,7 @@ export interface PdvCashClosingInput {
   sales: PdvCashClosingSale[];
   countedByMethod: Record<string, number>;
   cashMethods?: string[];
+  excludedMethods?: string[];
 }
 
 export interface PdvCashClosingSummary {
@@ -735,19 +736,21 @@ export function getPdvLowStockAlerts<TProduct extends PdvStockMovementProduct>(p
 }
 
 export function closePdvCashSession(input: PdvCashClosingInput): PdvCashClosingSummary {
-  const cashMethods = new Set(input.cashMethods ?? ["A VISTA"]);
+  const cashMethods = new Set(input.cashMethods?.length ? input.cashMethods : ["A VISTA"]);
+  const excludedMethods = new Set(input.excludedMethods ?? []);
   const withdrawalTotal = roundCurrency(input.withdrawals.reduce((sum, withdrawal) => sum + normalizePaymentAmount(withdrawal.amount), 0));
   const salesTotal = roundCurrency(input.sales.reduce((sum, sale) => sum + normalizePaymentAmount(sale.netTotal), 0));
   const expectedByMethod = input.sales.reduce<Record<string, number>>((acc, sale) => {
     for (const payment of sale.payments) {
+      if (excludedMethods.has(payment.method)) continue;
       acc[payment.method] = roundCurrency((acc[payment.method] ?? 0) + normalizePaymentAmount(payment.amount));
     }
     return acc;
   }, {});
 
-  for (const method of cashMethods) {
-    expectedByMethod[method] = roundCurrency((expectedByMethod[method] ?? 0) + input.initialAmount - withdrawalTotal);
-  }
+  // O fundo inicial e as sangrias pertencem a uma gaveta, não a cada nome de pagamento em dinheiro.
+  const primaryCashMethod = cashMethods.values().next().value ?? "A VISTA";
+  expectedByMethod[primaryCashMethod] = roundCurrency((expectedByMethod[primaryCashMethod] ?? 0) + input.initialAmount - withdrawalTotal);
 
   const methods = new Set([...Object.keys(expectedByMethod), ...Object.keys(input.countedByMethod)]);
   const countedByMethod: Record<string, number> = {};
@@ -811,7 +814,7 @@ export function authorizePdvAction(input: PdvActionAuthorizationInput): PdvActio
   const operatorCanAuthorize = sensitiveRoles.has(input.operator.role);
   const manager = operatorCanAuthorize
     ? input.operator
-    : input.users.find((user) => user.active && sensitiveRoles.has(user.role) && user.managerPassword === input.managerPassword);
+    : input.users.find((user) => user.active && sensitiveRoles.has(user.role) && !!input.managerPassword?.trim() && !!(user.password ?? user.managerPassword) && (user.password ?? user.managerPassword) === input.managerPassword);
 
   if (!manager) {
     throw new Error("Autorizacao de gerente necessaria.");

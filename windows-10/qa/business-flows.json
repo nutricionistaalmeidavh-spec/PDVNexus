@@ -30,12 +30,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/fechamento\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/fechamento",
           "name": "financeiro-route"
         },
         {
@@ -99,12 +99,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/fechamento\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/fechamento",
           "name": "financeiro-route"
         },
         {
@@ -173,7 +173,26 @@
           "action": "desktopStoreSet",
           "key": "nexus-core:pdv-store:v1",
           "name": "reset-pdv",
-          "value": {}
+          "value": {
+            "extensions": {
+              "users": [
+                {
+                  "id": "OP-001",
+                  "name": "Operador Caixa",
+                  "role": "cashier",
+                  "active": true
+                },
+                {
+                  "id": "GER-001",
+                  "name": "Gerente",
+                  "role": "manager",
+                  "active": true,
+                  "managerPassword": "123456"
+                }
+              ],
+              "currentOperatorId": "OP-001"
+            }
+          }
         },
         {
           "action": "reload",
@@ -187,12 +206,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/fechamento\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/fechamento",
           "name": "financeiro-route"
         },
         {
@@ -232,6 +251,24 @@
           "name": "debito-contado"
         },
         {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+          "value": "0",
+          "name": "cheques-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir OUTROS\"]",
+          "value": "0",
+          "name": "outros-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"PIN do gerente (obrigatório)\"]",
+          "value": "123456",
+          "name": "autorizacao-gerente"
+        },
+        {
           "action": "click",
           "text": "Fechar com conferência",
           "exact": true,
@@ -248,6 +285,13 @@
           "path": "extensions.cashClosings.0.status",
           "expected": "balanced",
           "name": "fechamento-conferido"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "extensions.auditLogs.0.action",
+          "expected": "close-cash",
+          "name": "auditoria-fechamento"
         }
       ]
     },
@@ -266,7 +310,26 @@
           "action": "desktopStoreSet",
           "key": "nexus-core:pdv-store:v1",
           "name": "reset-pdv",
-          "value": {}
+          "value": {
+            "extensions": {
+              "users": [
+                {
+                  "id": "OP-001",
+                  "name": "Operador Caixa",
+                  "role": "cashier",
+                  "active": true
+                },
+                {
+                  "id": "GER-001",
+                  "name": "Gerente",
+                  "role": "manager",
+                  "active": true,
+                  "managerPassword": "123456"
+                }
+              ],
+              "currentOperatorId": "OP-001"
+            }
+          }
         },
         {
           "action": "reload",
@@ -280,12 +343,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/fechamento\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/fechamento",
           "name": "financeiro-route"
         },
         {
@@ -325,6 +388,24 @@
           "name": "debito-contado"
         },
         {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+          "value": "0",
+          "name": "cheques-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir OUTROS\"]",
+          "value": "0",
+          "name": "outros-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"PIN do gerente (obrigatório)\"]",
+          "value": "123456",
+          "name": "autorizacao-gerente"
+        },
+        {
           "action": "click",
           "text": "Fechar com conferência",
           "exact": true,
@@ -341,6 +422,13 @@
           "path": "extensions.cashClosings.0.status",
           "expected": "divergent",
           "name": "fechamento-divergente"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "extensions.auditLogs.0.action",
+          "expected": "close-cash",
+          "name": "auditoria-fechamento"
         }
       ]
     },
@@ -1782,12 +1870,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/vendas\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/vendas",
           "name": "financeiro-route"
         },
         {
@@ -1941,12 +2029,12 @@
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/vendas\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/vendas",
           "name": "financeiro-route"
         },
         {
@@ -2355,18 +2443,18 @@
         },
         {
           "action": "waitFor",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/vendas\"]",
           "name": "financeiro-ready",
           "timeoutMs": 20000
         },
         {
           "action": "click",
-          "selector": "a[href=\"#/financeiro\"]",
+          "selector": "a[href=\"#/vendas\"]",
           "name": "open-financeiro"
         },
         {
           "action": "expectURL",
-          "includes": "#/financeiro",
+          "includes": "#/vendas",
           "name": "financeiro-route"
         },
         {

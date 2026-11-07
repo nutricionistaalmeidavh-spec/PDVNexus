@@ -39,7 +39,7 @@ export const PDV_BUSINESS_BASELINE = Object.freeze({
     lastReceiptText: "",
     users: [
       { id: "OP-001", name: "Operador Caixa", role: "cashier", active: true },
-      { id: "GER-001", name: "Gerente", role: "manager", active: true }
+      { id: "GER-001", name: "Gerente", role: "manager", active: true, managerPassword: "123456" }
     ],
     currentOperatorId: "OP-001",
     auditLogs: [],

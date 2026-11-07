@@ -132,12 +132,12 @@
     },
     {
       "action": "click",
-      "selector": "a[href=\"#/financeiro\"]",
+      "selector": "a[href=\"#/vendas\"]",
       "name": "open-financeiro"
     },
     {
       "action": "expectURL",
-      "includes": "#/financeiro",
+      "includes": "#/vendas",
       "name": "financeiro-route"
     },
     {
@@ -206,7 +206,37 @@
     },
     {
       "action": "screenshot",
-      "name": "04-financeiro"
+      "name": "04-vendas-e-relatorios"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/financeiro\"]",
+      "name": "open-cadastros-financeiros"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Formas de pagamento",
+      "exact": true,
+      "name": "payment-methods-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "04c-financeiro-cadastros"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/fechamento\"]",
+      "name": "open-blind-closing"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Conferência de caixa",
+      "exact": true,
+      "name": "blind-cash-closing-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "04d-fechamento-caixa"
     },
     {
       "action": "click",
