@@ -20,6 +20,10 @@ const parseCount = (raw: string, label: string): number => {
   if (!Number.isFinite(value) || value < 0) throw new Error(`Valor inválido em ${label}.`);
   return Math.round((value + Number.EPSILON) * 100) / 100;
 };
+export function parsePdvOpeningAmount(raw: string): number {
+  return parseCount(raw, "troco inicial");
+}
+
 export function buildPdvCashCount(input: PdvCashCountDraft): Record<string, number> {
   return {
     "A VISTA": parseCount(input.cash, "dinheiro contado"),
