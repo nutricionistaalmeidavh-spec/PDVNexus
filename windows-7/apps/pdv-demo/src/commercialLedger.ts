@@ -31,7 +31,7 @@ export interface CommercialSettlement {
   amount: number;
   paidAt: string;
   method: string;
-  kind: "purchase" | "sale";
+  kind: "purchase" | "sale" | "expense";
 }
 export interface CommercialExpense {
   id: string;
@@ -39,6 +39,9 @@ export interface CommercialExpense {
   amount: number;
   category: string;
   occurredAt: string;
+  /** Optional on old records: legacy expenses are not automatically treated as paid or pending. */
+  dueDate?: string;
+  trackPayment?: boolean;
 }
 export interface CommercialLedger {
   suppliers: CommercialSupplier[];
@@ -66,6 +69,8 @@ export interface CommercialSaleItem {
 export interface CommercialSale {
   number: string;
   finalizedAt: string;
+  /** Optional: old credit sales did not register a due date. */
+  dueDate?: string;
   netTotal: number;
   discountPercent?: number;
   items: CommercialSaleItem[];
@@ -221,12 +226,27 @@ export function settleReceivable(ledger: CommercialLedger, payment: Omit<Commerc
   if (money(payment.amount) > balance) throw new Error("Recebimento excede saldo a receber.");
   return { ...ledger, settlements: [...ledger.settlements, { ...payment, amount: money(payment.amount), kind: "sale" }] };
 }
+/** Legacy expenses without trackPayment have no known liquidation status. */
+export function expenseOpenBalance(ledger: CommercialLedger, expense: CommercialExpense): number | null {
+  if (!expense.trackPayment) return null;
+  return Math.max(0, money(expense.amount - settlementsSum(ledger, "expense", expense.id)));
+}
+export function settleExpense(ledger: CommercialLedger, payment: Omit<CommercialSettlement, "kind">): CommercialLedger {
+  validateSettlement(ledger,payment);
+  const expense = ledger.expenses.find(row=>row.id===payment.referenceId);
+  if (!expense) throw new Error("Despesa não encontrada.");
+  const balance = expenseOpenBalance(ledger,expense);
+  if (balance===null) throw new Error("Despesa histórica sem controle de pagamento; rastreamento não habilitado.");
+  if (money(payment.amount)>balance) throw new Error("Pagamento excede saldo da despesa.");
+  return {...ledger,settlements:[...ledger.settlements,{...payment,amount:money(payment.amount),kind:"expense"}]};
+}
 export function registerExpense(ledger: CommercialLedger, expense: CommercialExpense): CommercialLedger {
   unique(ledger.expenses, expense.id);
   required(expense.id, "identificador da despesa");
   required(expense.description, "descrição da despesa");
   required(expense.occurredAt, "data da despesa");
   positive(expense.amount, "Valor da despesa");
+  if (expense.trackPayment && !/^\\d{4}-\\d{2}-\\d{2}$/.test(expense.dueDate ?? "")) throw new Error("Informe o vencimento da despesa controlada (AAAA-MM-DD).");
   return { ...ledger, expenses: [...ledger.expenses, { ...expense, amount: money(expense.amount) }] };
 }
 export function saleGrossProfit(sale: CommercialSale): { revenue: number; cost: number | null; grossProfit: number | null } {
