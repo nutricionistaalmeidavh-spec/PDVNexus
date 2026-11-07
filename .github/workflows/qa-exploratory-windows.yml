@@ -1,0 +1,86 @@
+name: QA - Exploracao Real (Gremlins + axe)
+
+on:
+  push:
+    branches: [qa/ollama-personas-actions-20261106]
+    paths:
+      - ".github/workflows/qa-exploratory-windows.yml"
+      - "windows-10/qa/run-exploratory-matrix.mjs"
+      - "windows-10/qa/exploratory-metrics.mjs"
+      - "windows-10/tests/pdv-qa-exploratory-metrics.test.mjs"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/qa-exploratory-windows.yml"
+      - "windows-10/qa/run-exploratory-matrix.mjs"
+      - "windows-10/qa/exploratory-metrics.mjs"
+      - "windows-10/tests/pdv-qa-exploratory-metrics.test.mjs"
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "Sementes por modulo (1 a 4)"
+        default: "2"
+        required: false
+        type: choice
+        options: ["1", "2", "3", "4"]
+      actions:
+        description: "Acoes Gremlins por modulo (10 a 200)"
+        default: "50"
+        required: false
+        type: choice
+        options: ["10", "25", "50", "100", "200"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdv-exploratory-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  exploratory-electron:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+      - name: Instalar projeto e ferramentas OSS
+        run: |
+          npm ci
+          npm ci --prefix tools/artisys-qa
+          npm install --no-save --no-package-lock --ignore-scripts --prefix tools/artisys-qa gremlins.js@2.2.0 axe-core@4.14.0
+      - name: Testar oraculos de invariantes canonicas
+        run: node --test tests/pdv-qa-exploratory-metrics.test.mjs
+      - name: Compilar renderer Electron
+        run: npm run build:pdv-demo
+      - name: Explorar 7 modulos com Gremlins e axe-core
+        run: |
+          $seeds = "${{ inputs.seeds || '2' }}"
+          $actions = "${{ inputs.actions || '50' }}"
+          node qa/run-exploratory-matrix.mjs --output qa-exploration-artifacts --seeds $seeds --actions $actions
+          if ($LASTEXITCODE -ne 0) { throw "QA exploratorio encontrou falhas ou erros de infraestrutura; consulte artifacts." }
+      - name: Publicar resumo
+        if: always()
+        run: |
+          if (Test-Path "qa-exploration-artifacts/report.md") {
+            Get-Content "qa-exploration-artifacts/report.md" -Raw | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+      - name: Evidencias e reprodutibilidade
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-QA-Gremlins-Axe
+          path: windows-10/qa-exploration-artifacts/
+          retention-days: 3
+          if-no-files-found: warn
