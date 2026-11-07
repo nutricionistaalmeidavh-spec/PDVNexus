@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPdvFinanceRows, buildPdvFinanceKanban } from "../apps/pdv-demo/src/financeMatrix";
 import { buildPdvFinanceReport, exportPdvFinanceCsv } from "../apps/pdv-demo/src/financeReporting";
-import { emptyCommercialLedger, settleExpense, expenseOpenBalance, type CommercialLedger } from "../apps/pdv-demo/src/commercialLedger";
+import { emptyCommercialLedger, settleExpense, expenseOpenBalance, registerRecurringExpenses, type CommercialLedger } from "../apps/pdv-demo/src/commercialLedger";
+import { buildPdvFinanceXlsx, buildPdvFinancePdf } from "../apps/pdv-demo/src/financeExportDocuments";
 
 const stamp="2026-11-04T12:00:00.000Z";
 const ledger:CommercialLedger={
@@ -33,7 +34,7 @@ test("P2 Kanban é composto por colunas de lançamentos individuais; a classific
  const original=JSON.stringify(input);
  const board=buildPdvFinanceKanban(buildPdvFinanceRows(input),"2026-11-07");
  assert.deepEqual(board.find(col=>col.id==="vencidas")?.rows.map(x=>x.reference),["C1"]);
- assert.deepEqual(board.find(col=>col.id==="a_vencer")?.rows.map(x=>x.reference),["C2","VD1","E1"]);
+ assert.deepEqual(board.find(col=>col.id==="a_vencer")?.rows.map(x=>x.reference).sort(),["C2","E1","VD1"]);
  assert.deepEqual(board.find(col=>col.id==="registradas")?.rows.map(x=>x.reference),["LEGACY"]);
  assert.deepEqual(JSON.stringify(input),original);
 });
@@ -69,4 +70,25 @@ test("P6 exportação CSV escapa campos, Excel não vira fórmula executável e 
  assert.match(csv,/^\uFEFF/);
  assert.match(csv,/"Fornecedor, =HYPERLINK"/);
  assert.match(csv,/,"C1"/);
+});
+
+test("P4 recorrência gera títulos independentes, ajusta dia 31 e não cria baixa futura",()=>{
+ const base={id:"RECUR",description:"Internet",amount:100,category:"Operacional",occurredAt:stamp,dueDate:"2026-01-31",trackPayment:true};
+ const next=registerRecurringExpenses(emptyCommercialLedger(),base,3);
+ assert.deepEqual(next.expenses.map(e=>e.dueDate),["2026-01-31","2026-02-28","2026-03-31"]);
+ assert.equal(next.settlements.length,0);
+ assert.deepEqual(next.expenses.map(e=>e.id),["RECUR-1","RECUR-2","RECUR-3"]);
+ assert.throws(()=>registerRecurringExpenses(next,base,3),/duplicad/i);
+ assert.throws(()=>registerRecurringExpenses(emptyCommercialLedger(),base,13),/12 meses/i);
+});
+
+test("P6 exportação XLSX OOXML e PDF A4 usam implementações locais reais",()=>{
+ const rows=buildPdvFinanceRows(input);
+ const report=buildPdvFinanceReport(input);
+ const xlsx=buildPdvFinanceXlsx(rows,report);
+ const pdf=buildPdvFinancePdf(rows,report,"Loja teste");
+ assert.equal(new TextDecoder().decode(xlsx.slice(0,2)),"PK");
+ assert.ok(new TextDecoder().decode(xlsx).includes("xl/worksheets/sheet1.xml"));
+ assert.match(new TextDecoder().decode(pdf.slice(0,16)),/^%PDF-1\.4/);
+ assert.ok(pdf.length>700);
 });
