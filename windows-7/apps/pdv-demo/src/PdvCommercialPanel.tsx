@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   buildFiscalReadiness, emptyCommercialLedger, normalizeCommercialLedger,
   purchaseOpenBalance, purchaseTotal, receivePurchase, registerExpense, registerPurchase,
@@ -27,12 +27,12 @@ const numberInput = (value: string) => {
   const n = Number(text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text);
   return n;
 };
-const box: React.CSSProperties = { background: "#fff", border: "1px solid #dae3ed", borderRadius: 9, padding: 14, display: "grid", gap: 10 };
-const field: React.CSSProperties = { padding: "9px 10px", minHeight: 38, borderRadius: 6, border: "1px solid #cbd5e1", minWidth: 0, flex: "1 1 145px" };
-const action: React.CSSProperties = { padding: "9px 13px", minHeight: 38, borderRadius: 6, background: "#1d4ed8", color: "#fff", border: 0, cursor: "pointer" };
-const split: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" };
-const table: React.CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 520 };
-const cell: React.CSSProperties = { padding: "9px", borderBottom: "1px solid #e2e8f0", textAlign: "left" };
+const box: CSSProperties = { background: "#fff", border: "1px solid #dae3ed", borderRadius: 9, padding: 14, display: "grid", gap: 10 };
+const field: CSSProperties = { padding: "9px 10px", minHeight: 38, borderRadius: 6, border: "1px solid #cbd5e1", minWidth: 0, flex: "1 1 145px" };
+const action: CSSProperties = { padding: "9px 13px", minHeight: 38, borderRadius: 6, background: "#1d4ed8", color: "#fff", border: 0, cursor: "pointer" };
+const split: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" };
+const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 520 };
+const cell: CSSProperties = { padding: "9px", borderBottom: "1px solid #e2e8f0", textAlign: "left" };
 
 function downloadCsv(rows: string[][], filename: string) {
   const csv = "\uFEFF" + rows.map((cells) => cells.map((v) => '"' + v.replace(/"/g, '""') + '"').join(";")).join("\r\n");
