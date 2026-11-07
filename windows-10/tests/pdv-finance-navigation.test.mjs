@@ -21,3 +21,11 @@ for (const edition of ["windows-10", "windows-7"]) {
     assert.match(panel, /activeView === "relatorios"/);
   });
 }
+
+test("QA visual executa contas a pagar na rota Financeiro, não em aba antiga de Gestão", () => {
+  const flow = JSON.parse(readFileSync(new URL("../qa/flows/ui-review.json", import.meta.url), "utf8"));
+  const openAccounts = flow.steps.find(step => step.name === "open-payables");
+  assert.equal(openAccounts.selector, 'a[href="#/financeiro"]');
+  assert.ok(flow.steps.some(step => step.name === "ledger-settlements" && step.action === "expectVisible"));
+  assert.ok(flow.steps.some(step => step.name === "return-to-commercial-for-profit" && step.selector === 'a[href="#/gestao"]'));
+});
