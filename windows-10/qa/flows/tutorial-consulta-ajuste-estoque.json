@@ -20,6 +20,12 @@
       "holdMs": 700
     },
     {
+      "action": "expectVisible",
+      "selector": "article:has(h2:text-is(\"Estoque\"))",
+      "name": "painel-estoque-disponivel",
+      "holdMs": 500
+    },
+    {
       "action": "expectURL",
       "includes": "#/produtos",
       "name": "produtos-route",
