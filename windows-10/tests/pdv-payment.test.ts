@@ -583,3 +583,25 @@ test("fechamento não aceita autorização fantasma de gerente sem PIN", () => {
     reason: "Fechamento", createdAt: "2026-11-07T10:00:00Z"
   }), /Autorizacao de gerente necessaria/);
 });
+
+test("fechamento não considera crediário a receber como dinheiro contado", () => {
+  const closing = closePdvCashSession({
+    openedAt:"2026-11-07 08:00", closedAt:"2026-11-07 18:00",
+    initialAmount:100, withdrawals:[],
+    sales:[{number:"0001",netTotal:250,payments:[{method:"A PRAZO",amount:200},{method:"CHEQUE",amount:50}]}],
+    countedByMethod:{"A VISTA":100, CHEQUE:50},
+    excludedMethods:["A PRAZO"]
+  });
+  assert.equal(closing.status,"balanced");
+  assert.equal(closing.expectedByMethod.CHEQUE,50);
+  assert.equal(Object.prototype.hasOwnProperty.call(closing.expectedByMethod,"A PRAZO"),false);
+});
+test("caixa inicial não é somado duas vezes quando existem duas formas de dinheiro", () => {
+  const closing=closePdvCashSession({
+    openedAt:"2026-11-07 08:00",closedAt:"2026-11-07 18:00",
+    initialAmount:100,withdrawals:[],sales:[],
+    cashMethods:["A VISTA","DINHEIRO"],countedByMethod:{"A VISTA":100,DINHEIRO:0}
+  });
+  assert.equal(closing.status,"balanced");
+  assert.equal(closing.expectedCashTotal,100);
+});
