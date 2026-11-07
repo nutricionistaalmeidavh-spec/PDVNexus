@@ -26,7 +26,7 @@ contextBridge.exposeInMainWorld("nexusDesktop", {
   pdvStore: {
     status: () => ipcRenderer.invoke("nexus-pdv-store:status"),
     load: (storeKey) => ipcRenderer.invoke("nexus-pdv-store:load", storeKey),
-    save: (storeKey, snapshotJson) => ipcRenderer.invoke("nexus-pdv-store:save", storeKey, snapshotJson)
+    save: (storeKey, snapshotJson, expectedRevision) => ipcRenderer.invoke("nexus-pdv-store:save", storeKey, snapshotJson, expectedRevision)
   },
   store: {
     status: () => ipcRenderer.invoke("app-store:status"),

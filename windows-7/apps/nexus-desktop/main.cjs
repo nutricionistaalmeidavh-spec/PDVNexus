@@ -178,6 +178,9 @@ function loadPdvStoreSnapshot(storeKey) {
 }
 
 function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error("REVISION_REQUIRED: leitura canônica obrigatória antes de gravar.");
+  }
   let state;
   try {
     state = JSON.parse(String(snapshotJson ?? "{}"));
@@ -191,7 +194,7 @@ function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
   const database = getDesktopStore();
   const previous = database.pdvSnapshots[key] ?? null;
   const revision = Number(previous?.revision ?? 0);
-  if (expectedRevision !== undefined && revision !== expectedRevision) {
+  if (revision !== expectedRevision) {
     const error = new Error("REVISION_CONFLICT: dados atualizados por outro caixa; recarregue antes de alterar.");
     error.code = "REVISION_CONFLICT";
     throw error;
@@ -525,8 +528,8 @@ ipcMain.handle("nexus-pdv-store:load", (_event, storeKey) => {
   return loadPdvStoreSnapshot(storeKey);
 });
 
-ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson) => {
-  return savePdvStoreSnapshot(storeKey, snapshotJson);
+ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson, expectedRevision) => {
+  return savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision);
 });
 
 ipcMain.handle("app-store:status", () => ({

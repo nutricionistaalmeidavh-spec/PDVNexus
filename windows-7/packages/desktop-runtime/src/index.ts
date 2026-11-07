@@ -47,16 +47,17 @@ export interface DesktopPdvStoreStatus {
 export interface DesktopPdvStoreRow {
   snapshotJson: string;
   updatedAt: string;
+  revision: number;
 }
 
 export interface DesktopPdvStoreBridge {
   status(): Promise<DesktopPdvStoreStatus>;
   load(storeKey: string): Promise<DesktopPdvStoreRow | null>;
-  save(storeKey: string, snapshotJson: string): Promise<{ updatedAt: string }>;
+  save(storeKey: string, snapshotJson: string, expectedRevision: number): Promise<{ updatedAt: string; revision: number }>;
 }
 
 export type DesktopStoreStatus = DesktopPdvStoreStatus;
-export type DesktopStoreRow = DesktopPdvStoreRow;
+export type DesktopStoreRow = Pick<DesktopPdvStoreRow, "snapshotJson" | "updatedAt">;
 
 export interface DesktopStoreBridge {
   status(): Promise<DesktopStoreStatus>;
@@ -218,7 +219,7 @@ export function getDesktopPdvStoreBridge(): DesktopPdvStoreBridge | undefined {
 }
 
 export function getDesktopStoreBridge(): DesktopStoreBridge | undefined {
-  return window.nexusDesktop?.store ?? getDesktopPdvStoreBridge();
+  return window.nexusDesktop?.store;
 }
 
 export function getDesktopBackupBridge(): DesktopBackupBridge | undefined {
