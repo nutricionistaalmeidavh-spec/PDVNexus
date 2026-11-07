@@ -46,3 +46,10 @@ test("se não encontrar produto, oferece cadastro separado do lançamento de ven
     assert.match(app, /onCreateProduct=\{\(\) =>/);
   }
 });
+
+
+test("barra de lançamento reflow antes de ficar menor que a largura mínima dos seis botões", () => {
+  const css = fs.readFileSync(new URL("../apps/pdv-demo/src/pdv-dense-v2.css", import.meta.url), "utf8");
+  assert.match(css, /@media \(max-width: 1240px\)/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important/);
+});
