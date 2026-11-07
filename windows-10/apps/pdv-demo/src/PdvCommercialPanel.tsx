@@ -185,7 +185,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <div style={{ ...box, flex: "1 1 220px" }}>A receber<strong style={{ fontSize: 22 }}>{currency(summary.receivableOpen)}</strong></div>
         <div style={{ ...box, flex: "1 1 220px" }}>Despesas registradas<strong style={{ fontSize: 22 }}>{currency(summary.expensesTotal)}</strong></div>
       </div>
-      <div style={box}><strong>Ações financeiras</strong>
+      <div style={box}><strong>Registrar pagamento ou recebimento parcial</strong>
         <div style={split}>
           <button disabled={!allowed} style={action} onClick={() => { setReviewStep("form");setDialog("settlement"); }}>Registrar pagamento ou recebimento</button>
           <button disabled={!allowed} style={{ ...action, background: "#334155" }} onClick={() => { setReviewStep("form");setDialog("expense"); }}>Nova despesa</button>
