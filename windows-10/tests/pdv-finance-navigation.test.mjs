@@ -62,3 +62,21 @@ test("QA cobre parcelamento real em 3x e trilha financeira de auditoria",()=>{
  assert.ok(ui.steps.some(x=>x.name==="open-finance-audit"));
  assert.ok(ui.steps.some(x=>x.name==="finance-audit-source-table"));
 });
+
+test("Kanban QA arrasta entre colunas, grava vencimento e baixas na base canônica",()=>{
+ const suite=JSON.parse(readFileSync(new URL("../qa/business-flows.json",import.meta.url),"utf8"));
+ const flow=suite.flows.find(x=>x.id==="finance-kanban-canonical-move");
+ assert.ok(flow?.critical);
+ assert.ok(flow.steps.some(x=>x.action==="dragTo"&&x.name==="drag-overdue-to-upcoming"));
+ assert.ok(flow.steps.some(x=>x.name==="canonical-due-date-saved"));
+ assert.ok(flow.steps.some(x=>x.name==="canonical-full-settlement"&&x.expected===70));
+ const qa=readFileSync(new URL("../tools/artisys-qa/src/steps.js",import.meta.url),"utf8");
+ assert.match(qa,/case 'dragTo'/);
+});
+
+test("persistência SQLite reage a alterações isoladas do commercialLedger, sem depender de vendas ou estoque",()=>{
+ for (const edition of ["windows-10","windows-7"]) {
+  const app=readFileSync(new URL(`../../${edition}/apps/pdv-demo/src/PdvDemoApp.tsx`,import.meta.url),"utf8");
+  assert.match(app,/\[persistenceState, catalogProducts,[^\]]*commercialLedger\]\);/);
+ }
+});

@@ -11,6 +11,7 @@ import {
 import type { PdvStockMovement } from "../../../packages/database/src/pdv";
 import { PdvGuidedDialog, guidedFieldStyle, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
 import { PdvFinancePanel } from "./PdvFinancePanel";
+import type { PdvFinanceMoveResult } from "./financeKanbanActions";
 
 type Props<P extends CommercialCatalogProduct> = {
   ledger: CommercialLedger;
@@ -24,6 +25,7 @@ type Props<P extends CommercialCatalogProduct> = {
   storeName?: string;
   mode?: "gestao" | "financeiro";
   onLedgerChange: (next: CommercialLedger) => void;
+  onFinanceMove:(result:PdvFinanceMoveResult)=>void;
   onPurchaseReceived: (change: { ledger: CommercialLedger; catalog: P[]; movements: PdvStockMovement[] }) => void;
 };
 const timestamp = () => new Date().toISOString();
@@ -52,7 +54,7 @@ function downloadCsv(rows: string[][], filename: string) {
 }
 
 export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Props<P>) {
-  const { ledger, catalog, movements, sales, creditMethods, allowed, customers, operator, storeName, mode = "gestao", onLedgerChange, onPurchaseReceived } = props;
+  const { ledger, catalog, movements, sales, creditMethods, allowed, customers, operator, storeName, mode = "gestao", onLedgerChange, onFinanceMove, onPurchaseReceived } = props;
   const [view, setView] = useState<"compras" | "financeiro" | "relatorios">("compras");
   const activeView = mode === "financeiro" ? "financeiro" : view;
   const [message, setMessage] = useState("");
@@ -205,8 +207,8 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     </> : null}
 
     {activeView === "financeiro" ? <PdvFinancePanel ledger={ledger} sales={sales} creditMethods={creditMethods}
-      customers={customers} allowed={allowed} storeName={storeName}
-      onOpenSettlement={openFinanceSettlement} onOpenExpense={openFinanceExpense} /> : null}
+      customers={customers} allowed={allowed} storeName={storeName} operator={operator}
+      onCommitMove={onFinanceMove} onOpenSettlement={openFinanceSettlement} onOpenExpense={openFinanceExpense} /> : null}
 
     {activeView === "relatorios" ? <>
       <div style={split}>

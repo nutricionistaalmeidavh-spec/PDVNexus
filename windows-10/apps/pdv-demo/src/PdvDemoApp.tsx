@@ -522,7 +522,7 @@ export function PdvDemoApp() {
         }
       }
     })();
-  }, [persistenceState, catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions, scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups]);
+  }, [persistenceState, catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions, scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups, commercialLedger]);
 
   useEffect(() => {
     if (!serialBridge) return;
@@ -923,6 +923,11 @@ export function PdvDemoApp() {
           creditMethods={paymentOptions.filter((p) => p.kind === "store-credit" || /A PRAZO|CREDI[AÁ]RIO/i.test(p.name)).map((p) => p.name)}
           allowed={canManageFinance}
           onLedgerChange={setCommercialLedger}
+          onFinanceMove={(result)=>{
+            setCommercialLedger(result.ledger);
+            // Only credit-due-date edits return a new sale list. React batches both canonical updates.
+            if(result.sales!==completedSales)setCompletedSales(result.sales as CompletedSale[]);
+          }}
           onPurchaseReceived={(result) => {
             setCatalogProducts(result.catalog);
             setInventoryMovements(result.movements);
