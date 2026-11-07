@@ -5,7 +5,7 @@ import { completePdvSale } from "../packages/database/src/pdv";
 
 const products = [
   { productCode: "10001", barcode: "7891234567895", productName: "Café Pilão Tradicional", category: "Mercearia", brand: "Pilão", active: true },
-  { productCode: "10002", barcode: "7891234567888", productName: "Café Extraforte", category: "Mercearia", brand: "Outra", active: true },
+  { productCode: "10002", barcode: "7891234567888", productName: "Café Extraforte", category: "Mercearia", brand: "Outra", producer: "Cooperativa do Cerrado", active: true },
   { productCode: "10003", barcode: "7891234567871", productName: "Leite Integral", category: "Laticínios", brand: "Campo", active: true },
   { productCode: "10004", barcode: "7891234567864", productName: "Café Inativo", category: "Mercearia", active: false }
 ];
@@ -44,4 +44,9 @@ test("histórico de vendas persiste para além das 100 últimas vendas", () => {
   });
   assert.equal(result.completedSales.length, 251);
   assert.equal(result.completedSales[250].number, "ANT-249");
+});
+
+test("pesquisa parcial também encontra empreendimento ou produtor", () => {
+  assert.deepEqual(findPdvProducts(products, "cerrado").map(p => p.productCode), ["10002"]);
+  assert.deepEqual(findPdvProducts(products, "cooperativa").map(p => p.productCode), ["10002"]);
 });
