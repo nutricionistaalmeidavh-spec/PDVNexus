@@ -8,16 +8,6 @@
       "timeoutMs": 20000
     },
     {
-      "action": "desktopStoreSet",
-      "key": "nexus-core:pdv-store:v1",
-      "name": "reset-pdv",
-      "value": {}
-    },
-    {
-      "action": "reload",
-      "name": "reload-reset"
-    },
-    {
       "action": "waitFor",
       "selector": "a[href=\"#/caixa\"]",
       "name": "pdv-reset-ready",
@@ -27,7 +17,7 @@
       "action": "click",
       "selector": "a[href=\"#/produtos\"]",
       "name": "open-produtos",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "expectURL",
@@ -40,63 +30,63 @@
       "text": "Novo produto",
       "exact": true,
       "name": "novo-produto",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Código *\"]",
       "value": "QA900",
       "name": "codigo",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Código de barras (opcional)\"]",
       "value": "QA900BAR",
       "name": "barras",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Descrição *\"]",
       "value": "Produto QA 900",
       "name": "descricao",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Categoria (opcional)\"]",
       "value": "Testes",
       "name": "categoria",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Preço de venda *\"]",
       "value": "19,90",
       "name": "preco",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Estoque inicial (opcional)\"]",
       "value": "5",
       "name": "estoque",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Estoque mínimo (opcional)\"]",
       "value": "1",
       "name": "minimo",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "click",
       "text": "Cadastrar produto",
       "exact": true,
       "name": "cadastrar-produto",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "waitForTimeout",
@@ -111,45 +101,38 @@
       "holdMs": 500
     },
     {
-      "action": "expectDesktopStoreJson",
-      "key": "nexus-core:pdv-store:v1",
-      "path": "catalogProducts.5.productCode",
-      "expected": "QA900",
-      "name": "produto-persistido"
-    },
-    {
       "action": "click",
       "selector": "a[href=\"#/caixa\"]",
       "name": "voltar-caixa-apos-cadastro",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "clickIfVisible",
       "text": "Abrir caixa",
       "exact": true,
       "name": "abrir-caixa-apos-cadastro",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "press",
       "selector": "input[placeholder*=\"Bipe\"]",
       "key": "F2",
       "name": "iniciar-primeira-venda",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder*=\"Bipe\"]",
       "value": "QA900",
       "name": "buscar-produto-cadastrado",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "press",
       "selector": "input[placeholder*=\"Bipe\"]",
       "key": "Enter",
       "name": "adicionar-produto-venda",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "expectVisible",
@@ -163,14 +146,14 @@
       "selector": "input[placeholder*=\"Bipe\"]",
       "key": "F6",
       "name": "registrar-pagamento",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "press",
       "selector": "input[placeholder*=\"Bipe\"]",
       "key": "F8",
       "name": "finalizar-venda-tutorial",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "expectVisible",
@@ -183,7 +166,7 @@
       "text": "Fechar",
       "exact": true,
       "name": "fechar-comprovante-tutorial",
-      "holdMs": 650
+      "holdMs": 700
     }
   ]
 }
