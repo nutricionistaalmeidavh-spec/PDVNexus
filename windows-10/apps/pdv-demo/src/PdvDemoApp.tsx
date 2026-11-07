@@ -375,6 +375,72 @@ export function PdvDemoApp() {
     });
     return () => { cancelled = true; };
   }, []);
+  useEffect(() => {
+    if (!desktopStoreBridge) return;
+    let disposed = false;
+    let refreshing = false;
+    let refreshQueued = false;
+
+    const reconcileCanonicalExternalWrite = async () => {
+      if (refreshing) { refreshQueued = true; return; }
+      refreshing = true;
+      try {
+        do {
+          refreshQueued = false;
+          // The main checkout's already-committed writes must finish first. A parallel
+          // snapshot is never blindly merged over an in-flight customer operation.
+          for (let attempt = 0; attempt < 80 && persistenceSaveActiveRef.current && !disposed; attempt++) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 25));
+          }
+          if (disposed) return;
+          if (persistenceSaveActiveRef.current) {
+            throw new Error("Gravação do caixa ainda ativa; reconciliação segura não concluída.");
+          }
+          const row = await desktopStoreBridge.load(PDV_STORE_KEY);
+          if (disposed || !row?.snapshotJson) return;
+          if (!Number.isSafeInteger(row.revision) || row.revision < 0) {
+            throw new Error("A revisão do banco canônico está inválida.");
+          }
+          if (row.revision <= lastPersistedRevisionRef.current) continue;
+          // If the cashier has unsaved modifications we refuse to replace its read-model.
+          // The operator can recover the emergency backup; we never lose a pending sale.
+          if (pendingPersistenceSnapshotRef.current &&
+              pendingPersistenceSnapshotRef.current !== lastPersistedSnapshotRef.current) {
+            throw new Error("Alterações locais pendentes impedem a atualização automática do caixa.");
+          }
+          const imported = parsePdvSnapshot(row.snapshotJson);
+          const extensions = normalizePdvExtensions(imported.extensions);
+          preservedPdvExtensionsRef.current = imported.extensions && typeof imported.extensions === "object"
+            ? { ...imported.extensions } : {};
+          lastPersistedSnapshotRef.current = row.snapshotJson;
+          lastPersistedRevisionRef.current = row.revision;
+          pendingPersistenceSnapshotRef.current = "";
+          setCatalogProducts(imported.catalogProducts);
+          setRegisteredCustomers(imported.registeredCustomers);
+          setCompletedSales(imported.completedSales);
+          setCashSession(imported.cashSession);
+          setPaymentOptions(imported.paymentOptions);
+          setInventoryMovements(extensions.inventoryMovements);
+          setCashClosings(extensions.cashClosings);
+          setCancelledSales(extensions.cancelledSales);
+          setAuditLogs(extensions.auditLogs);
+          setPromotionGroups(extensions.promotionGroups);
+          setCommercialLedger(extensions.commercialLedger);
+        } while (refreshQueued);
+      } catch (error) {
+        if (disposed) return;
+        const detail = error instanceof Error ? error.message : "Falha na atualização do banco";
+        setDesktopStoreStatus("Reconciliação do banco canônico bloqueada: " + detail);
+        setPersistenceState("error");
+      } finally {
+        refreshing = false;
+      }
+    };
+    const onExternalWrite = () => { void reconcileCanonicalExternalWrite(); };
+    window.addEventListener("nexus-pdv:canonical-external-write", onExternalWrite);
+    return () => { disposed = true; window.removeEventListener("nexus-pdv:canonical-external-write", onExternalWrite); };
+  }, [desktopStoreBridge]);
+
   useEffect(() => { if (!desktopPdvSyncBridge) return; void desktopPdvSyncBridge.status().then(setSyncServerStatus).catch(() => setSyncServerStatus({ running: false })); }, [desktopPdvSyncBridge]);
   useEffect(() => {
     if (!desktopStoreBridge || persistenceState !== "ready") return;

@@ -89,6 +89,10 @@ export async function saveMainPdvSnapshot(snapshot: unknown, expectedRevision: n
   const desktop = getDesktopPdvStoreBridge();
   if (desktop) {
     const result = await desktop.save(PDV_STORE_KEY, serialized, expectedRevision);
+    // Notify the checkout's read-model only after the canonical write has committed.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-external-write", { detail: { revision: result.revision } }));
+    }
     return { serialized, revision: result.revision };
   }
   writeLocal(PDV_STORE_KEY, serialized);
@@ -104,10 +108,13 @@ export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) 
     const snapshot = parseJson(row.snapshotJson, {}) as Record<string, unknown>;
     const extensions = snapshot.extensions && typeof snapshot.extensions === "object"
       ? snapshot.extensions as Record<string, unknown> : {};
-    await desktop.save(PDV_STORE_KEY, JSON.stringify({
+    const result = await desktop.save(PDV_STORE_KEY, JSON.stringify({
       ...snapshot,
       extensions: { ...extensions, productLabelBatchStore: normalized }
     }), row.revision);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-external-write", { detail: { revision: result.revision } }));
+    }
     return normalized;
   }
   writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, JSON.stringify(normalized));
