@@ -471,6 +471,27 @@
       "name": "finance-matrix-visible"
     },
     {
+      "action": "click",
+      "text": "Auditoria",
+      "exact": true,
+      "name": "open-finance-audit"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-finance-audit=\"true\"]",
+      "name": "finance-audit-source-table"
+    },
+    {
+      "action": "screenshot",
+      "name": "08d-financeiro-auditoria"
+    },
+    {
+      "action": "click",
+      "text": "Matriz financeira",
+      "exact": true,
+      "name": "return-finance-matrix-from-audit"
+    },
+    {
       "action": "screenshot",
       "name": "08-financeiro-contas"
     },

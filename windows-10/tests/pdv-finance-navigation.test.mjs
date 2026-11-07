@@ -52,3 +52,13 @@ test("E2E da forma de pagamento autentica gerente existente; não oferece bootst
  assert.ok(actions.some(x=>x.name==="authenticate-existing-manager"));
  assert.ok(!actions.some(x=>x.name==="bootstrap-finance-manager"));
 });
+
+test("QA cobre parcelamento real em 3x e trilha financeira de auditoria",()=>{
+ const business=JSON.parse(readFileSync(new URL("../qa/business-flows.json",import.meta.url),"utf8"));
+ const flow=business.flows.find(x=>x.id==="sale-store-credit");
+ assert.ok(flow.steps.some(x=>x.name==="selecionar-3-parcelas" && x.value==="3"));
+ assert.ok(flow.steps.some(x=>x.name==="segunda-parcela-vencimento" && x.expected==="2026-12-20"));
+ const ui=JSON.parse(readFileSync(new URL("../qa/flows/ui-review.json",import.meta.url),"utf8"));
+ assert.ok(ui.steps.some(x=>x.name==="open-finance-audit"));
+ assert.ok(ui.steps.some(x=>x.name==="finance-audit-source-table"));
+});
