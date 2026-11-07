@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "../apps/pdv-demo/src/cashierSafety";
+import { parsePdvOpeningAmount, buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "../apps/pdv-demo/src/cashierSafety";
 
 test("fechamento: dinheiro, PIX, crédito e débito são conferidos individualmente", () => {
   assert.deepEqual(buildPdvCashCount({cash:"100,50",pix:"20",credit:"135.75",debit:"60"}), {
@@ -51,4 +51,13 @@ test("conferência de modalidades adicionais não confunde cheque com dinheiro",
   assert.equal(counted.CHEQUE,50.25);
   assert.equal(counted.OUTROS,0);
   assert.throws(() => buildPdvCashCount({cash:"0",pix:"0",credit:"0",debit:"0",extras:{CHEQUE:""}}),/CHEQUE/);
+});
+
+test("abertura do caixa usa troco informado em pt-BR, sem aceitar valor negativo ou inválido", () => {
+  assert.equal(parsePdvOpeningAmount("150,00"), 150);
+  assert.equal(parsePdvOpeningAmount("1.250,50"), 1250.5);
+  assert.equal(parsePdvOpeningAmount("0"), 0);
+  assert.throws(() => parsePdvOpeningAmount("-1"), /troco|inicial|inválid/i);
+  assert.throws(() => parsePdvOpeningAmount("texto"), /troco|inicial|inválid/i);
+  assert.throws(() => parsePdvOpeningAmount(""), /troco|inicial|informe/i);
 });
