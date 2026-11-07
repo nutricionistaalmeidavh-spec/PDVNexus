@@ -357,6 +357,47 @@
     {
       "action": "screenshot",
       "name": "07-configuracoes"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/financeiro\"]",
+      "name": "open-financeiro-contas"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/financeiro",
+      "name": "financeiro-contas-route"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Registrar pagamento ou recebimento parcial",
+      "exact": true,
+      "name": "financeiro-contas-receber"
+    },
+    {
+      "action": "expectVisible",
+      "text": "A pagar",
+      "exact": true,
+      "name": "financeiro-saldos-a-pagar"
+    },
+    {
+      "action": "screenshot",
+      "name": "08-financeiro-contas"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
+      "name": "open-gestao-comercial"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Cadastrar fornecedor",
+      "exact": true,
+      "name": "gestao-compras-continua"
+    },
+    {
+      "action": "screenshot",
+      "name": "09-gestao-compras"
     }
   ]
 }
