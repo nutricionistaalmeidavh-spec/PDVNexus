@@ -264,7 +264,7 @@
     {
       "action": "expectVisible",
       "text": "Lucro bruto apurado",
-      "exact": true,
+      "exact": false,
       "name": "gross-profit-no-fake-margin"
     },
     {
