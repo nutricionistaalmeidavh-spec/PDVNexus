@@ -31,12 +31,15 @@ export function buildPdvFinanceReport(input:{
     value[kind]=money(value[kind]+amount);
     daily.set(day!,value);
   };
-  // Operational entry at sale time only for non-credit tenders. Credit enters once, at settlement.
+  // Only non-credit tender enters on sale completion. Cash change is not revenue;
+  // legacy sales without a documented changeDue keep their original tender figure.
   for(const sale of sales) {
-    for(const payment of sale.payments) {
-      if(!creditMethodsNormalized.has(payment.method.toLocaleLowerCase("pt-BR").trim()))
-        record(sale.finalizedAt,"in",payment.amount);
-    }
+    const received=money(sale.payments.filter(payment=>
+      !creditMethodsNormalized.has(payment.method.toLocaleLowerCase("pt-BR").trim()))
+      .reduce((total,payment)=>total+payment.amount,0));
+    const knownChange=sale.paymentSummary?.changeDue;
+    const change=Number.isFinite(knownChange)?Math.max(0,knownChange??0):0;
+    record(sale.finalizedAt,"in",money(Math.max(0,received-change)));
   }
   for(const settlement of ledger.settlements)
     record(settlement.paidAt,settlement.kind==="sale"?"in":"out",settlement.amount);

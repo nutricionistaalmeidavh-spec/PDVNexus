@@ -93,6 +93,7 @@ export interface CommercialSale {
   discountPercent?: number;
   items: CommercialSaleItem[];
   payments: Array<{ method: string; amount: number }>;
+  paymentSummary?: { changeDue?: number };
   installments?: CommercialSaleInstallment[];
 }
 export interface CommercialSummary {
