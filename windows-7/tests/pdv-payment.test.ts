@@ -570,3 +570,16 @@ test("renderPdvReceipt prints optional store address and phone", () => {
   assert.match(receipt, /Rua Central, 123/);
   assert.match(receipt, /Telefone: \(16\) 99999-0000/);
 });
+
+
+test("fechamento não aceita autorização fantasma de gerente sem PIN", () => {
+  assert.throws(() => authorizePdvAction({
+    action: "close-cash",
+    operator: { id: "CAIXA-1", name: "Caixa", role: "cashier", active: true },
+    users: [
+      { id: "CAIXA-1", name: "Caixa", role: "cashier", active: true },
+      { id: "GER-1", name: "Gerente", role: "manager", active: true }
+    ],
+    reason: "Fechamento", createdAt: "2026-11-07T10:00:00Z"
+  }), /Autorizacao de gerente necessaria/);
+});
