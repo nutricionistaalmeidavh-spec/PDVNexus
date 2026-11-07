@@ -32,11 +32,11 @@ async function nextDecision(persona, state, history, maxSteps, model) {
   const prompt = buildPrompt(persona, state, history, maxSteps);
   let error;
   let rejection = "";
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       const body = {
         model, stream: false, think: false, keep_alive: "2m",
-        format: buildDecisionSchema(state.controls), options: { temperature: 0, num_predict: 160, num_ctx: 8192 },
+        format: buildDecisionSchema(state.controls), options: { temperature: 0, num_predict: 220, num_ctx: 8192 },
         messages: [
           { role: "system", content: "Voce age somente sobre controles visiveis do PDV ficticio. Responda exclusivamente JSON conforme schema. Nunca invente conclusao." },
           { role: "user", content: prompt + (attempt ? "\nSUA RESPOSTA ANTERIOR FOI INVALIDA: " + rejection + ". Escolha exclusivamente um elementId deste conjunto: " + state.controls.map((c) => c.id).join(", ") + "." : "") }
@@ -51,7 +51,7 @@ async function nextDecision(persona, state, history, maxSteps, model) {
       rejection = String(reason.message || reason).slice(0, 250);
     }
   }
-  throw new Error("Falha de decisao do agente: " + (error?.message || error));
+  throw new Error("Falha de decisao do agente após 4 tentativas: " + (error?.message || error) + " (IDs disponíveis: " + state.controls.filter((c)=>!c.disabled).map((c)=>c.id).join(",") + ")");
 }
 
 async function observe(page, persona) {
@@ -91,7 +91,7 @@ async function observe(page, persona) {
   const menuOnly = ["route", "routeText"].includes(persona.goal.kind);
   const candidates = menuOnly
     ? allControls.filter((c) => c.tag === "A" && c.href.startsWith("#/"))
-    : allControls.slice(0, 60);
+    : allControls.slice(0, 100);
   const controls = candidates.map((control, index) => ({
     ...control, domIndex: control.id, id: index + 1
   }));
@@ -256,7 +256,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   const results = [];
   for (const persona of config.personas.slice(0, count)) {
-    results.push(await runPersona(persona, model, Math.min(20, Number(config.maxSteps) || 12)));
+    results.push(await runPersona(persona, model, Math.min(30, Number(persona.maxSteps ?? config.maxSteps) || 12)));
   }
   const summary = { schemaVersion: 1, model, startedAt, finishedAt: new Date().toISOString(),
     total: results.length, passed: results.filter((r) => r.status === "passed").length,
