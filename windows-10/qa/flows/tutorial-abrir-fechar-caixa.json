@@ -1,0 +1,161 @@
+{
+  "id": "pdv-tutorial-real-abrir-fechar-caixa",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "desktopStoreSet",
+      "key": "nexus-core:pdv-store:v1",
+      "name": "reset-pdv",
+      "value": {
+        "extensions": {
+          "users": [
+            {
+              "id": "OP-001",
+              "name": "Operador Caixa",
+              "role": "cashier",
+              "active": true
+            },
+            {
+              "id": "GER-001",
+              "name": "Gerente",
+              "role": "manager",
+              "active": true,
+              "managerPassword": "123456"
+            }
+          ],
+          "currentOperatorId": "OP-001"
+        }
+      }
+    },
+    {
+      "action": "reload",
+      "name": "reload-reset"
+    },
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-reset-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/fechamento\"]",
+      "name": "open-financeiro",
+      "holdMs": 650
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/fechamento",
+      "name": "financeiro-route",
+      "holdMs": 500
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Caixa inicial\"]",
+      "value": "100",
+      "name": "caixa-inicial",
+      "holdMs": 650
+    },
+    {
+      "action": "click",
+      "text": "Abrir Caixa",
+      "exact": true,
+      "name": "abrir-caixa",
+      "holdMs": 650
+    },
+    {
+      "action": "click",
+      "text": "Iniciar contagem cega",
+      "exact": true,
+      "name": "abrir-dialogo-contagem",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Dinheiro contado\"]",
+      "value": "100",
+      "name": "dinheiro-contado",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"PIX conferido\"]",
+      "value": "0",
+      "name": "pix-contado",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Crédito conferido\"]",
+      "value": "0",
+      "name": "credito-contado",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Débito conferido\"]",
+      "value": "0",
+      "name": "debito-contado",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+      "value": "0",
+      "name": "cheques-conferidos",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Conferir OUTROS\"]",
+      "value": "0",
+      "name": "outros-conferidos",
+      "holdMs": 650
+    },
+    {
+      "action": "click",
+      "text": "Revisar contagem",
+      "exact": true,
+      "name": "revisar-contagem-cega",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"PIN do gerente (obrigatório)\"]",
+      "value": "123456",
+      "name": "autorizacao-gerente",
+      "holdMs": 650
+    },
+    {
+      "action": "click",
+      "text": "Autorizar e fechar caixa",
+      "exact": true,
+      "name": "autorizar-fechar-caixa",
+      "holdMs": 650
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 300,
+      "name": "persistir-fechamento"
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "extensions.cashClosings.0.status",
+      "expected": "balanced",
+      "name": "fechamento-conferido"
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "extensions.auditLogs.0.action",
+      "expected": "close-cash",
+      "name": "auditoria-fechamento"
+    }
+  ]
+}
