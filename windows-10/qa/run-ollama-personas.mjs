@@ -160,7 +160,14 @@ async function runPersona(persona, model, maxSteps) {
     await page.evaluate(async ({ key, baseline }) => {
       const raw = JSON.stringify(baseline);
       window.localStorage.setItem(key, raw);
-      if (window.nexusDesktop?.pdvStore?.save) await window.nexusDesktop.pdvStore.save(key, raw);
+      const bridge = window.nexusDesktop?.pdvStore;
+      if (bridge?.save) {
+        const current = (await bridge.load(key)) ?? { revision: 0 };
+        if (!Number.isSafeInteger(current.revision) || current.revision < 0) {
+          throw new Error("Fixture QA sem revisão canônica válida.");
+        }
+        await bridge.save(key, raw, current.revision);
+      }
     }, { key: MAIN_PDV_STORE_KEY, baseline: PDV_BUSINESS_BASELINE });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector('a[href="#/caixa"]', { timeout: 25000 });
