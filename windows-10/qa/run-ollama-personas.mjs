@@ -45,7 +45,11 @@ async function nextDecision(persona, state, history, maxSteps, model) {
       const response = await jsonFetch(endpoint + "/api/chat", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
       });
-      return parseDecision(response.message?.content || "", state.controls);
+      const parsed = parseDecision(response.message?.content || "", state.controls);
+      if (parsed.action === "done" && !goalAchieved(persona.goal, state)) {
+        throw new Error("Objetivo ainda não demonstrado no estado canônico; continue a operação em vez de done");
+      }
+      return parsed;
     } catch (reason) {
       error = reason;
       rejection = String(reason.message || reason).slice(0, 250);
@@ -88,7 +92,7 @@ async function observe(page, persona) {
   // IDs curtos e consecutivos para o LLM; domIndex preserva indice real do locator.
   // Personas de navegacao recebem exclusivamente os links do menu, evitando que
   // modelos CPU pequenos confundam o destino com botoes do caixa.
-  const controls = selectPersonaControls(allControls, persona.goal);
+  const controls = selectPersonaControls(allControls, persona.goal, 75, pageState.route);
   return {
     ...pageState,
     controls,
