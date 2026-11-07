@@ -63,6 +63,9 @@ jobs:
       - name: Validate business journey coverage
         run: node --test tests/pdv-qa-business-flows.test.mjs
 
+      - name: Accessibility and UI readability regression
+        run: node --test tests/pdv-qa-ux-accessibility.test.mjs
+
       - name: Validate release and Drive sync contract
         run: node --test tests/pdv-release-drive-sync.test.mjs
 
