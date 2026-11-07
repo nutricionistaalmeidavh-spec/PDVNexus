@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {emptyCommercialLedger,buildCreditInstallments, type CommercialLedger} from "../apps/pdv-demo/src/commercialLedger";
+import {emptyCommercialLedger,buildCreditInstallments, type CommercialLedger, type CommercialSale} from "../apps/pdv-demo/src/commercialLedger";
 import {buildPdvFinanceRows,buildPdvFinanceKanban} from "../apps/pdv-demo/src/financeMatrix";
 import {applyPdvFinanceKanbanMove} from "../apps/pdv-demo/src/financeKanbanActions";
 import {buildPdvFinanceReport} from "../apps/pdv-demo/src/financeReporting";
 const at="2026-11-07T14:00:00.000Z",today="2026-11-07";
-const paid=()=>{
+const paid=():{ledger:CommercialLedger;sales:CommercialSale[];creditMethods:string[]}=>{
  const ledger:CommercialLedger={...emptyCommercialLedger(),
  suppliers:[{id:"F1",name:"Distribuidora",createdAt:at}],
  purchases:[{id:"C1",supplierId:"F1",orderedAt:at,status:"received",dueDate:"2026-11-05",items:[{productCode:"X",quantity:1,unitCost:100}]}],

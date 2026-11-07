@@ -57,7 +57,7 @@ export function applyPdvFinanceKanbanMove(input:PdvFinanceMoveInput):PdvFinanceM
   if(target==="registradas")throw new Error("Não é permitido remover rastreamento de pagamento ou transformar uma conta em histórica.");
   let ledger=input.ledger, sales=input.sales;
   const installmentNumber=previous.installmentLabel?Number(previous.installmentLabel.split("/")[0]):undefined;
-  const baseAction={id:eventId,kind:previous.kind==="payable"?"purchase":previous.kind==="receivable"?"sale":"expense",
+  const baseAction:Pick<CommercialFinanceAction,"id"|"kind"|"referenceId"|"performedAt"|"operatorId"|"operatorName">={id:eventId,kind:previous.kind==="payable"?"purchase":previous.kind==="receivable"?"sale":"expense",
     referenceId:previous.reference,performedAt:now,operatorId:operator.id,operatorName:operator.name};
   const textReason=input.reason?.trim();
   if(previous.status==="registrada"){
