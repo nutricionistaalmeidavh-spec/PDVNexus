@@ -83,21 +83,39 @@ async function runScenario(name,hash,seed) {
     const executed=await page.evaluate(async ({seed,actions})=>{
       if (!window.gremlins?.createHorde) throw new Error("gremlins nao carregado");
       const events=[];
+      const actual={ click:0, input:0, change:0, scroll:0, keydown:0 };
+      const samples=[];
+      const watch=(e)=>{
+        if (!(e.type in actual)) return;
+        actual[e.type] += 1;
+        if(samples.length < 200) samples.push({
+          type:e.type,
+          tag:e.target?.tagName || "?",
+          name:(e.target?.getAttribute?.("aria-label") || e.target?.getAttribute?.("placeholder") || "").slice(0,65)
+        });
+      };
+      for(const type of Object.keys(actual)) document.addEventListener(type,watch,true);
       const log={log:(...v)=>events.push(v.join(" ").slice(0,180)),info:(...v)=>events.push(v.join(" ").slice(0,180)),
         warn:(...v)=>events.push(v.join(" ").slice(0,180)),error:(...v)=>events.push(v.join(" ").slice(0,180))};
       const g=window.gremlins;
       const h=g.createHorde({
         randomizer:new g.Chance(seed),logger:log,
-        species:[g.species.clicker({clickTypes:["click"],canClick:el=>{
-          const href=el?.closest?.("a")?.getAttribute("href");
-          return !href || href.startsWith("#");
-        },showAction:()=>{}}),g.species.scroller()],
+        species:[
+          g.species.clicker({clickTypes:["click"],canClick:el=>{
+            const href=el?.closest?.("a")?.getAttribute("href");
+            return !href || href.startsWith("#");
+          },showAction:()=>{}}),
+          g.species.formFiller(),
+          g.species.scroller()
+        ],
         strategies:[g.strategies.allTogether({nb:actions})]
       });
-      await h.unleash();
-      return events.slice(0,500);
+      try { await h.unleash(); }
+      finally { for(const type of Object.keys(actual)) document.removeEventListener(type,watch,true); }
+      return { counts:actual, observed:samples, gremlinsLog:events.slice(0,300) };
     },{seed,actions});
-    result.actions=actions;
+    result.actions=Object.values(executed.counts).reduce((a,b)=>a+b,0);
+    result.eventCounts=executed.counts;
     await fs.writeFile(path.join(folder,"gremlins-events.json"),JSON.stringify(executed,null,2));
     await page.screenshot({path:path.join(folder,"02-fuzz.png")});
     result.screenshots.push("02-fuzz.png");
@@ -133,16 +151,17 @@ async function main(){
   for(let i=0;i<seeds;i++)for(const [name,hash] of PDV_ROUTES)
     results.push(await runScenario(name,hash,20261106+i));
   const summary={total:results.length,checked:results.filter(x=>x.status==="checked").length,
-    failed:results.filter(x=>x.status==="failed").length,plannedActions:results.length*actions,results};
+    failed:results.filter(x=>x.status==="failed").length,plannedActions:results.length*actions,
+    observedEvents:results.reduce((total,r)=>total+r.actions,0),results};
   await fs.writeFile(path.join(output,"summary.json"),JSON.stringify(summary,null,2)+"\n");
   const lines=["# PDV Nexus - Exploracao independente da IA","",
     "Gremlins.js 2.2.0 + axe-core + Playwright/Electron; testes locais e isolados.","",
-    "Cenarios: "+summary.total+" | Interacoes: "+summary.plannedActions+" | Sem falhas criticas: "+summary.checked+" | Falhas: "+summary.failed,"",
+    "Cenarios: "+summary.total+" | Interacoes programadas: "+summary.plannedActions+" | Eventos DOM realmente observados: "+summary.observedEvents+" | Sem falhas criticas: "+summary.checked+" | Falhas: "+summary.failed,"",
     "| Cenario | Resultado | Acoes | Achados |","|---|---|---:|---:|",
     ...results.map(r=>"| "+r.id+" | "+r.status+" | "+r.actions+" | "+r.issues.length+" |"),"",
     "## Achados",...results.flatMap(r=>r.issues.slice(0,8).map(f=>"- "+r.id+" ["+f.severity+"] "+f.type+": "+f.description)),"",
     "Sem falha critica nao significa ausência de bugs. Cobertura funcional dos 25 fluxos permanece em outra suite.",
-    "Traces, logs, prints e seeds permitem reproduzir cada achado.",""];
+    "Traces, logs, prints e seeds permitem reproduzir cada achado. A quantidade de eventos nao prova cobertura de negocio.",""];
   await fs.writeFile(path.join(output,"report.md"),lines.join("\n"));
   console.log("TOTAL "+summary.total+" CHECKED "+summary.checked+" FAILED "+summary.failed);
   if(summary.failed)process.exitCode=1;

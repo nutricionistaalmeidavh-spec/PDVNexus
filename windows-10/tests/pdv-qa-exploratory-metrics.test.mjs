@@ -30,3 +30,8 @@ test("acessibilidade e catalogada sem confundí-la com falha funcional", () => {
 test("nunca trata falta de dados canonicos como sucesso", () => {
   assert.equal(inspectCanonicalStore(null)[0].type, "missing-canonical-store");
 });
+
+test("sem eventos DOM reais, resultado deve falhar para evitar falso positivo", () => {
+  const r=classifyExploration({route:"#/caixa",expectedRoute:"#/caixa",before:{},after:{},actions:0});
+  assert.equal(r.critical[0].type,"no-random-actions");
+});

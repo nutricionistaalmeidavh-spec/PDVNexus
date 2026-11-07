@@ -55,6 +55,6 @@ export function classifyExploration({ route, expectedRoute, before, after, error
   for (const a of accessibility.slice(0, 30)) {
     findings.push({ type: "accessibility", severity: ["critical", "serious"].includes(a.impact) ? "high" : "medium", description: a.id + ": " + a.description, nodes: a.nodes });
   }
-  if (actions < 1) findings.push({ type: "no-random-actions", severity: "high", description: "Gremlins nao gerou eventos de teste" });
+  if (actions < 1) findings.push({ type: "no-random-actions", severity: "critical", description: "Nenhum evento DOM de interacao foi observado: nao afirmar cobertura" });
   return { findings, critical: findings.filter(x => x.severity === "critical"), warnings: findings.filter(x => x.severity !== "critical") };
 }
