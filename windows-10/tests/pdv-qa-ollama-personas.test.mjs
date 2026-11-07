@@ -96,3 +96,26 @@ test("metas comerciais conferem os produtos, os valores e o meio de pagamento gr
   assert.equal(goalAchieved(saleGoal,{store:{completedSales:[sale]}}),false);
   assert.equal(goalAchieved(saleGoal,{store:{completedSales:[{...sale,items:[{productCode:"00101"}]}]}}),true);
 });
+
+test("cadastro e abertura de caixa com valor exigem navegar antes de atuar no caixa errado", () => {
+  const controls = [
+    {id:0,domIndex:0,tag:"A",href:"#/caixa",name:"Caixa",disabled:false},
+    {id:1,domIndex:1,tag:"A",href:"#/produtos",name:"Produtos",disabled:false},
+    {id:2,domIndex:2,tag:"A",href:"#/fechamento",name:"Fechamento de caixa",disabled:false},
+    {id:3,domIndex:3,tag:"INPUT",placeholder:"Bipe ou pesquise por código",disabled:false},
+    {id:4,domIndex:4,tag:"BUTTON",name:"Abrir caixa",disabled:false}
+  ];
+  assert.deepEqual(selectPersonaControls(controls,{kind:"productExists"} ,75,"#/caixa").map(c=>c.href),["#/produtos"]);
+  assert.deepEqual(selectPersonaControls(controls,{kind:"cashOpen",initialAmount:150},75,"#/caixa").map(c=>c.href),["#/fechamento"]);
+  assert.ok(selectPersonaControls(controls,{kind:"saleCompleted"},75,"#/caixa").some(c=>c.name==="Abrir caixa"));
+});
+
+test("o agente não aceita done sem estado real nem usa instrução de finalizar uma venda para cadastrar produto", () => {
+  const runner=readFileSync(new URL("../qa/run-ollama-personas.mjs", import.meta.url),"utf8");
+  assert.match(runner, /parsed.action === "done" && !goalAchieved\(persona.goal, state\)/);
+  const productPrompt=buildPrompt(config.personas.find(p=>p.id==="cadastro-produto"),{route:"#/produtos",controls,indicators:{}},[],20);
+  assert.match(productPrompt,/98001/);
+  assert.match(productPrompt,/QA IA Banana/);
+  assert.match(productPrompt,/9,90/);
+  assert.doesNotMatch(productPrompt,/Para finalizar uma venda primeiro abra caixa/);
+});
