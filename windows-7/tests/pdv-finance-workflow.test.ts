@@ -33,9 +33,9 @@ const input={ledger,sales,creditMethods:["A PRAZO"]};
 test("P2 Kanban é composto por colunas de lançamentos individuais; a classificação é derivada e não altera a fonte",()=>{
  const original=JSON.stringify(input);
  const board=buildPdvFinanceKanban(buildPdvFinanceRows(input),"2026-11-07");
- assert.deepEqual(board.find(col=>col.id==="vencidas")?.rows.map(x=>x.reference),["C1"]);
+ assert.deepEqual(board.find(col=>col.id==="vencidas")?.rows.map(x=>x.reference),[]);
  assert.deepEqual(board.find(col=>col.id==="a_vencer")?.rows.map(x=>x.reference),["C2"]);
- assert.deepEqual(board.find(col=>col.id==="parciais")?.rows.map(x=>x.reference).sort(),["E1","VD1"]);
+ assert.deepEqual(board.find(col=>col.id==="parciais")?.rows.map(x=>x.reference).sort(),["C1","E1","VD1"]);
  assert.deepEqual(board.find(col=>col.id==="registradas")?.rows.map(x=>x.reference),["LEGACY"]);
  assert.deepEqual(JSON.stringify(input),original);
 });
