@@ -26,3 +26,12 @@ for (const edition of editions) {
     assert.match(source, /if \(event\.key === "F8"\) finalizeSale\(\)/);
   });
 }
+
+for (const edition of editions) {
+  const source = readFileSync(new URL(edition, import.meta.url), "utf8");
+
+  test(`${edition}: fechamento não descarta o histórico após cinquenta sessões`, () => {
+    assert.doesNotMatch(source, /setCashClosings\(\(current\) => \[closing, \.\.\.current\]\.slice\(0,\s*50\)\)/);
+    assert.match(source, /setCashClosings\(\(current\) => \[closing, \.\.\.current\]\)/);
+  });
+}
