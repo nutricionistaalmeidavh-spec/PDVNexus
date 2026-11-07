@@ -25,3 +25,11 @@ test("atalhos: F3 continua focando pesquisa, F8 não finaliza enquanto o usuári
   assert.equal(shouldHandlePdvHotkey("F6",{route:"/caixa",editing:false,modifiers:true}),false);
   assert.equal(shouldHandlePdvHotkey("a",{route:"/caixa",editing:false}),false);
 });
+
+test("atalhos da operação funcionam com o leitor focado, sem confundir Delete com edição de texto", () => {
+  const context={route:"/caixa",editing:true,scannerInput:true};
+  assert.equal(shouldHandlePdvHotkey("F2",context),true);
+  assert.equal(shouldHandlePdvHotkey("F6",context),true);
+  assert.equal(shouldHandlePdvHotkey("F8",context),true);
+  assert.equal(shouldHandlePdvHotkey("Delete",context),false);
+});
