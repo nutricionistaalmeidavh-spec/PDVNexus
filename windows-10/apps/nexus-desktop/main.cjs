@@ -256,19 +256,13 @@ function getPdvDatabase() {
 }
 
 function resetPdvDataForNewInstalledVersion(db) {
+  // An application update must NEVER delete customers, products, inventory or sales.
+  // Track the installed version as migration metadata. Schema migrations are additive.
   const version = app.getVersion();
   const previousVersion = db.prepare("SELECT value FROM pdv_meta WHERE name = ?").get("installed-pdv-version")?.value;
   if (previousVersion === version) return;
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    for (const table of ["pdv_store", "pdv_migration_backups", "pdv_products", "pdv_customers", "pdv_sales", "pdv_sale_items", "pdv_cancelled_sales", "pdv_inventory_movements", "pdv_settings"]) db.exec(`DELETE FROM ${table}`);
-    db.exec("DELETE FROM pdv_meta");
-    db.prepare("INSERT INTO pdv_meta (name, value) VALUES (?, ?)").run("installed-pdv-version", version);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  db.prepare("INSERT INTO pdv_meta (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value")
+    .run("installed-pdv-version", version);
 }
 
 function getAppDatabase() {
@@ -352,11 +346,6 @@ function savePdvStoreSnapshot(storeKey, snapshotJson) {
   }
   try {
     writePdvStateToTables(db, key, state, updatedAt);
-    db.prepare(`
-      INSERT INTO pdv_store (store_key, snapshot_json, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
-    `).run(key, JSON.stringify(state), updatedAt);
     appendPdvSqliteLog("save.done", `store=${key}; ms=${Date.now() - startedAt}`);
     return { updatedAt };
   } catch (error) {
@@ -415,6 +404,9 @@ function writePdvStateToTables(db, storeKey, state, updatedAt) {
     insertSetting.run(storeKey, "deviceConfig", JSON.stringify(state.deviceConfig ?? {}));
     insertSetting.run(storeKey, "extensions", JSON.stringify({ ...extensions, cancelledSales: [], inventoryMovements: [] }));
     db.prepare("INSERT OR REPLACE INTO pdv_meta (name, value) VALUES (?, ?)").run(`direct-schema:${storeKey}`, "1");
+    // The snapshot compatibility view and normalized tables commit atomically.
+    db.prepare("INSERT INTO pdv_store (store_key, snapshot_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at")
+      .run(storeKey, JSON.stringify(state), updatedAt);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
