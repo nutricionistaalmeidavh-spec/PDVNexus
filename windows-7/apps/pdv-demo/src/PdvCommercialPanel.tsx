@@ -16,6 +16,7 @@ type Props<P extends CommercialCatalogProduct> = {
   sales: CommercialSale[];
   creditMethods: string[];
   allowed: boolean;
+  mode?: "gestao" | "financeiro";
   onLedgerChange: (next: CommercialLedger) => void;
   onPurchaseReceived: (change: { ledger: CommercialLedger; catalog: P[]; movements: PdvStockMovement[] }) => void;
 };
@@ -45,8 +46,9 @@ function downloadCsv(rows: string[][], filename: string) {
 }
 
 export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Props<P>) {
-  const { ledger, catalog, movements, sales, creditMethods, allowed, onLedgerChange, onPurchaseReceived } = props;
+  const { ledger, catalog, movements, sales, creditMethods, allowed, mode = "gestao", onLedgerChange, onPurchaseReceived } = props;
   const [view, setView] = useState<"compras" | "financeiro" | "relatorios">("compras");
+  const activeView = mode === "financeiro" ? "financeiro" : view;
   const [message, setMessage] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [supplierDocument, setSupplierDocument] = useState("");
@@ -112,20 +114,20 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     onLedgerChange(registerExpense(ledger, row));
     setExpenseAmount("");setExpenseDescription("");
   });
-  const tabs: Array<typeof view> = ["compras", "financeiro", "relatorios"];
+  const tabs: Array<typeof view> = mode === "financeiro" ? [] : ["compras", "relatorios"];
   const tabLabel: Record<typeof view,string> = { compras:"Compras e fornecedores", financeiro:"Contas e despesas",
     relatorios:"Lucratividade" };
 
   return <section data-pdv-commercial-panel="true" style={{ display: "grid", gap: 14 }}>
     <div style={{ ...split, justifyContent: "space-between" }}>
-      <div><h2 style={{ margin: 0 }}>Gestão comercial</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
+      <div><h2 style={{ margin: 0 }}>{mode === "financeiro" ? "Financeiro" : "Gestão comercial"}</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
       <div style={{ fontSize: 12, color: "#475569" }}>Armazenamento local canônico</div>
     </div>
-    <div style={split}>{tabs.map((t) => <button key={t} type="button" onClick={() => { setView(t);setMessage(""); }} aria-pressed={view === t}
-      style={{ ...action, background: view === t ? "#1d4ed8" : "#e2e8f0", color: view === t ? "#fff" : "#0f172a" }}>{tabLabel[t]}</button>)}</div>
+    {mode === "gestao" ? <div style={split}>{tabs.map((t) => <button key={t} type="button" onClick={() => { setView(t);setMessage(""); }} aria-pressed={view === t}
+      style={{ ...action, background: view === t ? "#1d4ed8" : "#e2e8f0", color: view === t ? "#fff" : "#0f172a" }}>{tabLabel[t]}</button>)}</div> : null}
     {message ? <div role="status" style={{ background: "#eef2ff", color: "#1e3a8a", padding: 10, borderRadius: 6 }}>{message}</div> : null}
 
-    {view === "compras" ? <>
+    {activeView === "compras" ? <>
       <div style={box}><strong>Cadastrar fornecedor</strong><div style={split}>
         <input aria-label="Nome do fornecedor" style={field} placeholder="Razão social ou nome *" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} />
         <input style={field} placeholder="CNPJ/CPF (opcional)" value={supplierDocument} onChange={(e) => setSupplierDocument(e.target.value)} />
@@ -160,7 +162,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         </tr>)}</tbody></table></div></div>
     </> : null}
 
-    {view === "financeiro" ? <>
+    {activeView === "financeiro" ? <>
       <div style={{ ...split }}>
         <div style={{ ...box, flex: "1 1 220px" }}>A pagar<strong style={{ fontSize: 22 }}>{currency(summary.payableOpen)}</strong></div>
         <div style={{ ...box, flex: "1 1 220px" }}>A receber<strong style={{ fontSize: 22 }}>{currency(summary.receivableOpen)}</strong></div>
@@ -191,7 +193,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <span>{p.kind === "purchase" ? "Pagamento" : "Recebimento"} · {p.referenceId}</span><strong>{currency(p.amount)}</strong><small>{p.method}</small></div>)}</div>
     </> : null}
 
-    {view === "relatorios" ? <>
+    {activeView === "relatorios" ? <>
       <div style={split}>
         <div style={{ ...box, flex: "1 1 200px" }}>Vendas registradas<strong style={{ fontSize: 21 }}>{currency(summary.revenueTotal)}</strong></div>
         <div style={{ ...box, flex: "1 1 200px" }}>Custos conhecidos das vendas<strong style={{ fontSize: 21 }}>{currency(summary.knownCostTotal)}</strong></div>
