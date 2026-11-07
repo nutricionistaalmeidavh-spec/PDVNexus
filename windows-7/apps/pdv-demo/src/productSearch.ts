@@ -4,6 +4,7 @@ export type PdvSearchableProduct = {
   barcode?: string;
   productName: string;
   brand?: string;
+  producer?: string;
   category?: string;
   active?: boolean;
 };
@@ -27,7 +28,7 @@ export function findPdvProducts<T extends PdvSearchableProduct>(products: readon
   const terms = query.split(/\s+/).filter(Boolean);
   return enabled.filter((product) => {
     const haystack = normalize([
-      product.productName, product.brand ?? "", product.category ?? "",
+      product.productName, product.brand ?? "", product.producer ?? "", product.category ?? "",
       product.productCode, product.barcode ?? ""
     ].join(" "));
     return terms.every((term) => haystack.includes(term));
