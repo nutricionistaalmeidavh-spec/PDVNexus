@@ -215,9 +215,9 @@
     },
     {
       "action": "expectVisible",
-      "text": "Formas de pagamento",
+      "text": "Acesso restrito",
       "exact": true,
-      "name": "payment-methods-visible"
+      "name": "cashier-payment-methods-restricted"
     },
     {
       "action": "screenshot",
