@@ -510,8 +510,9 @@ export function PdvDemoApp() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
       const editing = target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+      const scannerInput = target === checkoutSearchRef.current;
       const dialogOpen = Boolean(document.querySelector('[role="dialog"], dialog[open]'));
-      if (!shouldHandlePdvHotkey(event.key, {route, editing, dialogOpen, modifiers: event.ctrlKey || event.altKey || event.metaKey || event.shiftKey, composing: event.isComposing})) return;
+      if (!shouldHandlePdvHotkey(event.key, {route, editing, scannerInput, dialogOpen, modifiers: event.ctrlKey || event.altKey || event.metaKey || event.shiftKey, composing: event.isComposing})) return;
       event.preventDefault();
       if (event.key === "F2") startNewSale();
       if (event.key === "F3") checkoutSearchRef.current?.focus();
