@@ -1,0 +1,70 @@
+name: QA - PDV Jornadas Variaveis (Caixa, Estoque, Vendas)
+
+on:
+  push:
+    branches: [qa/ollama-personas-actions-20261106]
+    paths:
+      - ".github/workflows/qa-variable-business-journeys.yml"
+      - "windows-10/qa/variable-business-journeys.mjs"
+      - "windows-10/qa/run-variable-business-journeys.mjs"
+      - "windows-10/tests/pdv-qa-variable-business.test.mjs"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/qa-variable-business-journeys.yml"
+      - "windows-10/qa/variable-business-journeys.mjs"
+      - "windows-10/qa/run-variable-business-journeys.mjs"
+      - "windows-10/tests/pdv-qa-variable-business.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-variable-business-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  variable-journeys:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+      - name: Instalar dependencias de QA
+        run: |
+          npm ci
+          npm ci --prefix tools/artisys-qa
+      - name: Testar gerador e oraculos
+        run: node --test tests/pdv-qa-variable-business.test.mjs
+      - name: Compilar PDV Electron isolado
+        run: npm run build:pdv-demo
+      - name: Executar sequencias comerciais variaveis
+        run: |
+          node qa/run-variable-business-journeys.mjs --output qa-variable-artifacts --seeds 1101,1102,1103,1104
+          if ($LASTEXITCODE -ne 0) { throw "Falhas nas sequencias. Veja report.md, summary.json e traces." }
+      - name: Publicar relatorio no Actions
+        if: always()
+        run: |
+          if (Test-Path "qa-variable-artifacts/report.md") {
+            Get-Content "qa-variable-artifacts/report.md" -Raw | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+      - name: Evidencias reais por etapa (screenshots, traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDVNexus-QA-Jornadas-Variaveis
+          path: windows-10/qa-variable-artifacts/
+          if-no-files-found: warn
+          retention-days: 3
