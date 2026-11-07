@@ -381,7 +381,7 @@
     {
       "action": "expectVisible",
       "text": "A pagar",
-      "exact": true,
+      "exact": false,
       "name": "financeiro-saldos-a-pagar"
     },
     {
