@@ -20,15 +20,17 @@ export async function readPersonaConfig(filename) {
 }
 
 /** Escolhe controles DOM visíveis, habilitados e relacionados ao objetivo, sem inventar ações. */
-export function selectPersonaControls(controls, goal, limit = 75) {
+export function selectPersonaControls(controls, goal, limit = 75, route = "") {
   const kind = String(goal?.kind || "");
   const navigationOnly = kind === "route" || kind === "routeText";
   const valid = controls.filter((c) => c && !c.disabled &&
     Number.isSafeInteger(c.domIndex ?? c.id) &&
     (c.tag === "A" ? String(c.href || "").startsWith("#/") : true));
-  const candidates = navigationOnly
-    ? valid.filter((c) => c.tag === "A" && String(c.href || "").startsWith("#/"))
-    : valid;
+  const requiredRoute = kind === "productExists" && !String(route).includes("#/produtos") ? "#/produtos"
+    : kind === "cashOpen" && goal.initialAmount !== undefined && !String(route).includes("#/fechamento") ? "#/fechamento" : "";
+  const candidates = requiredRoute
+    ? valid.filter((c) => c.tag === "A" && c.href === requiredRoute)
+    : navigationOnly ? valid.filter((c) => c.tag === "A" && String(c.href || "").startsWith("#/")) : valid;
   const focusTerms = kind === "productExists" ? ["produto", "cadastr", "nome", "código", "codigo", "preço", "preco", "salvar", "estoque", "mercadoria"]
     : kind === "saleCompleted" ? ["caixa", "venda", "pagamento", "vista", "iniciar", "bipe", "pesquise", "adicionar", "finalizar", "total", "f8"]
     : kind === "cashOpen" ? ["caixa", "inicial", "abrir", "dinheiro", "movimentações"] : [];
@@ -108,6 +110,22 @@ export function goalAchieved(goal, state) {
 }
 
 export function buildPrompt(persona, state, history, maxSteps) {
+  const goal = persona.goal;
+  const taskGuide = goal.kind === "productExists"
+    ? "Para cadastrar produto: abra Produtos (#/produtos), clique Novo produto, preencha codigo " + (goal.code || "98001") +
+      ", nome " + goal.value + ", preco R$ " + Number(goal.unitPrice ?? 9.9).toFixed(2).replace(".", ",") +
+      " e estoque positivo; clique Cadastrar produto. Nao use o campo Bipe do caixa."
+    : goal.kind === "cashOpen"
+    ? "Para abrir caixa com R$ " + String(goal.initialAmount ?? 0) +
+      ": abra Fechamento de caixa (#/fechamento), preencha o campo Caixa inicial com " + String(goal.initialAmount ?? 0) + " e clique Abrir caixa."
+    : goal.kind === "saleCompleted"
+    ? "Para concluir uma venda: abra o caixa se fechado; clique Nova venda (F2), preencha o leitor com " + String(goal.productCode || "00101") +
+      " e pressione Enter, escolha pagamento " + String(goal.paymentMethod || "A VISTA") +
+      " (F6 quando aplicavel), depois Finalizar (F8). A meta so passa quando a venda estiver persistida."
+    : goal.kind === "route" || goal.kind === "routeText"
+    ? "Para navegar, procure no menu o link cujo href corresponde exatamente a " + String(goal.value || goal.route) +
+      ". Nao repita cliques em links que nao mudam para a rota desejada."
+    : "Navegue conforme o objetivo e confira o estado persistido.";
   return [
     "Voce e um cliente ficticio usando o PDV Nexus em ambiente de teste local e isolado.",
     "Perfil: " + persona.profile,
@@ -117,7 +135,7 @@ export function buildPrompt(persona, state, history, maxSteps) {
     "Use apenas JSON: {\"action\":\"click|fill|press|select|done\",\"elementId\":0,\"value\":\"\",\"key\":\"Enter\",\"reason\":\"curto\"}.",
     "Para fill, value e texto; para select, value deve ser um valor das options; press aceita Enter/Escape/Tab/F2/F6/F8.",
     "Para navegar, use um dos links A com href correspondente a rota desejada. Os IDs dos controles sao numeros pequenos sequenciais e devem vir EXATAMENTE da lista, sem inventar ID.",
-    "Para finalizar uma venda primeiro abra caixa, inicie venda, digite codigo 00101, Enter, escolha pagamento e finalize.",
+    taskGuide,
     "A acao done so deve ocorrer quando a tarefa estiver completa; o avaliador checa o estado real.",
     "Passos maximos: " + maxSteps,
     "Rota atual: " + state.route,
