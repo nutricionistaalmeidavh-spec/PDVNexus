@@ -972,8 +972,7 @@
         },
         {
           "action": "click",
-          "text": "Delete / Remover ultimo item",
-          "exact": true,
+          "selector": "[data-cashier-footer=\"sale-actions\"] button:has-text(\"Cancelar item\")",
           "name": "remover-ultima",
           "holdMs": 150
         },
