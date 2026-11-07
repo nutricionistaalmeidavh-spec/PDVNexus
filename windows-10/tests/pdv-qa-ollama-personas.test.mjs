@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { readPersonaConfig, parseDecision, goalAchieved, buildPrompt } from "../qa/ollama-persona-core.mjs";
+import { readPersonaConfig, parseDecision, goalAchieved, buildPrompt, buildDecisionSchema } from "../qa/ollama-persona-core.mjs";
 
 const config = await readPersonaConfig(new URL("../qa/ollama-personas.config.json", import.meta.url));
 const controls = [
@@ -56,4 +56,14 @@ test("prompt de navegacao prioriza links reais e nunca revela indice interno do 
   assert.match(prompt,/#\/produtos/);
   assert.doesNotMatch(prompt,/domIndex/);
   assert.match(prompt,/EXATAMENTE/);
+});
+
+test("schema da IA limita elementId aos controles realmente visiveis", () => {
+  const schema = buildDecisionSchema([
+    { id: 1, tag: "A", disabled: false },
+    { id: 2, tag: "INPUT", disabled: true },
+    { id: 3, tag: "BUTTON", disabled: false }
+  ]);
+  assert.deepEqual(schema.properties.elementId.enum, [1, 3]);
+  assert.throws(() => buildDecisionSchema([]), /Nenhum controle/);
 });
