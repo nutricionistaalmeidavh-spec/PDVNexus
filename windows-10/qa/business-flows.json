@@ -2502,14 +2502,14 @@
         },
         {
           "action": "expectVisible",
-          "role": "alert",
-          "name": "validacao-sem-crash"
+          "name": "validacao-sem-crash",
+          "selector": "[role=\"alert\"]"
         },
         {
           "action": "expectText",
-          "role": "alert",
           "expected": "Informe o nome da forma de pagamento.",
-          "name": "erro-legivel"
+          "name": "erro-legivel",
+          "selector": "[role=\"alert\"]"
         },
         {
           "action": "fill",
