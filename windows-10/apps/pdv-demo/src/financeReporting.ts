@@ -73,7 +73,7 @@ export function exportPdvFinanceCsv(rows:readonly PdvFinanceRow[]):string {
   const head=["Natureza","Documento","Cliente / fornecedor / despesa","Data","Vencimento",
     "Valor original","Liquidado","Saldo em aberto","Situação","Referências das baixas"];
   const lines=rows.map(row=>[
-    row.kind,row.reference,row.party,row.date,row.dueDate??"",row.original.toFixed(2),
+    row.kind,row.reference+(row.installmentLabel?" · Parcela "+row.installmentLabel:""),row.party,row.date,row.dueDate??"",row.original.toFixed(2),
     row.settled===null?"":row.settled.toFixed(2),row.open===null?"":row.open.toFixed(2),row.status,
     row.sources.map(source=>source.id).join(" | ")
   ]);

@@ -1,12 +1,13 @@
 import { buildWorkbookXlsx, type WorkbookTable } from "./reportDocuments";
 import type { PdvFinanceRow } from "./financeMatrix";
 import type { PdvFinanceReport } from "./financeReporting";
+import type { CommercialAuditRecord } from "./commercialLedger";
 
 const fixed=(n:number)=>Number.isFinite(n)?Number(n.toFixed(2)):0;
 const money=(n:number)=>"R$ "+n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const nameFor=(row:PdvFinanceRow)=>row.kind==="payable"?"Conta a pagar":row.kind==="receivable"?"Conta a receber":"Despesa";
 
-export function buildPdvFinanceXlsx(rows:readonly PdvFinanceRow[],report:PdvFinanceReport):Uint8Array {
+export function buildPdvFinanceXlsx(rows:readonly PdvFinanceRow[],report:PdvFinanceReport,audit:readonly CommercialAuditRecord[]=[]):Uint8Array {
  const tables:WorkbookTable[]=[
   {name:"Resumo",headers:["Indicador","Valor"],widths:[42,24],moneyColumns:[2],rows:[
    ["Entradas realizadas",fixed(report.realizedIn)],["Saídas realizadas",fixed(report.realizedOut)],
@@ -16,7 +17,7 @@ export function buildPdvFinanceXlsx(rows:readonly PdvFinanceRow[],report:PdvFina
   ]},
   {name:"Lançamentos",headers:["Natureza","Documento","Cliente / fornecedor","Data","Vencimento",
      "Valor original","Liquidado","Em aberto","Situação"],widths:[20,20,38,22,18,19,19,19,18],
-     moneyColumns:[6,7,8],rows:rows.map(r=>[nameFor(r),r.reference,r.party,r.date,r.dueDate??"Não informado",
+     moneyColumns:[6,7,8],rows:rows.map(r=>[nameFor(r),r.reference+(r.installmentLabel?" · Parcela "+r.installmentLabel:""),r.party,r.date,r.dueDate??"Não informado",
        fixed(r.original),r.settled===null?"Não controlado":fixed(r.settled),r.open===null?"Não controlado":fixed(r.open),r.status])},
   {name:"Baixas",headers:["Documento","Baixa","Data","Forma","Valor"],widths:[20,26,25,23,18],moneyColumns:[5],
      rows:rows.flatMap(row=>row.sources.map(s=>[row.reference,s.id,s.paidAt,s.method,fixed(s.amount)]))},
@@ -25,6 +26,12 @@ export function buildPdvFinanceXlsx(rows:readonly PdvFinanceRow[],report:PdvFina
   {name:"Despesas por categoria",headers:["Categoria","Valor registrado","Saldo pendente identificado"],widths:[34,23,34],moneyColumns:[2,3],
      rows:report.categories.map(cat=>[cat.category,fixed(cat.registered),cat.pending===null?"Incompleto":fixed(cat.pending)])}
  ];
+ if(audit.length)tables.push({
+  name:"Auditoria",headers:["Evento","Documento","Data","Operador","Valor","Forma"],
+  widths:[27,25,27,35,18,20],moneyColumns:[5],
+  rows:audit.map(event=>[event.action,event.referenceId,event.performedAt,event.operatorName??"Não registrado (legado)",
+    event.amount===undefined?"":fixed(event.amount),event.method??""])
+ });
  return buildWorkbookXlsx(tables);
 }
 
@@ -62,7 +69,7 @@ export function buildPdvFinancePdf(rows:readonly PdvFinanceRow[],report:PdvFinan
  let page=addPage(),y=684;
  for(const r of rows){
   if(y<74){page=addPage();y=684;}
-  page.commands.push(pdfLine(short(r.reference+" | "+r.party,66),40,y,9,true));
+  page.commands.push(pdfLine(short(r.reference+(r.installmentLabel?" · Parcela "+r.installmentLabel:"")+" | "+r.party,66),40,y,9,true));
   const right=r.open===null?"não controlado":money(r.open);
   page.commands.push(pdfLine(short(nameFor(r)+" | "+right+" | "+(r.dueDate??"sem vencimento"),85),40,y-13,8));
   page.commands.push("0.87 G 0.5 w 40 "+(y-21)+" m 555 "+(y-21)+" l S");

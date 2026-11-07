@@ -59,7 +59,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
    try{
      const filename="pdv-nexus-financeiro-"+todayLocal();
      if(format==="csv")downloadFile(exportPdvFinanceCsv(filtered),filename+".csv","text/csv;charset=utf-8");
-     if(format==="xlsx")downloadFile(buildPdvFinanceXlsx(filtered,report),filename+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+     if(format==="xlsx")downloadFile(buildPdvFinanceXlsx(filtered,report,audit),filename+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
      if(format==="pdf")downloadFile(buildPdvFinancePdf(filtered,report,storeName),filename+".pdf","application/pdf");
    }catch(error){setExportError(error instanceof Error?error.message:"Não foi possível exportar o relatório.");}
  };
