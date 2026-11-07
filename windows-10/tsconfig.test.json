@@ -14,6 +14,7 @@
     "packages/modules/pdv-ops/src/index.ts",
     "apps/pdv-demo/src/receiptPrintFormat.ts",
     "apps/pdv-demo/src/quantityPricing.ts",
+    "apps/pdv-demo/src/productSearch.ts",
     "apps/pdv-demo/src/productLabels.ts",
     "apps/pdv-demo/src/batchInventory.ts",
     "apps/pdv-demo/src/batchPhysicalTracking.ts",
