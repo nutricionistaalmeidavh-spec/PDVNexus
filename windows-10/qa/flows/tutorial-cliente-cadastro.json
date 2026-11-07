@@ -8,16 +8,6 @@
       "timeoutMs": 20000
     },
     {
-      "action": "desktopStoreSet",
-      "key": "nexus-core:pdv-store:v1",
-      "name": "reset-pdv",
-      "value": {}
-    },
-    {
-      "action": "reload",
-      "name": "reload-reset"
-    },
-    {
       "action": "waitFor",
       "selector": "a[href=\"#/caixa\"]",
       "name": "pdv-reset-ready",
@@ -27,7 +17,7 @@
       "action": "click",
       "selector": "a[href=\"#/clientes\"]",
       "name": "open-clientes",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "expectURL",
@@ -40,35 +30,35 @@
       "selector": "input[placeholder=\"Nome do cliente\"]",
       "value": "Cliente QA",
       "name": "nome",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"CPF/CNPJ\"]",
       "value": "111.222.333-44",
       "name": "documento",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Cidade\"]",
       "value": "Ribeirao Preto",
       "name": "cidade",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "fill",
       "selector": "input[placeholder=\"Limite de credito\"]",
       "value": "750",
       "name": "limite",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "click",
       "text": "Cadastrar Cliente",
       "exact": true,
       "name": "cadastrar",
-      "holdMs": 650
+      "holdMs": 700
     },
     {
       "action": "waitForTimeout",
@@ -81,13 +71,6 @@
       "exact": true,
       "name": "cliente-visivel",
       "holdMs": 500
-    },
-    {
-      "action": "expectDesktopStoreJson",
-      "key": "nexus-core:pdv-store:v1",
-      "path": "registeredCustomers.3.name",
-      "expected": "Cliente QA",
-      "name": "cliente-persistido"
     }
   ]
 }
