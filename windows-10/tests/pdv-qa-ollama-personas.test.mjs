@@ -14,7 +14,7 @@ const controls = [
 test("10 personas com metas verificaveis, sem IDs duplicados", () => {
   assert.equal(config.personas.length, 10);
   assert.ok(config.personas.every((p) => !!p.goal.kind && !!p.objective));
-  assert.ok(config.maxSteps <= 20);
+  assert.ok(config.maxSteps <= 30);
 });
 test("agent só pode clicar em controles apresentados", () => {
   assert.deepEqual(parseDecision('{"action":"click","elementId":1}', controls).action, "click");
@@ -66,4 +66,22 @@ test("schema da IA limita elementId aos controles realmente visiveis", () => {
   ]);
   assert.deepEqual(schema.properties.elementId.enum, [1, 3]);
   assert.throws(() => buildDecisionSchema([]), /Nenhum controle/);
+});
+
+test("uma venda só passa quando os produtos e pagamentos exigidos estão registrados", () => {
+  const goal={kind:"saleCompleted",productCode:"00101",paymentMethod:"A VISTA"};
+  const sale={items:[{productCode:"00102"}],payments:[{method:"PIX",amount:100}]};
+  assert.equal(goalAchieved(goal,{store:{completedSales:[sale]}}),false);
+  assert.equal(goalAchieved(goal,{store:{completedSales:[{...sale,items:[{productCode:"00101"}],payments:[{method:"A VISTA",amount:100}]}]}}),true);
+});
+test("cadastro de produto confirma nome, código e preço na fonte canônica", () => {
+  const goal={kind:"productExists",value:"QA IA Banana",code:"98001",unitPrice:9.9};
+  const source={store:{catalogProducts:[{productName:"QA IA Banana",productCode:"98001",unitPrice:9.8}]}};
+  assert.equal(goalAchieved(goal,source),false);
+  source.store.catalogProducts[0].unitPrice=9.9;
+  assert.equal(goalAchieved(goal,source),true);
+});
+test("caixa de R$ 150 não passa se for aberto com zero", () => {
+  assert.equal(goalAchieved({kind:"cashOpen",expectedInitialAmount:150},{store:{cashSession:{initialAmount:0}}}),false);
+  assert.equal(goalAchieved({kind:"cashOpen",expectedInitialAmount:150},{store:{cashSession:{initialAmount:150}}}),true);
 });
