@@ -24,7 +24,9 @@ test('seis tutoriais usam ações reais do aplicativo e não sequências de imag
     const actions = data.steps.map(x => x.action);
     assert.ok(actions.includes('click') || actions.includes('clickIfVisible'), name);
     assert.ok(actions.includes('expectVisible') || actions.includes('expectDesktopStoreJson'), name);
-    if (!['historico-vendas', 'relatorios-negocio'].includes(name)) {\n      assert.ok(actions.includes('fill') || actions.includes('press') || actions.includes('selectOption'), name);\n    }
+    if (!['historico-vendas', 'relatorios-negocio'].includes(name)) {
+      assert.ok(actions.includes('fill') || actions.includes('press') || actions.includes('selectOption'), name);
+    }
     assert.ok(!actions.every(action => ['screenshot', 'waitFor', 'waitForTimeout'].includes(action)), name);
     assert.ok(definition.durationTargetSec >= 25, name);
   }
