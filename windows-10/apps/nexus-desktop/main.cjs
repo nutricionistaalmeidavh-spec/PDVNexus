@@ -347,6 +347,12 @@ function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
   let state;
   try {
     state = JSON.parse(String(snapshotJson ?? "{}"));
+    // A partial, corrupt or stale client payload must never erase canonical tables.
+    if (!state || typeof state !== "object" || !Array.isArray(state.catalogProducts) ||
+        !Array.isArray(state.registeredCustomers) || !Array.isArray(state.completedSales) ||
+        !state.extensions || typeof state.extensions !== "object" || Array.isArray(state.extensions)) {
+      throw new Error("Snapshot incompleto: produtos, clientes, vendas e extensões são obrigatórios.");
+    }
   } catch {
     throw new Error("Snapshot do PDV inválido; os dados não foram gravados.");
   }
@@ -440,14 +446,14 @@ function readPdvStateFromTables(db, storeKey) {
   return {
     catalogProducts: readRows("pdv_products", "product_code"),
     registeredCustomers: readRows("pdv_customers", "customer_id"),
-    completedSales: readRows("pdv_sales", "finalized_at, sale_number"),
+    completedSales: readRows("pdv_sales", "rowid"),
     cashSession: settings.get("cashSession") ?? null,
     paymentOptions: settings.get("paymentOptions") ?? [],
     deviceConfig: settings.get("deviceConfig") ?? {},
     extensions: {
       ...extensions,
-      cancelledSales: readRows("pdv_cancelled_sales", "finalized_at, sale_number"),
-      inventoryMovements: readRows("pdv_inventory_movements", "created_at, movement_id")
+      cancelledSales: readRows("pdv_cancelled_sales", "rowid"),
+      inventoryMovements: readRows("pdv_inventory_movements", "rowid")
     }
   };
 }
@@ -488,7 +494,11 @@ async function handlePdvSyncRequest(request, response, options) {
   }
 
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-  const storeKey = url.searchParams.get("storeKey") || options.storeKey || "default";
+  const storeKey = options.storeKey || "default";
+  if (url.searchParams.has("storeKey") && url.searchParams.get("storeKey") !== storeKey) {
+    sendJson(response, 403, { error: "Outra loja não pode ser acessada com este token." });
+    return;
+  }
 
   if (request.method === "GET" && url.pathname === "/health") {
     sendJson(response, 200, { ok: true, storeKey, updatedAt: new Date().toISOString() });
