@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { readPersonaConfig, parseDecision, goalAchieved, buildPrompt, buildDecisionSchema } from "../qa/ollama-persona-core.mjs";
+import { readPersonaConfig, parseDecision, goalAchieved, buildPrompt, buildDecisionSchema, selectPersonaControls } from "../qa/ollama-persona-core.mjs";
 
 const config = await readPersonaConfig(new URL("../qa/ollama-personas.config.json", import.meta.url));
 const controls = [
@@ -66,4 +66,33 @@ test("schema da IA limita elementId aos controles realmente visiveis", () => {
   ]);
   assert.deepEqual(schema.properties.elementId.enum, [1, 3]);
   assert.throws(() => buildDecisionSchema([]), /Nenhum controle/);
+});
+
+
+test("seleciona controles relevantes e habilitados com ID visual reindexado, mantendo índice real", () => {
+  const all = Array.from({length:95}, (_,i) => ({
+    id:i, domIndex:i, tag:i===0 ? "A" : "BUTTON", href:i===0 ? "#/produtos" : "",
+    disabled:i===4, name:i===85 ? "Cadastrar produto" : "Ação secundária",
+    placeholder:i===92 ? "Nome do produto" : ""
+  }));
+  const selected=selectPersonaControls(all,{kind:"productExists"});
+  assert.ok(selected.some(x=>x.domIndex===85), "ação útil deve permanecer visível além dos 60 primeiros controles");
+  assert.ok(selected.some(x=>x.domIndex===92), "campo relevante não pode sumir da observação");
+  assert.ok(selected.every(x=>!x.disabled));
+  assert.deepEqual(selected.map(x=>x.id), Array.from({length:selected.length},(_,i)=>i+1));
+  assert.ok(selected.every(x=>Number.isSafeInteger(x.domIndex)));
+});
+
+test("metas comerciais conferem os produtos, os valores e o meio de pagamento gravados, não apenas contagens", () => {
+  const catalog={catalogProducts:[{productCode:"98001",productName:"QA IA Banana",unitPrice:12}]};
+  const productGoal={kind:"productExists",value:"QA IA Banana",code:"98001",unitPrice:9.9};
+  assert.equal(goalAchieved(productGoal,{store:catalog}),false);
+  assert.equal(goalAchieved(productGoal,{store:{catalogProducts:[{...catalog.catalogProducts[0],unitPrice:9.9}]}}),true);
+  const cashGoal={kind:"cashOpen",initialAmount:150};
+  assert.equal(goalAchieved(cashGoal,{store:{cashSession:{initialAmount:0}}}),false);
+  assert.equal(goalAchieved(cashGoal,{store:{cashSession:{initialAmount:150}}}),true);
+  const saleGoal={kind:"saleCompleted",productCode:"00101",paymentMethod:"A VISTA"};
+  const sale={items:[{productCode:"00102"}],payments:[{method:"A VISTA",amount:100}]};
+  assert.equal(goalAchieved(saleGoal,{store:{completedSales:[sale]}}),false);
+  assert.equal(goalAchieved(saleGoal,{store:{completedSales:[{...sale,items:[{productCode:"00101"}]}]}}),true);
 });
