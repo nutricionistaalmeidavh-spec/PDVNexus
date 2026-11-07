@@ -1,7 +1,7 @@
 import test from "node:test";import assert from "node:assert/strict";
 import {bootstrapPdvFirstManager,authenticatePdvOperator,canReadPdvFinance} from "../apps/pdv-demo/src/financeAuthorization";
 const cashier={id:"OP",name:"Caixa",role:"cashier" as const,active:true};
-const manager={id:"GER",name:"Gerente",role:"manager" as const,active:true};
+const manager={id:"GER",name:"Gerente",role:"manager" as const,active:true,managerPassword:undefined as string|undefined};
 test("P5 operador não vira gerente por escolher nome; sessão exige PIN",()=>{
  const users=[cashier,{...manager,managerPassword:"nuncaCompartilhar"}];
  assert.equal(canReadPdvFinance(users[1],"OP"),false);
