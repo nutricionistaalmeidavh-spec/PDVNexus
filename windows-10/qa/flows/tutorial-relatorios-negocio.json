@@ -8,96 +8,109 @@
       "timeoutMs": 20000
     },
     {
-      "action": "desktopStoreSet",
-      "key": "nexus-core:pdv-store:v1",
-      "name": "seed-relatorio",
-      "value": {
-        "completedSales": [
-          {
-            "number": "000101",
-            "openedAt": "18/09/2026, 10:00:00",
-            "customerId": "CLI-001",
-            "seller": "Operador Caixa",
-            "discountPercent": 0,
-            "items": [
-              {
-                "id": "I-1",
-                "productCode": "00101",
-                "productName": "Teclado com fio",
-                "unitLabel": "UN",
-                "quantity": 1,
-                "unitPrice": 100,
-                "totalPrice": 100,
-                "source": "catalog"
-              }
-            ],
-            "payments": [
-              {
-                "method": "PIX",
-                "amount": 100
-              }
-            ],
-            "finalizedAt": "18/09/2026, 10:05:00",
-            "netTotal": 100,
-            "paymentSummary": {
-              "status": "paid",
-              "total": 100,
-              "paidTotal": 100,
-              "remainingTotal": 0,
-              "changeDue": 0,
-              "creditTotal": 0,
-              "immediateTotal": 100
-            }
-          }
-        ]
-      }
-    },
-    {
-      "action": "reload",
-      "name": "reload-seed"
-    },
-    {
       "action": "waitFor",
-      "selector": "a[href=\"#/vendas\"]",
-      "name": "financeiro-ready",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-reset-ready-tutorial",
       "timeoutMs": 20000
     },
     {
       "action": "click",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "open-caixa-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "clickIfVisible",
+      "text": "Abrir caixa",
+      "exact": true,
+      "name": "abrir-caixa-se-necessario-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F2",
+      "name": "nova-venda-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "value": "7895555441971",
+      "name": "scan-teclado-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "Enter",
+      "name": "confirmar-teclado-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F6",
+      "name": "pagamento-vista-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F8",
+      "name": "finalizar-venda-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]",
+      "name": "comprovante-tutorial",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Fechar",
+      "exact": true,
+      "name": "fechar-comprovante-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 450,
+      "name": "persistir-venda-tutorial"
+    },
+    {
+      "action": "click",
       "selector": "a[href=\"#/vendas\"]",
-      "name": "open-financeiro",
-      "holdMs": 650
+      "name": "abrir-relatorios",
+      "holdMs": 700
     },
     {
       "action": "expectURL",
       "includes": "#/vendas",
-      "name": "financeiro-route",
+      "name": "rota-relatorios",
       "holdMs": 500
     },
     {
       "action": "expectVisible",
       "text": "Relatórios e dashboard",
       "exact": true,
-      "name": "dashboard",
+      "name": "painel-relatorios",
       "holdMs": 500
     },
     {
       "action": "expectVisible",
       "text": "Ticket médio",
       "exact": true,
-      "name": "ticket",
+      "name": "ticket-medio",
       "holdMs": 500
-    },
-    {
-      "action": "screenshot",
-      "name": "relatorios-dashboard"
     },
     {
       "action": "click",
       "text": "Por produto",
       "exact": true,
       "name": "relatorio-por-produto",
-      "holdMs": 900
+      "holdMs": 700
     },
     {
       "action": "expectVisible",
@@ -110,7 +123,7 @@
       "text": "Itens vendidos",
       "exact": true,
       "name": "relatorio-itens-vendidos",
-      "holdMs": 800
+      "holdMs": 700
     }
   ]
 }
