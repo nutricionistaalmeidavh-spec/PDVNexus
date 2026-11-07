@@ -14,6 +14,17 @@
       "name": "new-pdv-brand"
     },
     {
+      "action": "expectVisible",
+      "text": "Nova venda (F2)",
+      "exact": true,
+      "name": "initial-sale-cta-visible"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "button[aria-label=\"Iniciar nova venda\"]",
+      "name": "initial-sale-cta-accessible"
+    },
+    {
       "action": "waitFor",
       "selector": "[data-cashier-layout=\"dense-v2\"]",
       "name": "dense-cashier-layout",
@@ -71,6 +82,34 @@
     {
       "action": "screenshot",
       "name": "02-produtos"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Os 5 produtos iniciais são exemplos para conhecer o sistema. Você pode cadastrar quantos produtos precisar, sem limite de cinco.",
+      "exact": true,
+      "name": "example-products-not-limit"
+    },
+    {
+      "action": "click",
+      "text": "Novo produto",
+      "exact": true,
+      "name": "open-new-product-form"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Cadastrar produto",
+      "exact": true,
+      "name": "product-create-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "02a-cadastro-de-produto"
+    },
+    {
+      "action": "click",
+      "text": "Recolher cadastro",
+      "exact": true,
+      "name": "close-product-form"
     },
     {
       "action": "click",
@@ -168,6 +207,69 @@
     {
       "action": "screenshot",
       "name": "04-financeiro"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
+      "name": "open-canonical-gestao"
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/gestao",
+      "name": "gestao-route"
+    },
+    {
+      "action": "expectVisible",
+      "name": "commercial-dashboard",
+      "selector": "[data-pdv-commercial-panel=\"true\"] h2"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Cadastrar fornecedor",
+      "exact": true,
+      "name": "supplier-registration"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Nova compra · adicionar itens",
+      "exact": true,
+      "name": "purchase-entry-form"
+    },
+    {
+      "action": "screenshot",
+      "name": "05a-compras-fornecedores"
+    },
+    {
+      "action": "click",
+      "text": "Contas e despesas",
+      "exact": true,
+      "name": "open-payables"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Registrar pagamento ou recebimento parcial",
+      "exact": true,
+      "name": "ledger-settlements"
+    },
+    {
+      "action": "screenshot",
+      "name": "05b-financeiro-gerencial"
+    },
+    {
+      "action": "click",
+      "text": "Lucratividade",
+      "exact": true,
+      "name": "open-commercial-profit"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Lucratividade por venda",
+      "exact": false,
+      "name": "gross-profit-visible"
+    },
+    {
+      "action": "screenshot",
+      "name": "05c-lucratividade"
     },
     {
       "action": "click",

@@ -21,7 +21,12 @@ function createPageHarness() {
             load: async (key) => desktopStore.get(key) ?? null
           },
           pdvStore: {
-            save: async (key, snapshotJson) => { pdvStore.set(key, { snapshotJson }); },
+            save: async (key, snapshotJson, expectedRevision) => {
+              const revision = pdvStore.get(key)?.revision ?? 0;
+              assert.equal(expectedRevision, revision, "QA fixture must pass the canonical revision to IPC");
+              pdvStore.set(key, { snapshotJson, revision: revision + 1 });
+              return { revision: revision + 1 };
+            },
             load: async (key) => pdvLoadOverride ? pdvLoadOverride(key) : (pdvStore.get(key) ?? null)
           }
         }
@@ -63,10 +68,18 @@ test('snapshot principal do PDV usa bridge SQLite pdvStore', async () => {
   });
   assert.equal(harness.desktopStore.has(key), false);
   assert.deepEqual(JSON.parse(harness.pdvStore.get(key).snapshotJson), { completedSales: [{ number: '000001' }] });
+  assert.equal(harness.pdvStore.get(key).revision, 1);
   await executeStep({
     ...base,
     page: harness.page,
-    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000001' }
+    step: { action: 'desktopStoreSet', key, value: { completedSales: [{ number: '000002' }] } }
+  });
+  assert.equal(harness.pdvStore.get(key).revision, 2);
+  assert.equal(JSON.parse(harness.pdvStore.get(key).snapshotJson).completedSales[0].number, '000002');
+  await executeStep({
+    ...base,
+    page: harness.page,
+    step: { action: 'expectDesktopStoreJson', key, path: 'completedSales.0.number', expected: '000002' }
   });
 });
 

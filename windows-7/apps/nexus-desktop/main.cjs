@@ -136,6 +136,10 @@ function getDesktopStore() {
     try {
       desktopStoreRef = JSON.parse(fs.readFileSync(backupPath, "utf8"));
     } catch {
+      // Never silently start a new empty store over an unreadable existing database.
+      if (fs.existsSync(filePath) || fs.existsSync(backupPath)) {
+        throw new Error("Dados locais do PDV danificados; restaure o backup antes de operar.");
+      }
       desktopStoreRef = {};
     }
   }
@@ -169,20 +173,42 @@ function saveAppStoreSnapshot(storeKey, snapshotJson) {
 }
 
 function loadPdvStoreSnapshot(storeKey) {
-  return getDesktopStore().pdvSnapshots[String(storeKey ?? "default")] ?? null;
+  const row = getDesktopStore().pdvSnapshots[String(storeKey ?? "default")];
+  return row ? { ...row, revision: Number(row.revision ?? 0) } : null;
 }
 
-function savePdvStoreSnapshot(storeKey, snapshotJson) {
+function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error("REVISION_REQUIRED: leitura canônica obrigatória antes de gravar.");
+  }
   let state;
   try {
     state = JSON.parse(String(snapshotJson ?? "{}"));
+    if (!state || typeof state !== "object" || !Array.isArray(state.catalogProducts) ||
+      !Array.isArray(state.registeredCustomers) || !Array.isArray(state.completedSales) ||
+      !state.extensions || typeof state.extensions !== "object") throw new Error("Snapshot incompleto.");
   } catch {
     throw new Error("Snapshot do PDV inválido; os dados não foram gravados.");
   }
+  const key = String(storeKey ?? "default");
+  const database = getDesktopStore();
+  const previous = database.pdvSnapshots[key] ?? null;
+  const revision = Number(previous?.revision ?? 0);
+  if (revision !== expectedRevision) {
+    const error = new Error("REVISION_CONFLICT: dados atualizados por outro caixa; recarregue antes de alterar.");
+    error.code = "REVISION_CONFLICT";
+    throw error;
+  }
   const updatedAt = new Date().toISOString();
-  getDesktopStore().pdvSnapshots[String(storeKey ?? "default")] = { snapshotJson: JSON.stringify(state), updatedAt };
-  saveDesktopStore();
-  return { updatedAt };
+  database.pdvSnapshots[key] = { snapshotJson: JSON.stringify(state), updatedAt, revision: revision + 1 };
+  try { saveDesktopStore(); }
+  catch (error) {
+    // Keep in-memory truth identical to the last durable state when a write fails.
+    if (previous) database.pdvSnapshots[key] = previous;
+    else delete database.pdvSnapshots[key];
+    throw error;
+  }
+  return { updatedAt, revision: revision + 1 };
 }
 
 function sendJson(response, statusCode, payload) {
@@ -196,7 +222,7 @@ function sendJson(response, statusCode, payload) {
 }
 
 function isPdvSyncAuthorized(request, token) {
-  if (!token) return true;
+  if (!token) return false;
   return request.headers["x-nexus-token"] === token || request.headers.authorization === `Bearer ${token}`;
 }
 
@@ -221,7 +247,11 @@ async function handlePdvSyncRequest(request, response, options) {
   }
 
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-  const storeKey = url.searchParams.get("storeKey") || options.storeKey || "default";
+  const storeKey = options.storeKey || "default";
+  if (url.searchParams.has("storeKey") && url.searchParams.get("storeKey") !== storeKey) {
+    sendJson(response, 403, { error: "Outra loja não pode ser acessada com este token." });
+    return;
+  }
 
   if (request.method === "GET" && url.pathname === "/health") {
     sendJson(response, 200, { ok: true, storeKey, updatedAt: new Date().toISOString() });
@@ -236,8 +266,20 @@ async function handlePdvSyncRequest(request, response, options) {
   if (request.method === "PUT" && url.pathname === "/pdv-store") {
     const body = await readRequestBody(request);
     const parsed = JSON.parse(body || "{}");
+    if (!Number.isSafeInteger(parsed.expectedRevision) || parsed.expectedRevision < 0) {
+      sendJson(response, 428, { error: "expectedRevision obrigatório; consulte GET /pdv-store antes de gravar." });
+      return;
+    }
     const snapshotJson = typeof parsed.snapshotJson === "string" ? parsed.snapshotJson : JSON.stringify(parsed.snapshot ?? {});
-    sendJson(response, 200, savePdvStoreSnapshot(storeKey, snapshotJson));
+    try {
+      sendJson(response, 200, savePdvStoreSnapshot(storeKey, snapshotJson, parsed.expectedRevision));
+    } catch (error) {
+      if (error?.code === "REVISION_CONFLICT") {
+        sendJson(response, 409, { error: error.message, current: loadPdvStoreSnapshot(storeKey)?.revision });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -478,7 +520,7 @@ ipcMain.handle("nexus-secret:encryption-available", () => safeStorage.isEncrypti
 
 ipcMain.handle("nexus-pdv-store:status", () => ({
   available: Boolean(DatabaseSync),
-  path: getPdvDbPath(),
+  path: getDesktopStorePath(),
   machineName: os.hostname()
 }));
 
@@ -486,8 +528,8 @@ ipcMain.handle("nexus-pdv-store:load", (_event, storeKey) => {
   return loadPdvStoreSnapshot(storeKey);
 });
 
-ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson) => {
-  return savePdvStoreSnapshot(storeKey, snapshotJson);
+ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson, expectedRevision) => {
+  return savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision);
 });
 
 ipcMain.handle("app-store:status", () => ({
@@ -518,7 +560,8 @@ ipcMain.handle("nexus-pdv-sync:start", async (_event, options) => {
   }
 
   const port = Number(options?.port ?? PDV_SYNC_DEFAULT_PORT) || PDV_SYNC_DEFAULT_PORT;
-  const token = String(options?.token ?? "");
+  const token = String(options?.token ?? "").trim();
+  if (token.length < 16) throw new Error("Token de sincronização obrigatório (mínimo 16 caracteres) para proteger dados comerciais.");
   const storeKey = String(options?.storeKey ?? "default");
   const server = http.createServer((request, response) => {
     handlePdvSyncRequest(request, response, { token, storeKey }).catch((error) => {

@@ -173,7 +173,8 @@ function getPdvDatabase() {
     CREATE TABLE IF NOT EXISTS pdv_store (
       store_key TEXT PRIMARY KEY,
       snapshot_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      revision INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS pdv_meta (
       name TEXT PRIMARY KEY,
@@ -236,6 +237,10 @@ function getPdvDatabase() {
     CREATE INDEX IF NOT EXISTS idx_pdv_sales_finalized_at ON pdv_sales (store_key, finalized_at);
     CREATE INDEX IF NOT EXISTS idx_pdv_sale_items_product ON pdv_sale_items (store_key, product_code);
   `);
+  // Additive migration: keep all existing rows when upgrading a legacy installation.
+  if (!db.prepare("PRAGMA table_info(pdv_store)").all().some((row) => row.name === "revision")) {
+    db.exec("ALTER TABLE pdv_store ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+  }
   appendPdvSqliteLog("schema.ensure.done");
   try {
     const integrityRow = db.prepare("PRAGMA quick_check").get();
@@ -256,19 +261,13 @@ function getPdvDatabase() {
 }
 
 function resetPdvDataForNewInstalledVersion(db) {
+  // An application update must NEVER delete customers, products, inventory or sales.
+  // Track the installed version as migration metadata. Schema migrations are additive.
   const version = app.getVersion();
   const previousVersion = db.prepare("SELECT value FROM pdv_meta WHERE name = ?").get("installed-pdv-version")?.value;
   if (previousVersion === version) return;
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    for (const table of ["pdv_store", "pdv_migration_backups", "pdv_products", "pdv_customers", "pdv_sales", "pdv_sale_items", "pdv_cancelled_sales", "pdv_inventory_movements", "pdv_settings"]) db.exec(`DELETE FROM ${table}`);
-    db.exec("DELETE FROM pdv_meta");
-    db.prepare("INSERT INTO pdv_meta (name, value) VALUES (?, ?)").run("installed-pdv-version", version);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  db.prepare("INSERT INTO pdv_meta (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value")
+    .run("installed-pdv-version", version);
 }
 
 function getAppDatabase() {
@@ -329,7 +328,8 @@ function loadPdvStoreSnapshot(storeKey) {
       appendPdvSqliteLog("load.done", `store=${key}; empty=true; ms=${Date.now() - startedAt}`);
       return null;
     }
-    const result = { snapshotJson: JSON.stringify(state), updatedAt: getPdvUpdatedAt(db, key) };
+    const persisted = db.prepare("SELECT updated_at AS updatedAt, revision FROM pdv_store WHERE store_key = ?").get(key);
+    const result = { snapshotJson: JSON.stringify(state), updatedAt: persisted?.updatedAt ?? getPdvUpdatedAt(db, key), revision: Number(persisted?.revision ?? 0) };
     appendPdvSqliteLog("load.done", `store=${key}; ms=${Date.now() - startedAt}`);
     return result;
   } catch (error) {
@@ -338,7 +338,10 @@ function loadPdvStoreSnapshot(storeKey) {
   }
 }
 
-function savePdvStoreSnapshot(storeKey, snapshotJson) {
+function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error("REVISION_REQUIRED: leitura canônica obrigatória antes de gravar.");
+  }
   const startedAt = Date.now();
   const key = String(storeKey ?? "default");
   appendPdvSqliteLog("save.start", `store=${key}`);
@@ -347,18 +350,20 @@ function savePdvStoreSnapshot(storeKey, snapshotJson) {
   let state;
   try {
     state = JSON.parse(String(snapshotJson ?? "{}"));
+    // A partial, corrupt or stale client payload must never erase canonical tables.
+    if (!state || typeof state !== "object" || !Array.isArray(state.catalogProducts) ||
+        !Array.isArray(state.registeredCustomers) || !Array.isArray(state.completedSales) ||
+        !state.extensions || typeof state.extensions !== "object" || Array.isArray(state.extensions)) {
+      throw new Error("Snapshot incompleto: produtos, clientes, vendas e extensões são obrigatórios.");
+    }
   } catch {
     throw new Error("Snapshot do PDV inválido; os dados não foram gravados.");
   }
   try {
-    writePdvStateToTables(db, key, state, updatedAt);
-    db.prepare(`
-      INSERT INTO pdv_store (store_key, snapshot_json, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at
-    `).run(key, JSON.stringify(state), updatedAt);
+    writePdvStateToTables(db, key, state, updatedAt, expectedRevision);
     appendPdvSqliteLog("save.done", `store=${key}; ms=${Date.now() - startedAt}`);
-    return { updatedAt };
+    const row = db.prepare("SELECT revision FROM pdv_store WHERE store_key = ?").get(key);
+    return { updatedAt, revision: Number(row?.revision ?? 0) };
   } catch (error) {
     appendPdvSqliteLog("save.error", `store=${key}; ms=${Date.now() - startedAt}; ${error?.message || error}`);
     throw normalizePdvSqliteError(error, "a gravação dos dados");
@@ -384,7 +389,7 @@ function migrateLegacyPdvSnapshotIfNeeded(db, storeKey) {
   db.prepare("INSERT OR REPLACE INTO pdv_meta (name, value) VALUES (?, ?)").run(`direct-schema:${storeKey}`, "1");
 }
 
-function writePdvStateToTables(db, storeKey, state, updatedAt) {
+function writePdvStateToTables(db, storeKey, state, updatedAt, expectedRevision) {
   const products = Array.isArray(state.catalogProducts) ? state.catalogProducts : [];
   const customers = Array.isArray(state.registeredCustomers) ? state.registeredCustomers : [];
   const sales = Array.isArray(state.completedSales) ? state.completedSales : [];
@@ -393,6 +398,15 @@ function writePdvStateToTables(db, storeKey, state, updatedAt) {
   const inventoryMovements = Array.isArray(extensions.inventoryMovements) ? extensions.inventoryMovements : [];
   db.exec("BEGIN IMMEDIATE");
   try {
+    if (expectedRevision !== undefined) {
+      const current = db.prepare("SELECT revision FROM pdv_store WHERE store_key = ?").get(storeKey);
+      const revision = Number(current?.revision ?? 0);
+      if (revision !== expectedRevision) {
+        const conflict = new Error("REVISION_CONFLICT: o caixa foi atualizado por outro terminal. Recarregue os dados antes de repetir a operação.");
+        conflict.code = "REVISION_CONFLICT";
+        throw conflict;
+      }
+    }
     for (const table of ["pdv_products", "pdv_customers", "pdv_sales", "pdv_sale_items", "pdv_cancelled_sales", "pdv_inventory_movements", "pdv_settings"]) db.prepare(`DELETE FROM ${table} WHERE store_key = ?`).run(storeKey);
     const insertProduct = db.prepare("INSERT INTO pdv_products (store_key, product_code, payload_json) VALUES (?, ?, ?)");
     const insertCustomer = db.prepare("INSERT INTO pdv_customers (store_key, customer_id, payload_json) VALUES (?, ?, ?)");
@@ -415,6 +429,9 @@ function writePdvStateToTables(db, storeKey, state, updatedAt) {
     insertSetting.run(storeKey, "deviceConfig", JSON.stringify(state.deviceConfig ?? {}));
     insertSetting.run(storeKey, "extensions", JSON.stringify({ ...extensions, cancelledSales: [], inventoryMovements: [] }));
     db.prepare("INSERT OR REPLACE INTO pdv_meta (name, value) VALUES (?, ?)").run(`direct-schema:${storeKey}`, "1");
+    // The snapshot compatibility view and normalized tables commit atomically.
+    db.prepare("INSERT INTO pdv_store (store_key, snapshot_json, updated_at, revision) VALUES (?, ?, ?, 1) ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at, revision = pdv_store.revision + 1")
+      .run(storeKey, JSON.stringify(state), updatedAt);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -432,14 +449,14 @@ function readPdvStateFromTables(db, storeKey) {
   return {
     catalogProducts: readRows("pdv_products", "product_code"),
     registeredCustomers: readRows("pdv_customers", "customer_id"),
-    completedSales: readRows("pdv_sales", "finalized_at, sale_number"),
+    completedSales: readRows("pdv_sales", "rowid"),
     cashSession: settings.get("cashSession") ?? null,
     paymentOptions: settings.get("paymentOptions") ?? [],
     deviceConfig: settings.get("deviceConfig") ?? {},
     extensions: {
       ...extensions,
-      cancelledSales: readRows("pdv_cancelled_sales", "finalized_at, sale_number"),
-      inventoryMovements: readRows("pdv_inventory_movements", "created_at, movement_id")
+      cancelledSales: readRows("pdv_cancelled_sales", "rowid"),
+      inventoryMovements: readRows("pdv_inventory_movements", "rowid")
     }
   };
 }
@@ -455,7 +472,7 @@ function sendJson(response, statusCode, payload) {
 }
 
 function isPdvSyncAuthorized(request, token) {
-  if (!token) return true;
+  if (!token) return false;
   return request.headers["x-nexus-token"] === token || request.headers.authorization === `Bearer ${token}`;
 }
 
@@ -480,7 +497,11 @@ async function handlePdvSyncRequest(request, response, options) {
   }
 
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-  const storeKey = url.searchParams.get("storeKey") || options.storeKey || "default";
+  const storeKey = options.storeKey || "default";
+  if (url.searchParams.has("storeKey") && url.searchParams.get("storeKey") !== storeKey) {
+    sendJson(response, 403, { error: "Outra loja não pode ser acessada com este token." });
+    return;
+  }
 
   if (request.method === "GET" && url.pathname === "/health") {
     sendJson(response, 200, { ok: true, storeKey, updatedAt: new Date().toISOString() });
@@ -495,8 +516,21 @@ async function handlePdvSyncRequest(request, response, options) {
   if (request.method === "PUT" && url.pathname === "/pdv-store") {
     const body = await readRequestBody(request);
     const parsed = JSON.parse(body || "{}");
+    // HTTP clients MUST use compare-and-swap; blindly replacing the shared state loses sales.
+    if (!Number.isSafeInteger(parsed.expectedRevision) || parsed.expectedRevision < 0) {
+      sendJson(response, 428, { error: "expectedRevision obrigatório; primeiro consulte GET /pdv-store." });
+      return;
+    }
     const snapshotJson = typeof parsed.snapshotJson === "string" ? parsed.snapshotJson : JSON.stringify(parsed.snapshot ?? {});
-    sendJson(response, 200, savePdvStoreSnapshot(storeKey, snapshotJson));
+    try {
+      sendJson(response, 200, savePdvStoreSnapshot(storeKey, snapshotJson, parsed.expectedRevision));
+    } catch (error) {
+      if (error?.code === "REVISION_CONFLICT") {
+        sendJson(response, 409, { error: error.message, current: loadPdvStoreSnapshot(storeKey)?.revision });
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -745,8 +779,8 @@ ipcMain.handle("nexus-pdv-store:load", (_event, storeKey) => {
   return loadPdvStoreSnapshot(storeKey);
 });
 
-ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson) => {
-  return savePdvStoreSnapshot(storeKey, snapshotJson);
+ipcMain.handle("nexus-pdv-store:save", (_event, storeKey, snapshotJson, expectedRevision) => {
+  return savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision);
 });
 
 ipcMain.handle("app-store:status", () => ({
@@ -777,7 +811,8 @@ ipcMain.handle("nexus-pdv-sync:start", async (_event, options) => {
   }
 
   const port = Number(options?.port ?? PDV_SYNC_DEFAULT_PORT) || PDV_SYNC_DEFAULT_PORT;
-  const token = String(options?.token ?? "");
+  const token = String(options?.token ?? "").trim();
+  if (token.length < 16) throw new Error("Token de sincronização obrigatório (mínimo 16 caracteres) para proteger dados comerciais.");
   const storeKey = String(options?.storeKey ?? "default");
   const server = http.createServer((request, response) => {
     handlePdvSyncRequest(request, response, { token, storeKey }).catch((error) => {

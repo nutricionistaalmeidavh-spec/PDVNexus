@@ -106,7 +106,7 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
   };
 
   const paymentFilterWarning = Boolean(paymentMethod || productCode);
-  const coverageNote = "Os resultados incluem apenas vendas ainda presentes no histórico desta instalação. Versões anteriores limitavam esse histórico às 100 vendas mais recentes.";
+  const coverageNote = "O relatório consulta todo o histórico preservado nesta instalação, independentemente da página exibida. Versões antigas podiam descartar vendas além das 100 mais recentes; consulte backups anteriores se precisar desses registros.";
 
   const setQuickPeriod = (key: string) => {
     setPeriod(key);

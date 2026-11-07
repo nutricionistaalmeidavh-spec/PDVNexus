@@ -116,7 +116,7 @@ export function applyBatchStockEntryToSnapshot(input: {
     catalogProducts: stockResult.products as SnapshotCatalogProduct[],
     extensions: {
       ...previousExtensions,
-      inventoryMovements: [stockResult.movement, ...previousMovements].slice(0, 200)
+      inventoryMovements: [stockResult.movement, ...previousMovements]
     }
   };
   return {

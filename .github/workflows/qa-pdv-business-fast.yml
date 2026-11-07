@@ -1,0 +1,63 @@
+name: QA PDV Canonical Business (fast)
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/qa-pdv-business-fast.yml"
+      - "windows-10/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/qa-pdv-business-fast.yml"
+      - "windows-10/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-journeys:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix tools/artisys-qa
+      - name: Validate canonical tests
+        run: |
+          npm run typecheck
+          node --test tests/pdv-non-fiscal-scope.test.mjs
+          npm run test:pdv-payments
+          npm run test:pdv-upgrade
+      - name: Build
+        run: npm run build:pdv-demo
+      - name: Run 25 business-critical scenarios without video dependency
+        run: node qa/run-business-flows.mjs --config qa/artisys-qa.config.json --suite qa/business-flows.json --output qa-business-fast-artifacts
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-Canonical-Business-FAST
+          path: windows-10/qa-business-fast-artifacts
+          retention-days: 3
+          if-no-files-found: warn

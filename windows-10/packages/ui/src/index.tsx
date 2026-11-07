@@ -14,7 +14,7 @@ const PDV_LABELS: Record<string, string> = {
   caixa: "Caixa",
   produtos: "Produtos",
   clientes: "Clientes",
-  financeiro: "Financeiro",
+  financeiro: "Financeiro e relatórios",
   administracao: "Administração",
   balanca: "Balança",
   configuracoes: "Configurações"
