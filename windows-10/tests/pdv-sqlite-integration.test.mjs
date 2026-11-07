@@ -85,3 +85,25 @@ test("SQLite real: malformed duplicated product rolls back deletes, preserving p
   assert.equal(count(db,"pdv_sales"),251);
  } finally { db.close(); }
 });
+
+test("SQLite canônico preserva marca, empreendimento, custo da venda e exclusão reversível do relatório", () => {
+ const db=createDb();
+ try {
+  const payload=state(1);
+  payload.catalogProducts[0].brand="ABRINCO";
+  payload.catalogProducts[0].producer="Cooperativa Cerrado";
+  payload.catalogProducts[0].costPrice=6.5;
+  payload.completedSales[0].reportExclusion={reason:"Treinamento",excludedAt:"2026-11-07T12:00:00Z",excludedBy:"GER-001"};
+  payload.completedSales[0].items[0].brand="ABRINCO";
+  payload.completedSales[0].items[0].producer="Cooperativa Cerrado";
+  payload.completedSales[0].items[0].unitCostAtSale=6.5;
+  write(db,"loja",payload,new Date().toISOString(),0);
+  const product=JSON.parse(db.prepare("SELECT payload_json FROM pdv_products WHERE store_key = 'loja'").get().payload_json);
+  const sale=JSON.parse(db.prepare("SELECT payload_json FROM pdv_sales WHERE store_key = 'loja'").get().payload_json);
+  assert.equal(product.producer,"Cooperativa Cerrado");
+  assert.equal(sale.reportExclusion.excludedBy,"GER-001");
+  assert.equal(sale.items[0].unitCostAtSale,6.5);
+  assert.equal(JSON.parse(row(db).snapshotJson).catalogProducts[0].brand,"ABRINCO");
+  assert.equal(JSON.parse(row(db).snapshotJson).completedSales[0].items[0].producer,"Cooperativa Cerrado");
+ } finally {db.close();}
+});
