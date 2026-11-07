@@ -12,7 +12,7 @@ const click=(selector,name)=>s("click",{selector,name});
 const fill=(selector,value,name)=>s("fill",{selector,value:String(value),name});
 const press=(key,name)=>s("press",{selector:scan,key,name,holdMs:key==="F8"?650:175});
 const wait=(name)=>s("waitForTimeout",{timeoutMs:400,name});
-const currency=(n)=>"R$ "+n.toFixed(2).replace(".",",");
+const currency=(n)=>n.toFixed(2).replace(".",",");
 function checkpoint(steps,tag,model,{report=true}={}){
   // Dados verificados antes E depois da recarga, sem mutacoes ocultas de fixtures.
   function checks(marker){
