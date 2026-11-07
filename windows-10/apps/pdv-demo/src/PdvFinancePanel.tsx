@@ -79,7 +79,7 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
  </section>;
  return <section data-pdv-finance-panel="true" style={{display:"grid",gap:14}}>
    <div style={{...rowLayout,justifyContent:"space-between"}}>
-     <div><h2 style={{margin:0,fontSize:20}}>Financeiro</h2>
+     <div><h2 style={{margin:0,fontSize:20}}>Visão geral</h2>
        <p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>Compras recebidas, crediário e despesas — sem saldos paralelos e com funcionamento offline.</p></div>
      <div style={rowLayout}><button type="button" onClick={onOpenExpense} style={compactButton}>+ Nova despesa</button>
        <button type="button" onClick={()=>onOpenSettlement("purchase")} style={guidedPrimaryStyle}>Registrar pagamento ou recebimento parcial</button></div>

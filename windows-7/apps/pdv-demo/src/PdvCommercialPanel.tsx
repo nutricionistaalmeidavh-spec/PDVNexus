@@ -161,10 +161,10 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
 
   if (!allowed) return <section data-pdv-commercial-panel="true" role="status" style={box}><h2>Acesso restrito</h2><p>A gestão e os dados financeiros exigem perfil de gerente ou administrador ativo.</p></section>;
   return <section data-pdv-commercial-panel="true" style={{ display: "grid", gap: 14 }}>
-    <div style={{ ...split, justifyContent: "space-between" }}>
-      <div><h2 style={{ margin: 0 }}>{mode === "financeiro" ? "Financeiro" : "Gestão comercial"}</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
+    {mode === "gestao" ? <div style={{ ...split, justifyContent: "space-between" }}>
+      <div><h2 style={{ margin: 0 }}>Gestão comercial</h2><p style={{ margin: "3px 0", fontSize: 12, color: "#64748b" }}>Dados comerciais associados ao mesmo cadastro e estoque do PDV. Sem saldos paralelos.</p></div>
       <div style={{ fontSize: 12, color: "#475569" }}>Armazenamento local canônico</div>
-    </div>
+    </div> : null}
     {mode === "gestao" ? <div style={split}>{tabs.map((t) => <button key={t} type="button" onClick={() => { setView(t);setMessage(""); }} aria-pressed={view === t}
       style={{ ...action, background: view === t ? "#1d4ed8" : "#e2e8f0", color: view === t ? "#fff" : "#0f172a" }}>{tabLabel[t]}</button>)}</div> : null}
     {message ? <div role="status" style={{ background: "#eef2ff", color: "#1e3a8a", padding: 10, borderRadius: 6 }}>{message}</div> : null}
