@@ -366,7 +366,8 @@
 }
 
 /* UI-only paging and checkout product picker: retain all records in SQLite. */
-@media (max-width: 980px) {
+/* Reflow before the 6-column cashier toolbar exceeds the usable content width. */
+@media (max-width: 1240px) {
   .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     height: auto !important;

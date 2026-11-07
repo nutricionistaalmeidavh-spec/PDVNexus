@@ -11,12 +11,13 @@ type Props<T extends PdvPickerProduct> = {
   initialSearch?: string;
   onSelect: (product: T) => void;
   onClose: () => void;
+  onCreateProduct?: () => void;
 };
 
 const PAGE_SIZE = 30;
 const formatMoney = (price: number) => price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export function PdvProductPicker<T extends PdvPickerProduct>({ products, initialSearch = "", onSelect, onClose }: Props<T>) {
+export function PdvProductPicker<T extends PdvPickerProduct>({ products, initialSearch = "", onSelect, onClose, onCreateProduct }: Props<T>) {
   const [query, setQuery] = useState(initialSearch);
   const [page, setPage] = useState(1);
   const matches = useMemo(() =>
@@ -55,7 +56,10 @@ export function PdvProductPicker<T extends PdvPickerProduct>({ products, initial
             <span style={{ fontSize: "11px", color: "#64748b" }}>{product.brand ? product.brand + " · " : ""}{product.productCode} · Estoque {product.stock.toLocaleString("pt-BR")}</span>
             <b style={{ fontSize: "16px", color: "#0f4ea3" }}>{formatMoney(product.unitPrice)}</b>
           </button>)}
-          {!matches.length ? <p role="status">Nenhum produto encontrado. Experimente parte do nome ou código.</p> : null}
+          {!matches.length ? <div style={{ display: "grid", gap: 9, gridColumn: "1 / -1", justifyItems: "start" }}>
+            <p role="status">Nenhum produto encontrado. Experimente parte do nome ou código. Para cadastrar uma mercadoria nova, use a opção abaixo.</p>
+            {onCreateProduct ? <button type="button" onClick={onCreateProduct} style={{ border: "1px solid #2563eb", color: "#fff", background: "#1d4ed8", borderRadius: 6, padding: "10px 14px", cursor: "pointer", fontWeight: 700 }}>Cadastrar novo produto</button> : null}
+          </div> : null}
         </div>
         {totalPages > 1 ? <div style={{ display: "flex", gap: "12px", alignItems: "center", justifyContent: "flex-end", borderTop: "1px solid #e2e8f0", padding: "10px 18px" }}>
           <button type="button" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>Anterior</button>
