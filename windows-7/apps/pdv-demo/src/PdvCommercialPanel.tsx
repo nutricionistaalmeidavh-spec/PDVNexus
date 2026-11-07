@@ -2,7 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import {
   emptyCommercialLedger, normalizeCommercialLedger,
   purchaseOpenBalance, purchaseTotal, receivePurchase, registerExpense, registerPurchase,
-  expenseOpenBalance, settleExpense,
+  expenseOpenBalance, settleExpense, registerRecurringExpenses,
   registerSupplier, saleGrossProfit, saleOpenBalance, settlePayable, settleReceivable,
   summarizeCommercial,
   type CommercialCatalogProduct, type CommercialExpense, type CommercialLedger,
@@ -79,6 +79,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   const [expenseDueDate, setExpenseDueDate] = useState("");
   const [expensePaidNow, setExpensePaidNow] = useState(false);
   const [expenseMethod, setExpenseMethod] = useState("PIX");
+  const [expenseRepeatMonths, setExpenseRepeatMonths] = useState(1);
   const summary = useMemo(() => summarizeCommercial({ ledger, sales, creditMethods }), [ledger, sales, creditMethods]);
   const receivables = useMemo(() => sales.filter((sale) => saleOpenBalance(ledger, sale, creditMethods) > 0), [ledger, sales, creditMethods]);
   const payables = useMemo(() => ledger.purchases.filter((p) => purchaseOpenBalance(ledger, p) > 0), [ledger]);
@@ -126,9 +127,10 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
     const row: CommercialExpense = { id: id("DES"), description: expenseDescription, amount: numberInput(expenseAmount),
       category: expenseCategory, occurredAt: timestamp(), dueDate:expenseDueDate, trackPayment:true,
       createdById:operator?.id, createdByName:operator?.name };
-    const created=registerExpense(ledger,row);
-    onLedgerChange(expensePaidNow ? settleExpense(created,{id:id("PAG"),referenceId:row.id,amount:row.amount,method:expenseMethod,paidAt:timestamp(),operatorId:operator?.id,operatorName:operator?.name}) : created);
-    setExpenseAmount("");setExpenseDescription("");setExpenseDueDate("");setExpensePaidNow(false);
+    const created=registerRecurringExpenses(ledger,row,expenseRepeatMonths);
+    const firstExpenseId=expenseRepeatMonths===1?row.id:row.id+"-1";
+    onLedgerChange(expensePaidNow ? settleExpense(created,{id:id("PAG"),referenceId:firstExpenseId,amount:row.amount,method:expenseMethod,paidAt:timestamp(),operatorId:operator?.id,operatorName:operator?.name}) : created);
+    setExpenseAmount("");setExpenseDescription("");setExpenseDueDate("");setExpensePaidNow(false);setExpenseRepeatMonths(1);
   });
   const selectedPurchase = ledger.purchases.find((p) => p.id === settlementReference);
   const selectedSale = sales.find((s) => s.number === settlementReference);
@@ -277,12 +279,14 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
         <label style={{ display: "grid", gap: 5 }}>Categoria<input style={guidedFieldStyle} value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} placeholder="Operacional" /></label>
         <label style={{ display: "grid", gap: 5 }}>Valor (R$)<input style={guidedFieldStyle} inputMode="decimal" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} placeholder="0,00" /></label>
         <label style={{ display: "grid", gap: 5 }}>Vencimento<input type="date" aria-label="Vencimento da despesa" style={guidedFieldStyle} value={expenseDueDate} onChange={(e)=>setExpenseDueDate(e.target.value)} /></label>
+        <label style={{display:"grid",gap:5}}>Recorrência mensal<select style={guidedFieldStyle} value={expenseRepeatMonths} onChange={e=>setExpenseRepeatMonths(Number(e.target.value))}><option value={1}>Somente este mês</option><option value={3}>Próximos 3 meses</option><option value={6}>Próximos 6 meses</option><option value={12}>Próximos 12 meses</option></select></label>
         <label style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={expensePaidNow} onChange={e=>setExpensePaidNow(e.target.checked)}/>Despesa já paga: registrar quitação agora</label>
         {expensePaidNow?<label style={{display:"grid",gap:5}}>Forma de pagamento<select style={guidedFieldStyle} value={expenseMethod} onChange={e=>setExpenseMethod(e.target.value)}><option>PIX</option><option>DINHEIRO</option><option>TRANSFERENCIA</option><option>CARTAO</option></select></label>:null}
       </> : <>
         <p><strong>{expenseDescription}</strong> · {expenseCategory}</p>
         <strong>Valor: {currency(expenseValue)}</strong>
         <p>Vencimento: <strong>{expenseDueDate}</strong></p>
+        <p>Obrigações: <strong>{expenseRepeatMonths} competência(s) mensais, registradas agora. Nenhum pagamento futuro automático.</strong></p>
         <p>Baixa: <strong>{expensePaidNow?"Confirmar saída via "+expenseMethod:"Permanece pendente até baixa posterior"}</strong></p>
       </>}
     </PdvGuidedDialog> : null}

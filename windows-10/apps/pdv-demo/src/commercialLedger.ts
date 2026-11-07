@@ -46,6 +46,8 @@ export interface CommercialExpense {
   trackPayment?: boolean;
   createdById?: string;
   createdByName?: string;
+  seriesId?: string;
+  seriesIndex?: number;
 }
 export interface CommercialLedger {
   suppliers: CommercialSupplier[];
@@ -253,6 +255,26 @@ export function registerExpense(ledger: CommercialLedger, expense: CommercialExp
   if (expense.trackPayment && !/^\d{4}-\d{2}-\d{2}$/.test(expense.dueDate ?? "")) throw new Error("Informe o vencimento da despesa controlada (AAAA-MM-DD).");
   return { ...ledger, expenses: [...ledger.expenses, { ...expense, amount: money(expense.amount) }] };
 }
+
+/** Future obligations are created upfront, locally, with independent IDs; never auto-pay them. */
+export function registerRecurringExpenses(ledger:CommercialLedger,expense:CommercialExpense,months:number):CommercialLedger {
+  if(!Number.isInteger(months)||months<1||months>12)throw new Error("A recorrência deve ter de 1 a 12 meses.");
+  if(!expense.trackPayment||!/^\d{4}-\d{2}-\d{2}$/.test(expense.dueDate??""))throw new Error("Recorrência requer controle de pagamento e vencimento.");
+  const [year,month,day]=expense.dueDate!.split("-").map(Number);
+  if(month<1||month>12||day<1||day>new Date(Date.UTC(year,month,0)).getUTCDate())throw new Error("Vencimento inválido para recorrência.");
+  let next=ledger;
+  for(let i=0;i<months;i++){
+    const total=year*12+(month-1)+i;
+    const y=Math.floor(total/12),m=total%12+1;
+    const clampedDay=Math.min(day,new Date(Date.UTC(y,m,0)).getUTCDate());
+    const date=[y,String(m).padStart(2,"0"),String(clampedDay).padStart(2,"0")].join("-");
+    const row={...expense,id:months===1?expense.id:`${expense.id}-${i+1}`,dueDate:date,
+      seriesId:months===1?undefined:expense.id,seriesIndex:months===1?undefined:i+1};
+    next=registerExpense(next,row);
+  }
+  return next;
+}
+
 export function saleGrossProfit(sale: CommercialSale): { revenue: number; cost: number | null; grossProfit: number | null } {
   const revenue = money(sale.netTotal);
   if (sale.items.some((item) => item.unitCostAtSale === undefined ||
