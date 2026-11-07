@@ -2200,6 +2200,29 @@
         },
         {
           "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-configuracoes-bootstrap"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "QA123456",
+          "name": "define-initial-test-manager-pin"
+        },
+        {
+          "action": "click",
+          "text": "Configurar gerente inicial",
+          "exact": true,
+          "name": "configure-initial-manager"
+        },
+        {
+          "action": "expectVisible",
+          "text": "Gerente inicial configurado.",
+          "exact": false,
+          "name": "manager-bootstrap-confirmed"
+        },
+        {
+          "action": "click",
           "selector": "a[href=\"#/financeiro\"]",
           "name": "open-financeiro"
         },
@@ -2308,6 +2331,29 @@
           "text": "Entrar",
           "exact": true,
           "name": "authenticate-seeded-manager"
+        },
+        {
+          "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-settings-to-authenticate-manager"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "123456",
+          "name": "enter-manager-test-pin"
+        },
+        {
+          "action": "click",
+          "text": "Entrar",
+          "exact": true,
+          "name": "authenticate-test-manager"
+        },
+        {
+          "action": "expectVisible",
+          "text": "Gerente QA autenticado.",
+          "exact": false,
+          "name": "manager-auth-confirmed"
         },
         {
           "action": "click",
