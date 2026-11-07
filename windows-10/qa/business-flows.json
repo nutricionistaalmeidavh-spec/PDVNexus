@@ -2183,6 +2183,23 @@
         },
         {
           "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-security-before-finance"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "QA-manager-payment-only-2026",
+          "name": "setup-manager-pin"
+        },
+        {
+          "action": "click",
+          "text": "Configurar gerente inicial",
+          "exact": true,
+          "name": "bootstrap-finance-manager"
+        },
+        {
+          "action": "click",
           "selector": "a[href=\"#/financeiro\"]",
           "name": "open-financeiro"
         },
@@ -2268,6 +2285,29 @@
           "selector": "a[href=\"#/administracao\"]",
           "name": "admin-link",
           "timeoutMs": 20000
+        },
+        {
+          "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-security-for-manager"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Selecionar operador para entrar\"]",
+          "value": "GER-001",
+          "name": "select-manager-login"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "123456",
+          "name": "enter-test-manager-pin"
+        },
+        {
+          "action": "click",
+          "text": "Entrar",
+          "exact": true,
+          "name": "authenticate-seeded-manager"
         },
         {
           "action": "click",
