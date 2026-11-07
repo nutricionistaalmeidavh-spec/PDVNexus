@@ -44,3 +44,11 @@ test("QA cobre Matriz, Kanban e exportações offline do Financeiro sem alterar 
  for(const step of ["open-finance-kanban","finance-kanban-columns","finance-xlsx-export","finance-pdf-export","return-to-finance-matrix"])
   assert.ok(flow.steps.some(x=>x.name===step),"Etapa ausente: "+step);
 });
+
+test("E2E da forma de pagamento autentica gerente existente; não oferece bootstrap quando o seed já tem PIN", () => {
+ const flow = JSON.parse(readFileSync(new URL("../qa/business-flows.json",import.meta.url),"utf8"));
+ const actions = flow.flows.find(x=>x.id==="payment-method-create")?.steps ?? [];
+ assert.ok(actions.some(x=>x.name==="select-existing-manager" && x.value==="GER-001"));
+ assert.ok(actions.some(x=>x.name==="authenticate-existing-manager"));
+ assert.ok(!actions.some(x=>x.name==="bootstrap-finance-manager"));
+});

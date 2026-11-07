@@ -2187,16 +2187,28 @@
           "name": "open-security-before-finance"
         },
         {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Selecionar operador para entrar\"]",
+          "value": "GER-001",
+          "name": "select-existing-manager"
+        },
+        {
           "action": "fill",
           "selector": "input[placeholder=\"Senha/PIN do operador\"]",
-          "value": "QA-manager-payment-only-2026",
-          "name": "setup-manager-pin"
+          "value": "123456",
+          "name": "manager-seeded-pin"
         },
         {
           "action": "click",
-          "text": "Configurar gerente inicial",
+          "text": "Entrar",
           "exact": true,
-          "name": "bootstrap-finance-manager"
+          "name": "authenticate-existing-manager"
+        },
+        {
+          "action": "expectVisible",
+          "text": "Gerente autenticado.",
+          "exact": false,
+          "name": "manager-authenticated-confirmation"
         },
         {
           "action": "click",
