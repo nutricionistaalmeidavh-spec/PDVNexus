@@ -19,7 +19,7 @@ for (const edition of ["windows-10", "windows-7"]) {
     assert.match(commercial, /PdvGuidedDialog/);
     assert.match(commercial, /dialog === "settlement"/);
     assert.match(commercial, /dialog === "expense"/);
-    assert.match(commercial, /reviewStep === "review"/);
+    assert.match(commercial, /setReviewStep\\("review"\\)/);
     assert.match(commercial, /settlementBalance/);
     assert.match(commercial, /setDialog\("settlement"\)/);
   });
