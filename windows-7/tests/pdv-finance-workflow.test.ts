@@ -92,3 +92,13 @@ test("P6 exportação XLSX OOXML e PDF A4 usam implementações locais reais",()
  assert.match(new TextDecoder().decode(pdf.slice(0,16)),/^%PDF-1\.4/);
  assert.ok(pdf.length>700);
 });
+
+test("P6 caixa realizado deduz troco efetivamente devolvido, sem inflar receita",()=>{
+ const rows=[{number:"TROCO",finalizedAt:stamp,netTotal:100,items:[],
+  payments:[{method:"A VISTA",amount:150}],paymentSummary:{changeDue:50}}];
+ const result=buildPdvFinanceReport({ledger:emptyCommercialLedger(),sales:rows,creditMethods:["A PRAZO"]});
+ assert.equal(result.realizedIn,100);
+ assert.equal(result.realizedOut,0);
+ assert.equal(result.netRealized,100);
+ assert.equal(result.forecastIn,0);
+});
