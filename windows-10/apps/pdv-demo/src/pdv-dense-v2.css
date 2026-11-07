@@ -72,7 +72,7 @@
 
 /* Barcode / code entry */
 .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
-  grid-template-columns: minmax(150px, 1fr) 82px 126px 92px 64px !important;
+  grid-template-columns: minmax(150px, 1fr) 82px 116px 126px 106px 68px !important;
   gap: 6px !important;
   padding: 27px 9px 9px !important;
   border-radius: 4px !important;
@@ -362,5 +362,15 @@
   }
   .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* UI-only paging and checkout product picker: retain all records in SQLite. */
+@media (max-width: 980px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > div:nth-child(2) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    height: auto !important;
+    min-height: 104px !important;
+    grid-auto-rows: minmax(40px, auto) !important;
   }
 }
