@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "defaultModel": "qwen3:1.7b",
-  "maxSteps": 14,
+  "maxSteps": 24,
   "personas": [
     {
       "id": "iniciante-produtos",
@@ -51,10 +51,10 @@
     {
       "id": "gerente-relatorios",
       "profile": "Gerente de loja que procura extratos e relatorios",
-      "objective": "Encontrar relatorios detalhados de vendas no financeiro.",
+      "objective": "Encontrar relatórios detalhados de vendas na nova navegação Vendas e relatórios.",
       "goal": {
         "kind": "routeText",
-        "route": "#/financeiro",
+        "route": "#/vendas",
         "text": "Relatórios detalhados de vendas"
       }
     },
@@ -70,9 +70,10 @@
     {
       "id": "caixa-abrir",
       "profile": "Operador de caixa no primeiro dia de trabalho",
-      "objective": "Abrir um caixa com troco inicial de R$ 150 na tela Financeiro.",
+      "objective": "Abrir um caixa com troco inicial de R$ 150 na área Fechamento de caixa.",
       "goal": {
-        "kind": "cashOpen"
+        "kind": "cashOpen",
+        "expectedInitialAmount": 150
       }
     },
     {
@@ -81,16 +82,22 @@
       "objective": "Cadastrar um produto de teste com nome QA IA Banana, preco R$ 9,90 e codigo 98001.",
       "goal": {
         "kind": "productExists",
-        "value": "QA IA Banana"
-      }
+        "value": "QA IA Banana",
+        "code": "98001",
+        "unitPrice": 9.9
+      },
+      "maxSteps": 30
     },
     {
       "id": "venda-teclado",
       "profile": "Vendedor experiente que usa atalhos de teclado",
       "objective": "Concluir uma venda real de teste do produto codigo 00101, com pagamento a vista. Pode usar F2 F6 F8.",
       "goal": {
-        "kind": "saleCompleted"
-      }
+        "kind": "saleCompleted",
+        "productCode": "00101",
+        "paymentMethod": "A VISTA"
+      },
+      "maxSteps": 30
     }
   ]
 }
