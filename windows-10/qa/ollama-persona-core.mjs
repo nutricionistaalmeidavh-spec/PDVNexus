@@ -63,9 +63,20 @@ export function parseDecision(message, controls) {
 export function goalAchieved(goal, state) {
   if (goal.kind === "route") return String(state.route).includes(goal.value);
   if (goal.kind === "routeText") return String(state.route).includes(goal.route) && String(state.pageText).includes(goal.text);
-  if (goal.kind === "cashOpen") return state.store?.cashSession != null && Number.isFinite(Number(state.store.cashSession.initialAmount)) && !state.store.cashSession.closedAt;
-  if (goal.kind === "saleCompleted") return (state.store?.completedSales?.length || 0) >= 1;
-  if (goal.kind === "productExists") return (state.store?.catalogProducts || []).some((p) => String(p.productName || "").toLowerCase().includes(String(goal.value).toLowerCase()));
+  if (goal.kind === "cashOpen") {
+    const session=state.store?.cashSession;
+    return Boolean(session && !session.closedAt && Number.isFinite(Number(session.initialAmount)) &&
+      (goal.expectedInitialAmount === undefined || Number(session.initialAmount) === Number(goal.expectedInitialAmount)));
+  }
+  if (goal.kind === "saleCompleted") return (state.store?.completedSales || []).some((sale) =>
+    (!goal.productCode || (sale.items || []).some((item) => String(item.productCode) === String(goal.productCode))) &&
+    (!goal.paymentMethod || (sale.payments || []).some((payment) => payment.method === goal.paymentMethod && Number(payment.amount) > 0))
+  );
+  if (goal.kind === "productExists") return (state.store?.catalogProducts || []).some((p) =>
+    String(p.productName || "").toLowerCase().includes(String(goal.value).toLowerCase()) &&
+    (!goal.code || String(p.productCode) === String(goal.code)) &&
+    (goal.unitPrice === undefined || Math.abs(Number(p.unitPrice) - Number(goal.unitPrice)) < 0.001)
+  );
   if (goal.kind === "customerExists") return (state.store?.registeredCustomers || []).some((p) => String(p.name || "").toLowerCase().includes(String(goal.value).toLowerCase()));
   return false;
 }
