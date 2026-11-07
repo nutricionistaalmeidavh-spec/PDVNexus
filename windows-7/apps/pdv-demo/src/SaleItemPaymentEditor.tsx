@@ -49,7 +49,7 @@ export function SaleItemPaymentEditor({ sale, cashMethodNames = [], onChange }: 
         </div>
         {sale.items.map(item => <div className="sale-allocation__row" key={item.id} style={{ "--allocation-cols": tenders.length } as CSSProperties}>
           <label className="sale-allocation__product">{item.productName}
-            <small>{item.productCode} · {qtyLabel(item.quantity)} {item.unitLabel} · {money(item.totalPrice)}</small>
+            <small>{item.brand ? `Marca: ${item.brand} · ` : ""}{item.producer ? `Empreendimento: ${item.producer} · ` : ""}{item.productCode} · {qtyLabel(item.quantity)} {item.unitLabel} · {money(item.totalPrice)}</small>
           </label>
           {tenders.map(tender => {
             const value = assignments.find(a => a.itemId === item.id && a.method === tender.method)?.quantity;
