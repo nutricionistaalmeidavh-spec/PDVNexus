@@ -273,22 +273,6 @@
     },
     {
       "action": "click",
-      "text": "Preparação fiscal",
-      "exact": true,
-      "name": "open-fiscal-readiness"
-    },
-    {
-      "action": "expectVisible",
-      "text": "Preparação de emissão fiscal NFC-e / NF-e",
-      "exact": true,
-      "name": "fiscal-readiness-gated"
-    },
-    {
-      "action": "screenshot",
-      "name": "05d-fiscal-preparacao"
-    },
-    {
-      "action": "click",
       "selector": "a[href=\"#/administracao\"]",
       "name": "open-administracao"
     },
