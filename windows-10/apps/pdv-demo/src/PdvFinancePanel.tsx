@@ -172,19 +172,43 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
        </div>
      </div>:null}
      {tab==="kanban"?<div style={{display:"grid",gap:10}}>
-       <div><strong>Kanban financeiro</strong><p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Colunas com lançamentos reais; clique em cada conta para abrir seu histórico. O estado não muda por arrastar cartões.</p></div>
+       <div><strong>Kanban financeiro</strong>
+         <p style={{fontSize:11,color:"#64748b",margin:"4px 0 0"}}>Arraste a conta para outra coluna ou use “Mover para” no cartão. A confirmação altera o lançamento financeiro original; não é apenas visual.</p>
+       </div>
        <div data-pdv-kanban="true" style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8}}>
-         {board.map(column=><section key={column.id} data-pdv-kanban-column={column.id} style={{flex:"0 0 246px",background:"#f1f5fb",border:"1px solid #dbe5f1",borderRadius:12,padding:10,display:"grid",gap:10,alignContent:"start",minHeight:245}}>
+         {board.map(column=><section key={column.id} data-pdv-kanban-column={column.id}
+           onDragOver={e=>{if(!allowed)return;e.preventDefault();e.dataTransfer.dropEffect="move";setDropColumn(column.id);}}
+           onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDropColumn(null);}}
+           onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData("text/plain")||dragging;
+             setDropColumn(null);setDragging(null);if(key)beginMove(key,column.id);}}
+           style={{flex:"0 0 246px",background:dropColumn===column.id?"#e4effd":"#f1f5fb",
+             border:dropColumn===column.id?"2px dashed #2563eb":"1px solid #dbe5f1",
+             borderRadius:12,padding:10,display:"grid",gap:10,alignContent:"start",minHeight:245}}>
            <div style={{...rowLayout,justifyContent:"space-between"}}><strong style={{fontSize:12}}>{column.title}</strong>
              <small style={{fontSize:11,color:"#4c5f79"}}>{column.rows.length}</small></div>
-           {column.rows.map(row=><button type="button" key={row.key} data-pdv-kanban-item={row.key}
-             onClick={()=>setDetail(row.key)} style={{textAlign:"left",border:"1px solid #dce5ee",borderRadius:9,background:"#fff",padding:11,
-             display:"grid",gap:6,cursor:"pointer"}}>
-             <strong style={{fontSize:12,color:"#182d4c"}}>{row.party}</strong>
-             <span style={{fontSize:11,color:"#63758a"}}>{row.reference}{row.installmentLabel?" · Parcela "+row.installmentLabel:""} · {labels[row.kind]}</span>
-             <strong style={{fontSize:16,color:"#164883"}}>{row.open===null?"Sem controle de baixa":money(row.open)}</strong>
-             <span style={{fontSize:11,color:"#67788e"}}>{row.dueDate?"Vence "+formatDay(row.dueDate):"Vencimento não informado"} · {statuses[row.status]}</span>
-           </button>)}
+           {column.rows.map(row=><article key={row.key} data-pdv-kanban-item={row.key} draggable={allowed}
+             onDragStart={e=>{e.dataTransfer.setData("text/plain",row.key);e.dataTransfer.effectAllowed="move";setDragging(row.key);}}
+             onDragEnd={()=>{setDragging(null);setDropColumn(null);}}
+             style={{textAlign:"left",border:"1px solid #dce5ee",borderRadius:9,background:"#fff",padding:11,
+               display:"grid",gap:7,cursor:allowed?"grab":"default",opacity:dragging===row.key?0.5:1}}>
+             <button type="button" onClick={()=>setDetail(row.key)}
+               style={{border:0,background:"transparent",textAlign:"left",padding:0,cursor:"pointer",display:"grid",gap:5}}>
+               <strong style={{fontSize:12,color:"#182d4c"}}>{row.party}</strong>
+               <span style={{fontSize:11,color:"#63758a"}}>{row.reference}{row.installmentLabel?" · Parcela "+row.installmentLabel:""} · {labels[row.kind]}</span>
+               <strong style={{fontSize:16,color:"#164883"}}>{row.open===null?"Sem controle de baixa":money(row.open)}</strong>
+               <span style={{fontSize:11,color:"#67788e"}}>{row.dueDate?"Vence "+formatDay(row.dueDate):"Vencimento não informado"} · {statuses[row.status]}</span>
+               {row.status==="parcial"&&row.dueDate&&row.dueDate<todayLocal()?
+                 <span style={{fontSize:10,color:"#9f3d24"}}>Parcial e vencida</span>:null}
+             </button>
+             <select aria-label={"Mover "+row.reference+" para outra coluna"} defaultValue="" disabled={!allowed}
+               onChange={e=>{const target=e.target.value as PdvKanbanColumnId;
+                 e.currentTarget.value="";if(target)beginMove(row.key,target);}}
+               style={{...filterStyle,minHeight:34,padding:5,flex:"auto",fontSize:11}}>
+               <option value="">Mover para...</option>
+               {board.filter(dest=>dest.id!==column.id).map(dest=>
+                 <option key={dest.id} value={dest.id}>{dest.title}</option>)}
+             </select>
+           </article>)}
            {!column.rows.length?<p style={{fontSize:11,color:"#7a8797"}}>Nenhuma conta nesta situação.</p>:null}
          </section>)}
        </div>
@@ -252,6 +276,11 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
        <p style={{fontSize:11,color:"#64748b",margin:0}}>Relatório gerencial, não fiscal. Diferença operacional não representa saldo bancário nem lucro líquido. Valores sem custo histórico não entram em margem afirmada.</p>
      </div>:null}
    </div>
+   {moving&&movingRow?<PdvKanbanMoveDialog key={moving.rowKey+":"+moving.target}
+     row={movingRow} target={moving.target}
+     targetTitle={board.find(column=>column.id===moving.target)?.title??moving.target}
+     error={moveError} onClose={()=>{setMoving(null);setMoveError("");}}
+     onConfirm={confirmMove}/>:null}
    {selected?<PdvGuidedDialog title="Origem do valor financeiro" description="Dados diretamente associados ao documento canônico, sem alterar o histórico."
      step={labels[selected.kind]+" · "+selected.reference} onClose={()=>setDetail(null)}
      actions={<><button type="button" style={guidedSecondaryStyle} onClick={()=>setDetail(null)}>Fechar</button>
