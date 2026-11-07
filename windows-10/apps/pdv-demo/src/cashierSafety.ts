@@ -16,10 +16,11 @@ export function buildPdvCashCount(input: PdvCashCountDraft): Record<string, numb
   };
 }
 export function shouldHandlePdvHotkey(
-  key: string, options: {route: string; editing: boolean; dialogOpen?: boolean; modifiers?: boolean; composing?: boolean}
+  key: string, options: {route: string; editing: boolean; scannerInput?: boolean; dialogOpen?: boolean; modifiers?: boolean; composing?: boolean}
 ): boolean {
   if (options.route !== "/caixa" || options.dialogOpen || options.modifiers || options.composing) return false;
   if (key === "F3") return true;
-  if (options.editing) return false;
-  return key === "F2" || key === "F6" || key === "F8" || key === "Delete";
+  if (key === "Delete") return !options.editing;
+  if (options.editing && !options.scannerInput) return false;
+  return key === "F2" || key === "F6" || key === "F8";
 }
