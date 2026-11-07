@@ -85,3 +85,10 @@ test("caixa de R$ 150 não passa se for aberto com zero", () => {
   assert.equal(goalAchieved({kind:"cashOpen",expectedInitialAmount:150},{store:{cashSession:{initialAmount:0}}}),false);
   assert.equal(goalAchieved({kind:"cashOpen",expectedInitialAmount:150},{store:{cashSession:{initialAmount:150}}}),true);
 });
+
+test("semeadura QA respeita CAS e nunca grava sem revision", () => {
+  const source=readFileSync(new URL("../qa/run-ollama-personas.mjs",import.meta.url),"utf8");
+  assert.match(source,/bridge\.load\(key\)/);
+  assert.match(source,/bridge\.save\(key, raw, current\.revision\)/);
+  assert.doesNotMatch(source,/pdvStore\.save\(key, raw\)/);
+});
