@@ -43,14 +43,15 @@ const schema = {
 async function nextDecision(persona, state, history, maxSteps, model) {
   const prompt = buildPrompt(persona, state, history, maxSteps);
   let error;
+  let rejection = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const body = {
         model, stream: false, think: false, keep_alive: "2m",
-        format: schema, options: { temperature: 0, num_predict: 160, num_ctx: 4096 },
+        format: schema, options: { temperature: 0, num_predict: 160, num_ctx: 8192 },
         messages: [
           { role: "system", content: "Voce age somente sobre controles visiveis do PDV ficticio. Responda exclusivamente JSON conforme schema. Nunca invente conclusao." },
-          { role: "user", content: prompt + (attempt ? "\nATENCAO: escolha id listado e valores validos; sua resposta anterior foi rejeitada." : "") }
+          { role: "user", content: prompt + (attempt ? "\nSUA RESPOSTA ANTERIOR FOI INVALIDA: " + rejection + ". Escolha exclusivamente um elementId deste conjunto: " + state.controls.map((c) => c.id).join(", ") + "." : "") }
         ]
       };
       const response = await jsonFetch(endpoint + "/api/chat", {
@@ -59,13 +60,14 @@ async function nextDecision(persona, state, history, maxSteps, model) {
       return parseDecision(response.message?.content || "", state.controls);
     } catch (reason) {
       error = reason;
+      rejection = String(reason.message || reason).slice(0, 250);
     }
   }
   throw new Error("Falha de decisao do agente: " + (error?.message || error));
 }
 
-async function observe(page) {
-  const controls = await page.locator(CONTROL_SELECTOR).evaluateAll((nodes) => nodes.map((el, index) => {
+async function observe(page, persona) {
+  const allControls = await page.locator(CONTROL_SELECTOR).evaluateAll((nodes) => nodes.map((el, index) => {
     const style = window.getComputedStyle(el);
     if (el.getClientRects().length === 0 || style.visibility === "hidden" || style.display === "none") return null;
     const tag = el.tagName;
@@ -95,6 +97,16 @@ async function observe(page) {
       store
     };
   }, MAIN_PDV_STORE_KEY);
+  // IDs curtos e consecutivos para o LLM; domIndex preserva indice real do locator.
+  // Personas de navegacao recebem exclusivamente os links do menu, evitando que
+  // modelos CPU pequenos confundam o destino com botoes do caixa.
+  const menuOnly = ["route", "routeText"].includes(persona.goal.kind);
+  const candidates = menuOnly
+    ? allControls.filter((c) => c.tag === "A" && c.href.startsWith("#/"))
+    : allControls.slice(0, 60);
+  const controls = candidates.map((control, index) => ({
+    ...control, domIndex: control.id, id: index + 1
+  }));
   return {
     ...pageState,
     controls,
@@ -107,9 +119,11 @@ async function observe(page) {
   };
 }
 
-async function applyDecision(page, decision) {
+async function applyDecision(page, decision, controls) {
   if (decision.action === "done") return;
-  const target = page.locator(CONTROL_SELECTOR).nth(decision.elementId);
+  const control = controls.find((item) => item.id === decision.elementId);
+  if (!control) throw new Error("Controle nao estava na lista visivel");
+  const target = page.locator(CONTROL_SELECTOR).nth(control.domIndex);
   if (!(await target.isVisible()) || !(await target.isEnabled())) throw new Error("Controle mudou desde a observacao");
   if (decision.action === "click") await target.click({ timeout: 3500 });
   else if (decision.action === "fill") await target.fill(decision.value, { timeout: 3500 });
@@ -167,7 +181,7 @@ async function runPersona(persona, model, maxSteps) {
     result.screenshots.push(path.relative(output, initial));
 
     for (let index = 0; index < maxSteps; index += 1) {
-      const state = await observe(page);
+      const state = await observe(page, persona);
       if (goalAchieved(persona.goal, state)) {
         result.status = "passed";
         break;
@@ -190,7 +204,7 @@ async function runPersona(persona, model, maxSteps) {
         break;
       }
       try {
-        await applyDecision(page, decision);
+        await applyDecision(page, decision, state.controls);
         action.outcome = "executed";
       } catch (error) {
         action.outcome = "interaction-error";
@@ -200,7 +214,7 @@ async function runPersona(persona, model, maxSteps) {
       await page.screenshot({ path: screenshot }).catch(() => {});
       result.screenshots.push(path.relative(output, screenshot));
     }
-    if (page && goalAchieved(persona.goal, await observe(page))) {
+    if (page && goalAchieved(persona.goal, await observe(page, persona))) {
       result.status = "passed";
       result.error = null;
     } else if (!result.error) result.error = "Meta nao atingida no limite de passos";

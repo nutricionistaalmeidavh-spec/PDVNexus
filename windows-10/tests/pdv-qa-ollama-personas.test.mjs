@@ -49,3 +49,11 @@ test("Ollama e agentes executam no mesmo step (processo nao morre entre etapas)"
   assert.match(step, /node qa\/run-ollama-personas\.mjs/);
   assert.equal((yml.match(/node qa\/run-ollama-personas\.mjs/g) || []).length, 1);
 });
+
+test("prompt de navegacao prioriza links reais e nunca revela indice interno do DOM", () => {
+  const persona=config.personas[0];
+  const prompt=buildPrompt(persona, {route:"#/caixa", controls:[{id:1,domIndex:24,tag:"A",href:"#/produtos",name:"Produtos"}],indicators:{}},[],14);
+  assert.match(prompt,/#\/produtos/);
+  assert.doesNotMatch(prompt,/domIndex/);
+  assert.match(prompt,/EXATAMENTE/);
+});

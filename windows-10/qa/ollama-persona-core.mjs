@@ -62,12 +62,13 @@ export function buildPrompt(persona, state, history, maxSteps) {
     "Acione somente controles listados e observe os resultados; nao invente sucesso.",
     "Use apenas JSON: {\"action\":\"click|fill|press|select|done\",\"elementId\":0,\"value\":\"\",\"key\":\"Enter\",\"reason\":\"curto\"}.",
     "Para fill, value e texto; para select, value deve ser um valor das options; press aceita Enter/Escape/Tab/F2/F6/F8.",
-    "Se nao souber, procure navegacao pelo menu. Para finalizar uma venda primeiro abra caixa, inicie venda, digite codigo 00101, Enter, escolha pagamento e finalize.",
+    "Para navegar, use um dos links A com href correspondente a rota desejada. Os IDs dos controles sao numeros pequenos sequenciais e devem vir EXATAMENTE da lista, sem inventar ID.",
+    "Para finalizar uma venda primeiro abra caixa, inicie venda, digite codigo 00101, Enter, escolha pagamento e finalize.",
     "A acao done so deve ocorrer quando a tarefa estiver completa; o avaliador checa o estado real.",
     "Passos maximos: " + maxSteps,
     "Rota atual: " + state.route,
     "Indicadores: " + JSON.stringify(state.indicators),
-    "Controles visiveis: " + JSON.stringify(state.controls),
+    "Controles visiveis: " + JSON.stringify(state.controls.map(({ domIndex, ...ui }) => ui)),
     "Historico recente: " + JSON.stringify(history.slice(-5))
   ].join("\n");
 }
