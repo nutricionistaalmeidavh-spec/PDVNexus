@@ -380,9 +380,61 @@
     },
     {
       "action": "expectVisible",
-      "text": "A pagar",
-      "exact": false,
-      "name": "financeiro-saldos-a-pagar"
+      "name": "financeiro-saldos-a-pagar",
+      "selector": "[data-pdv-finance-kpi=\"payable\"]"
+    },
+    {
+      "action": "click",
+      "text": "Kanban",
+      "exact": true,
+      "name": "open-finance-kanban"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-kanban=\"true\"]",
+      "name": "finance-kanban-columns"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-kanban-column=\"vencidas\"]",
+      "name": "finance-overdue-lane"
+    },
+    {
+      "action": "screenshot",
+      "name": "08b-financeiro-kanban"
+    },
+    {
+      "action": "click",
+      "text": "Relatórios",
+      "exact": true,
+      "name": "open-finance-reports"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Excel XLSX",
+      "exact": true,
+      "name": "finance-xlsx-export"
+    },
+    {
+      "action": "expectVisible",
+      "text": "PDF",
+      "exact": true,
+      "name": "finance-pdf-export"
+    },
+    {
+      "action": "screenshot",
+      "name": "08c-financeiro-relatorios"
+    },
+    {
+      "action": "click",
+      "text": "Matriz financeira",
+      "exact": true,
+      "name": "return-to-finance-matrix"
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[data-pdv-finance-panel=\"true\"] table",
+      "name": "finance-matrix-visible"
     },
     {
       "action": "screenshot",
