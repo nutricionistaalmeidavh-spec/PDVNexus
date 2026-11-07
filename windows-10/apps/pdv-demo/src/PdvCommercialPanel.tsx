@@ -155,7 +155,7 @@ export function PdvCommercialPanel<P extends CommercialCatalogProduct>(props: Pr
   };
   const openFinanceExpense = () => { if(allowed){setReviewStep("form");setDialog("expense");} };
   const tabs: Array<typeof view> = mode === "financeiro" ? [] : ["compras", "relatorios"];
-  const tabLabel: Record<typeof view,string> = { compras:"Compras e fornecedores", financeiro:"A pagar e A receber",
+  const tabLabel: Record<typeof view,string> = { compras:"Compras e fornecedores", financeiro:"Contas e despesas",
     relatorios:"Lucratividade" };
 
   if (!allowed) return <section data-pdv-commercial-panel="true" role="status" style={box}><h2>Acesso restrito</h2><p>A gestão e os dados financeiros exigem perfil de gerente ou administrador ativo.</p></section>;

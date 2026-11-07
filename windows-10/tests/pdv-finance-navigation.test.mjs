@@ -13,8 +13,8 @@ for (const edition of ["windows-10", "windows-7"]) {
     assert.match(app, /mode=\{route === "\/financeiro" \? "financeiro" : "gestao"\}/);
     assert.match(panel, /const activeView = mode === "financeiro" \? "financeiro" : view/);
     assert.match(panel, /activeView === "financeiro"/);
-    assert.match(panel, /A pagar/);
-    assert.match(panel, /A receber/);
+    assert.match(finance, /A pagar/);
+    assert.match(finance, /A receber/);
     assert.match(panel, /PdvFinancePanel/);
     assert.match(finance, /Matriz financeira/);
     assert.match(finance, /data-pdv-kanban/);

@@ -241,6 +241,40 @@
     {
       "action": "click",
       "selector": "a[href=\"#/gestao\"]",
+      "name": "cashier-gestao-is-restricted"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Acesso restrito",
+      "exact": true,
+      "name": "cashier-cannot-see-financial-data"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/configuracoes\"]",
+      "name": "configure-first-manager-for-qa"
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+      "value": "QA-test-manager-only-2026",
+      "name": "set-manager-test-pin"
+    },
+    {
+      "action": "click",
+      "text": "Configurar gerente inicial",
+      "exact": true,
+      "name": "bootstrap-manager-local-qa"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Gerente inicial configurado.",
+      "exact": false,
+      "name": "bootstrap-manager-confirmation"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/gestao\"]",
       "name": "open-canonical-gestao"
     },
     {

@@ -757,6 +757,12 @@
           "name": "pagamento-a-prazo"
         },
         {
+          "action": "fill",
+          "selector": "input[aria-label=\"Vencimento da venda a prazo\"]",
+          "value": "2026-11-20",
+          "name": "informar-vencimento-a-prazo"
+        },
+        {
           "action": "press",
           "selector": "input[placeholder*=\"Bipe\"]",
           "key": "F8",
@@ -872,6 +878,12 @@
           "text": "A PRAZO",
           "exact": true,
           "name": "pagamento-a-prazo"
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Vencimento da venda a prazo\"]",
+          "value": "2026-11-20",
+          "name": "informar-vencimento-a-prazo"
         },
         {
           "action": "expectVisible",
