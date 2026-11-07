@@ -2,7 +2,7 @@
 export interface PdvCashCountDraft { cash: string; pix: string; credit: string; debit: string; }
 const parseCount = (raw: string, label: string): number => {
   if (!raw.trim()) throw new Error(`Preencha ${label}, inclusive quando for R$ 0,00.`);
-  const normalized = raw.trim().includes(",") ? raw.trim().replace(/\\./g, "").replace(",", ".") : raw.trim();
+  const normalized = raw.trim().includes(",") ? raw.trim().split(".").join("").replace(",", ".") : raw.trim();
   const value = Number(normalized);
   if (!Number.isFinite(value) || value < 0) throw new Error(`Valor inválido em ${label}.`);
   return Math.round((value + Number.EPSILON) * 100) / 100;
