@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   emptyCommercialLedger, registerSupplier, registerPurchase, receivePurchase,
   settlePayable, settleReceivable, registerExpense, summarizeCommercial,
-  saleGrossProfit, buildFiscalReadiness
+  saleGrossProfit, buildFiscalReadiness, updateCommercialFiscalProfile
 } from "../apps/pdv-demo/src/commercialLedger";
 
 const at = "2026-11-06T20:00:00-03:00";
@@ -71,4 +71,11 @@ test("fiscal draft cannot be mistaken for legally issued document",()=>{
  const configured=buildFiscalReadiness({issuerCnpj:"12345678000195",uf:"SP",certificateConfigured:true,homologated:false});
  assert.equal(configured.issuanceEnabled,false);
  assert.equal(configured.status,"homologation-required");
+});
+
+test("fiscal UF and IE are canonical metadata while issuer CNPJ stays in company settings", () => {
+  const ledger=updateCommercialFiscalProfile(emptyCommercialLedger(),{uf:"MG",stateRegistration:"123456789",taxRegime:"simples"});
+  assert.equal(ledger.fiscalProfile.uf,"MG");
+  assert.equal(ledger.fiscalProfile.stateRegistration,"123456789");
+  assert.equal(buildFiscalReadiness({issuerCnpj:"AB123456000195",uf:"MG",certificateConfigured:true,homologated:false}).status,"homologation-required");
 });

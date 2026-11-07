@@ -314,7 +314,7 @@ export function PdvDemoApp() {
   const dashboardReport = generatePdvDashboardReport({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), to: new Date().toISOString(), sales: completedSales, products: sellableCatalogProducts, cashClosings });
   const activePaymentOptions = paymentOptions.filter((option) => option.active !== false);
   const salesHistory = useMemo(() => filterPdvSalesHistory({ sales: completedSales, cancelledSales, filters: { status: historyFilters.status, customerId: historyFilters.customerId || undefined, paymentMethod: historyFilters.paymentMethod || undefined, query: historyFilters.query || undefined } }), [completedSales, cancelledSales, historyFilters]);
-  const storageStatusLabel = desktopStoreStatus.includes("SQLite desktop ativo") ? "Banco local SQLite ativo" : "Armazenamento local ativo";
+  const storageStatusLabel = desktopStoreStatus.includes("Armazenamento canônico ativo") ? "Banco local ativo" : "Armazenamento local ativo";
   const buildPdvSnapshotJson = () => JSON.stringify(createDefaultPdvLocalStore({
     catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions,
     deviceConfig: { scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode },
@@ -341,7 +341,7 @@ export function PdvDemoApp() {
         2
       );
       if (cancelled) return;
-      setDesktopStoreStatus(`SQLite ativo neste computador (${status.machineName}). Banco: ${status.path}`);
+      setDesktopStoreStatus(`Armazenamento canônico ativo neste computador (${status.machineName}). Arquivo: ${status.path}`);
       if (row?.snapshotJson) {
         lastPersistedSnapshotRef.current = row.snapshotJson;
         const imported = parsePdvSnapshot(row.snapshotJson);
@@ -661,7 +661,7 @@ export function PdvDemoApp() {
       {route === "/clientes" ? <section style={styles.pageGrid}><SectionCard title="Clientes" subtitle="Cadastro e limite para venda a prazo"><div style={styles.stack}><div style={styles.formRow}><input value={customerDraft.name} onChange={(event) => setCustomerDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Nome do cliente" style={styles.input} /><input value={customerDraft.document} onChange={(event) => setCustomerDraft((current) => ({ ...current, document: event.target.value }))} placeholder="CPF/CNPJ" style={styles.input} /></div><div style={styles.formRow}><input value={customerDraft.city} onChange={(event) => setCustomerDraft((current) => ({ ...current, city: event.target.value }))} placeholder="Cidade" style={styles.input} /><input value={customerDraft.creditLimit} onChange={(event) => setCustomerDraft((current) => ({ ...current, creditLimit: event.target.value }))} placeholder="Limite de credito" style={styles.input} /></div><button onClick={saveCustomer} style={styles.primaryButton}>{editingCustomerId ? "Salvar Alteracoes" : "Cadastrar Cliente"}</button></div><table style={styles.table}><thead><tr><th style={styles.th}>Cliente</th><th style={styles.th}>Documento</th><th style={styles.th}>Cidade</th><th style={styles.th}>Limite</th><th style={styles.th}>Usado</th><th style={styles.th}>Acoes</th></tr></thead><tbody>{registeredCustomers.map((customer) => <tr key={customer.id}><td style={styles.td}>{customer.name}</td><td style={styles.td}>{customer.document}</td><td style={styles.td}>{customer.city}</td><td style={styles.td}>{formatCurrency(customer.creditLimit)}</td><td style={styles.td}>{formatCurrency(customer.creditUsed)}</td><td style={styles.td}><button onClick={() => editCustomer(customer)} style={styles.secondaryButton}>Editar</button><button onClick={() => removeCustomer(customer)} style={styles.secondaryButton}>Excluir</button></td></tr>)}</tbody></table></SectionCard></section> : null}
 
       {route === "/gestao" ? <section style={styles.pageGrid}>
-        <PdvCommercialPanel ledger={commercialLedger} catalog={catalogProducts} movements={inventoryMovements}
+        <PdvCommercialPanel ledger={commercialLedger} catalog={catalogProducts} movements={inventoryMovements} issuerCnpj={storeSettings.document}
           sales={completedSales}
           creditMethods={paymentOptions.filter((p) => p.kind === "store-credit" || /A PRAZO|CREDI[AÁ]RIO/i.test(p.name)).map((p) => p.name)}
           allowed={activeOperator.active && (activeOperator.role === "manager" || activeOperator.role === "admin")}

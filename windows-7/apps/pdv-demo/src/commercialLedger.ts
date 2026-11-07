@@ -40,7 +40,13 @@ export interface CommercialExpense {
   category: string;
   occurredAt: string;
 }
+export interface CommercialFiscalProfile {
+  uf: string;
+  stateRegistration: string;
+  taxRegime: "simples" | "normal" | "";
+}
 export interface CommercialLedger {
+  fiscalProfile: CommercialFiscalProfile;
   suppliers: CommercialSupplier[];
   purchases: CommercialPurchase[];
   settlements: CommercialSettlement[];
@@ -96,7 +102,7 @@ function unique<T extends { id: string }>(rows: T[], id: string) {
   if (rows.some((row) => row.id === id)) throw new Error("Identificador duplicado; operação não aplicada.");
 }
 export function emptyCommercialLedger(): CommercialLedger {
-  return { suppliers: [], purchases: [], settlements: [], expenses: [] };
+  return { suppliers: [], purchases: [], settlements: [], expenses: [], fiscalProfile: { uf: "", stateRegistration: "", taxRegime: "" } };
 }
 export function normalizeCommercialLedger(value: unknown): CommercialLedger {
   const obj = value && typeof value === "object" ? value as Partial<CommercialLedger> : {};
@@ -104,8 +110,14 @@ export function normalizeCommercialLedger(value: unknown): CommercialLedger {
     suppliers: Array.isArray(obj.suppliers) ? obj.suppliers : [],
     purchases: Array.isArray(obj.purchases) ? obj.purchases : [],
     settlements: Array.isArray(obj.settlements) ? obj.settlements : [],
-    expenses: Array.isArray(obj.expenses) ? obj.expenses : []
+    expenses: Array.isArray(obj.expenses) ? obj.expenses : [],
+    fiscalProfile: { uf: obj.fiscalProfile?.uf ?? "", stateRegistration: obj.fiscalProfile?.stateRegistration ?? "", taxRegime: obj.fiscalProfile?.taxRegime ?? "" }
   };
+}
+export function updateCommercialFiscalProfile(ledger: CommercialLedger, profile: CommercialFiscalProfile): CommercialLedger {
+  if (profile.uf && !["SP", "PR", "MG", "RJ", "SC", "RS"].includes(profile.uf)) throw new Error("UF ainda não parametrizada para preparação fiscal.");
+  if (!["", "simples", "normal"].includes(profile.taxRegime)) throw new Error("Regime tributário não reconhecido.");
+  return { ...ledger, fiscalProfile: { uf: profile.uf, stateRegistration: profile.stateRegistration.trim(), taxRegime: profile.taxRegime } };
 }
 export function purchaseTotal(purchase: CommercialPurchase) {
   return money(purchase.items.reduce((sum, row) => sum + row.quantity * row.unitCost, 0));
@@ -269,7 +281,7 @@ export function buildFiscalReadiness(input: FiscalReadinessInput): {
   issuanceEnabled: false;
   message: string;
 } {
-  if (!/^\d{14}$/.test(input.issuerCnpj.replace(/\D/g, "")) || !/^[A-Z]{2}$/.test(input.uf.toUpperCase()) ||
+  if (!(/^[A-Z0-9]{14}$/i.test(input.issuerCnpj.replace(/[.\/\-\s]/g, "").trim())) || !/^[A-Z]{2}$/.test(input.uf.toUpperCase()) ||
       !input.certificateConfigured) {
     return { status: "configuration-required", issuanceEnabled: false,
       message: "Dados do emitente e certificado A1 devem ser configurados. Nenhuma NFC-e foi transmitida." };
