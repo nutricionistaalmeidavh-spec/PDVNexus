@@ -1,4 +1,5 @@
 import { SalesReports } from "./SalesReports";
+import { buildPdvCashCount, shouldHandlePdvHotkey } from "./cashierSafety";
 import { changeSaleReportExclusion, type ReportExclusion, type ReportExclusionEvent, type ReportSaleIdentity } from "./reportTraining";
 import { SaleItemPaymentEditor } from "./SaleItemPaymentEditor";
 import { resolveItemPayments, type ItemPaymentAssignment, type ItemPaymentAllocation } from "./saleItemPayments";
@@ -508,18 +509,17 @@ export function PdvDemoApp() {
   }, [scaleBrand, serialBridge]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.isComposing || event.repeat) return;
-      if (window.location.hash && !window.location.hash.startsWith("#/caixa")) return;
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      const isTyping = Boolean(target?.closest("input, textarea, select, [contenteditable='true']"));
-      const isBarcodeField = target === checkoutSearchRef.current;
-      if (isTyping && !isBarcodeField) return;
-      if (event.key === "Delete" && isTyping) return;
-      if (event.key === "F2") { event.preventDefault(); startNewSale(); }
-      if (event.key === "F3") { event.preventDefault(); checkoutSearchRef.current?.focus(); }
-      if (event.key === "F6") { event.preventDefault(); applyQuickPayment("A VISTA"); }
-      if (event.key === "Delete") { event.preventDefault(); removeLastItem(); }
-      if (event.key === "F8") { event.preventDefault(); finalizeSale(); }
+      const target = event.target;
+      const editing = target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+      const scannerInput = target === checkoutSearchRef.current;
+      const dialogOpen = Boolean(document.querySelector('[role="dialog"], dialog[open]'));
+      if (!shouldHandlePdvHotkey(event.key, {route, editing, scannerInput, dialogOpen, modifiers: event.ctrlKey || event.altKey || event.metaKey || event.shiftKey, composing: event.isComposing})) return;
+      event.preventDefault();
+      if (event.key === "F2") startNewSale();
+      if (event.key === "F3") checkoutSearchRef.current?.focus();
+      if (event.key === "F6") applyQuickPayment("A VISTA");
+      if (event.key === "Delete") removeLastItem();
+      if (event.key === "F8") finalizeSale();
     };
     window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
   });
@@ -529,7 +529,17 @@ export function PdvDemoApp() {
     if (!cashSession || cashSession.closedAt) return setLastEvent("Nao existe caixa aberto.");
     const closedAt = new Date().toLocaleString("pt-BR");
     const sessionSales = filterPdvSalesForCashSession({ openedAt: cashSession.openedAt, closedAt, sales: completedSales });
-    const closing = closePdvCashSession({ ...cashSession, closedAt, sales: sessionSales, countedByMethod: { "A VISTA": Number(countedCashDraft) || 0, PIX: Number(countedPixDraft) || 0, CREDITO: Number(countedCreditDraft) || 0, DEBITO: Number(countedDebitDraft) || 0 } });
+    let countedByMethod: Record<string, number>;
+    try {
+      countedByMethod = buildPdvCashCount({
+        cash: countedCashDraft, pix: countedPixDraft,
+        credit: countedCreditDraft, debit: countedDebitDraft
+      });
+    } catch (error) {
+      setLastEvent(error instanceof Error ? error.message : "Contagem inválida para fechamento.");
+      return;
+    }
+    const closing = closePdvCashSession({ ...cashSession, closedAt, sales: sessionSales, countedByMethod });
     setCashClosings((current) => [closing, ...current].slice(0, 50)); setCashSession((current) => current ? { ...current, closedAt } : current); setLastEvent(`Caixa fechado com status ${closing.status === "balanced" ? "conferido" : "divergente"}. Divergencia em dinheiro: ${formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0)}.`);
   };
   const addWithdrawal = () => { if (!cashSession || cashSession.closedAt) return setLastEvent("Abra o caixa antes de registrar uma sangria."); const amount = Number(withdrawalDraft) || 0; if (amount <= 0) return setLastEvent("Informe um valor de sangria valido."); setCashSession((current) => current ? { ...current, withdrawals: [...current.withdrawals, { amount, note: withdrawalNote || "Sangria", createdAt: new Date().toLocaleString("pt-BR") }] } : current); setLastEvent(`Sangria de ${formatCurrency(amount)} registrada.`); };
