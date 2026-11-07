@@ -46,6 +46,7 @@ jobs:
       - name: Validate canonical tests
         run: |
           npm run typecheck
+          node --test tests/pdv-non-fiscal-scope.test.mjs
           npm run test:pdv-payments
           npm run test:pdv-upgrade
       - name: Build
