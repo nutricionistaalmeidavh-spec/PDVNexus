@@ -178,6 +178,8 @@ export function PdvDemoApp() {
   const pendingPersistenceSnapshotRef = useRef("");
   const lastPersistedSnapshotRef = useRef("");
   const lastPersistedRevisionRef = useRef(0);
+  // Preserve canonical extensions managed by other modules (lots, labels, etc.).
+  const preservedPdvExtensionsRef = useRef<Record<string, unknown>>({});
   const savedConfig = initialStore.deviceConfig;
   const savedExtensions = normalizePdvExtensions(initialStore.extensions);
   const [sale, setSale] = useState<SaleState | null>(null);
@@ -320,7 +322,7 @@ export function PdvDemoApp() {
   const buildPdvSnapshotJson = () => JSON.stringify(createDefaultPdvLocalStore({
     catalogProducts, registeredCustomers, completedSales, cashSession, paymentOptions,
     deviceConfig: { scaleBrand, barcodeMode, requestCommand, selectedPort, baudRate, manualProductCode },
-    extensions: { inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups, commercialLedger }
+    extensions: { ...preservedPdvExtensionsRef.current, inventoryMovements, cashClosings, receiptPrinterConfig, lastReceiptText, users, currentOperatorId, auditLogs, cancelledSales, terminalConfig, tefConfig, tefTransactions, autoBackupConfig, autoBackups, storeSettings, promotionGroups, commercialLedger }
   }));
 
   useEffect(() => { setRequestCommand(SCALE_REQUEST_COMMANDS[scaleBrand]); }, [scaleBrand]);
@@ -349,6 +351,8 @@ export function PdvDemoApp() {
         if (!Number.isSafeInteger(row.revision) || row.revision < 0) throw new Error("Revisão do banco inválida; gravação bloqueada.");
         lastPersistedRevisionRef.current = row.revision;
         const imported = parsePdvSnapshot(row.snapshotJson);
+        preservedPdvExtensionsRef.current = imported.extensions && typeof imported.extensions === "object"
+          ? { ...imported.extensions } : {};
         setCatalogProducts(imported.catalogProducts); setRegisteredCustomers(imported.registeredCustomers); setCompletedSales(imported.completedSales); setCashSession(imported.cashSession); setPaymentOptions(imported.paymentOptions);
         const importedExtensions = normalizePdvExtensions(imported.extensions);
         setInventoryMovements(importedExtensions.inventoryMovements); setCashClosings(importedExtensions.cashClosings); setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig); setLastReceiptText(importedExtensions.lastReceiptText); setUsers(importedExtensions.users); setCurrentOperatorId(importedExtensions.currentOperatorId); setAuditLogs(importedExtensions.auditLogs); setCancelledSales(importedExtensions.cancelledSales); setTerminalConfig(importedExtensions.terminalConfig); setTefConfig(importedExtensions.tefConfig); setTefTransactions(importedExtensions.tefTransactions); setAutoBackupConfig(importedExtensions.autoBackupConfig); setAutoBackups(importedExtensions.autoBackups); setStoreSettings(importedExtensions.storeSettings); setPromotionGroups(importedExtensions.promotionGroups); setCommercialLedger(importedExtensions.commercialLedger); setPersistenceState("ready"); return;
@@ -450,6 +454,8 @@ export function PdvDemoApp() {
   const addWithdrawal = () => { if (!cashSession || cashSession.closedAt) return setLastEvent("Abra o caixa antes de registrar uma sangria."); const amount = Number(withdrawalDraft) || 0; if (amount <= 0) return setLastEvent("Informe um valor de sangria valido."); setCashSession((current) => current ? { ...current, withdrawals: [...current.withdrawals, { amount, note: withdrawalNote || "Sangria", createdAt: new Date().toLocaleString("pt-BR") }] } : current); setLastEvent(`Sangria de ${formatCurrency(amount)} registrada.`); };
   const exportPdvBackup = () => { const snapshot = buildPdvSnapshotJson(); const blob = new Blob([snapshot], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `pdv-backup-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); setLastEvent("Backup do PDV exportado em JSON."); };
   const applyImportedStore = (imported: ReturnType<typeof parsePdvSnapshot>) => {
+    preservedPdvExtensionsRef.current = imported.extensions && typeof imported.extensions === "object"
+      ? { ...imported.extensions } : {};
     setCatalogProducts(imported.catalogProducts); setRegisteredCustomers(imported.registeredCustomers); setCompletedSales(imported.completedSales); setCashSession(imported.cashSession); setPaymentOptions(imported.paymentOptions);
     const importedExtensions = normalizePdvExtensions(imported.extensions);
     setInventoryMovements(importedExtensions.inventoryMovements); setCashClosings(importedExtensions.cashClosings); setReceiptPrinterConfig(importedExtensions.receiptPrinterConfig); setLastReceiptText(importedExtensions.lastReceiptText); setUsers(importedExtensions.users); setCurrentOperatorId(importedExtensions.currentOperatorId); setAuditLogs(importedExtensions.auditLogs); setCancelledSales(importedExtensions.cancelledSales); setTerminalConfig(importedExtensions.terminalConfig); setTefConfig(importedExtensions.tefConfig); setTefTransactions(importedExtensions.tefTransactions); setAutoBackupConfig(importedExtensions.autoBackupConfig); setAutoBackups(importedExtensions.autoBackups); setStoreSettings(importedExtensions.storeSettings); setPromotionGroups(importedExtensions.promotionGroups); setCommercialLedger(importedExtensions.commercialLedger);

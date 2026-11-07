@@ -73,16 +73,15 @@ export async function commitBatchStockEntry(draft: BatchStockEntryDraft) {
     createdAt: new Date().toLocaleString("pt-BR")
   });
 
-  const stored = await saveMainPdvSnapshot(result.snapshot, expectedRevision);
-  try {
-    const store = await saveProductLabelBatchStore(result.store);
-    return { ...result, store };
-  } catch (error) {
-    // Compensating rollback only when nobody else wrote since the receipt.
-    try { await saveMainPdvSnapshot(originalSnapshotJson, stored.revision); }
-    catch { /* Preserve newer canonical data if concurrent write happened. */ }
-    throw error;
-  }
+  // A single CAS transaction now writes stock, movement and lot metadata together.
+  const originalExtensions = result.snapshot.extensions && typeof result.snapshot.extensions === "object"
+    ? result.snapshot.extensions as Record<string, unknown> : {};
+  const unifiedSnapshot = {
+    ...result.snapshot,
+    extensions: { ...originalExtensions, productLabelBatchStore: result.store }
+  };
+  await saveMainPdvSnapshot(unifiedSnapshot, expectedRevision);
+  return { ...result, snapshot: unifiedSnapshot, store: result.store };
 }
 
 export async function saveMainPdvSnapshot(snapshot: unknown, expectedRevision: number) {
@@ -98,10 +97,20 @@ export async function saveMainPdvSnapshot(snapshot: unknown, expectedRevision: n
 
 export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) {
   const normalized = normalizeProductBatchStore({ ...store, version: 2, updatedAt: new Date().toISOString() });
-  const serialized = JSON.stringify(normalized);
-  const bridge = typeof window !== "undefined" ? window.nexusDesktop?.store : undefined;
-  if (bridge) await bridge.save(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
-  writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, serialized);
+  const desktop = getDesktopPdvStoreBridge();
+  if (desktop) {
+    const row = await desktop.load(PDV_STORE_KEY);
+    if (!row?.snapshotJson) throw new Error("Banco canônico do PDV indisponível. Lotes não foram gravados.");
+    const snapshot = parseJson(row.snapshotJson, {}) as Record<string, unknown>;
+    const extensions = snapshot.extensions && typeof snapshot.extensions === "object"
+      ? snapshot.extensions as Record<string, unknown> : {};
+    await desktop.save(PDV_STORE_KEY, JSON.stringify({
+      ...snapshot,
+      extensions: { ...extensions, productLabelBatchStore: normalized }
+    }), row.revision);
+    return normalized;
+  }
+  writeLocal(PRODUCT_LABEL_BATCH_STORE_KEY, JSON.stringify(normalized));
   return normalized;
 }
 
@@ -161,6 +170,18 @@ export async function loadMainPdvSnapshot() {
 }
 
 export async function loadProductLabelBatchStore() {
+  const desktop = getDesktopPdvStoreBridge();
+  if (desktop) {
+    const row = await desktop.load(PDV_STORE_KEY);
+    if (row?.snapshotJson) {
+      const snapshot = parseJson(row.snapshotJson, {}) as { extensions?: { productLabelBatchStore?: unknown } };
+      if (snapshot.extensions?.productLabelBatchStore) {
+        return normalizeProductBatchStore(snapshot.extensions.productLabelBatchStore);
+      }
+    }
+    // One-time read-only fallback: old installations kept batch metadata in the app store.
+    // The next explicit batch save migrates it to the canonical PDV snapshot.
+  }
   const bridge = typeof window !== "undefined" ? window.nexusDesktop?.store : undefined;
   if (bridge) {
     try {
