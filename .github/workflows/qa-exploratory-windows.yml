@@ -25,7 +25,7 @@ on:
         options: ["1", "2", "3", "4"]
       actions:
         description: "Acoes Gremlins por modulo (10 a 200)"
-        default: "50"
+        default: "100"
         required: false
         type: choice
         options: ["10", "25", "50", "100", "200"]
@@ -64,10 +64,17 @@ jobs:
         run: node --test tests/pdv-qa-exploratory-metrics.test.mjs
       - name: Compilar renderer Electron
         run: npm run build:pdv-demo
+      - name: Verificar 25 jornadas comerciais (E2E reais)
+        id: business
+        continue-on-error: true
+        run: node qa/run-business-flows.mjs --config qa/artisys-qa.config.json --suite qa/business-flows.json --output qa-business-artifacts
+
       - name: Explorar 7 modulos com Gremlins e axe-core
+        id: fuzz
+        continue-on-error: true
         run: |
           $seeds = "${{ inputs.seeds || '2' }}"
-          $actions = "${{ inputs.actions || '50' }}"
+          $actions = "${{ inputs.actions || '100' }}"
           node qa/run-exploratory-matrix.mjs --output qa-exploration-artifacts --seeds $seeds --actions $actions
           if ($LASTEXITCODE -ne 0) { throw "QA exploratorio encontrou falhas ou erros de infraestrutura; consulte artifacts." }
       - name: Publicar resumo
@@ -75,6 +82,10 @@ jobs:
         run: |
           if (Test-Path "qa-exploration-artifacts/report.md") {
             Get-Content "qa-exploration-artifacts/report.md" -Raw | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          if (Test-Path "qa-business-artifacts/business-summary.json") {
+            $summary = Get-Content "qa-business-artifacts/business-summary.json" -Raw | ConvertFrom-Json
+            "## Jornadas reais: $($summary.passed)/$($summary.total) aprovadas; $($summary.failed) falhas" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           }
       - name: Evidencias e reprodutibilidade
         if: always()
@@ -84,3 +95,18 @@ jobs:
           path: windows-10/qa-exploration-artifacts/
           retention-days: 3
           if-no-files-found: warn
+
+      - name: Upload evidencias dos 25 fluxos comerciais
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Nexus-QA-Business-Exploratory
+          path: windows-10/qa-business-artifacts/
+          retention-days: 3
+          if-no-files-found: warn
+
+      - name: Gate final (nao esconder falhas)
+        if: always()
+        run: |
+          if ("${{ steps.business.outcome }}" -ne "success") { throw "Fluxos comerciais falharam; verifique artifact do business" }
+          if ("${{ steps.fuzz.outcome }}" -ne "success") { throw "Fuzzing falhou; verifique artifact Gremlins-Axe" }

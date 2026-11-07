@@ -11,9 +11,9 @@ Esta terceira camada verifica problemas da interface real, independentemente do 
 ## Execucao
 Workflow: QA - Exploracao Real (Gremlins + axe).
 
-Padrao: 7 modulos x 2 sementes x 50 interacoes = 700 eventos planejados. Cenarios isolados em perfis temporarios. Seeds, screenshots e Playwright traces ficam no artifact.
+Padrao: 7 modulos x 2 sementes x 100 ataques = 1400 ataques planejados (eventos reais medidos separadamente). Cenarios isolados em perfis temporarios. Seeds, screenshots e Playwright traces ficam no artifact.
 
-Testes E2E das 25 jornadas comerciais continuam independentes, para validar operacoes completas e estados reais. Nao considere um click bem sucedido como prova de que uma compra ou venda funciona.
+As 25 jornadas comerciais agora tambem rodam no mesmo workflow, em etapa independente com evidencias próprias, para validar operacoes completas e estados reais. Nao considere um click bem sucedido como prova de que uma compra ou venda funciona.
 
 Cada instancia usa um diretorio de dados exclusivo; as requisicoes HTTP externas do renderer sao bloqueadas. Nao existe dependencia de API paga nem deploy.
 
@@ -25,7 +25,7 @@ Na pasta windows-10, em Windows:
     npm install --no-save --no-package-lock --ignore-scripts --prefix tools/artisys-qa gremlins.js@2.2.0 axe-core@4.14.0
     node --test tests/pdv-qa-exploratory-metrics.test.mjs
     npm run build:pdv-demo
-    node qa/run-exploratory-matrix.mjs --seeds 2 --actions 50
+    node qa/run-exploratory-matrix.mjs --seeds 2 --actions 100
 
 ## Interpretacao
 - critical: erro de renderer, perda de persistencia, invariante canonica violada ou falha de infraestrutura.
