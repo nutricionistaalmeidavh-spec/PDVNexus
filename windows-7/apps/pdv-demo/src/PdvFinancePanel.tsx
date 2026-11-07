@@ -104,10 +104,10 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
       {[
-        {label:"A pagar",value:summary.payableOpen},
-        {label:"A receber",value:summary.receivableOpen},
-        {label:"Despesas registradas",value:summary.expensesTotal}
-      ].map(item=><div key={item.label} style={box}><span style={{fontSize:11,color:"#617187"}}>{item.label}</span>
+        {key:"payable",label:"A pagar",value:summary.payableOpen},
+        {key:"receivable",label:"A receber",value:summary.receivableOpen},
+        {key:"expenses",label:"Despesas registradas",value:summary.expensesTotal}
+      ].map(item=><div key={item.key} data-pdv-finance-kpi={item.key} style={box}><span style={{fontSize:11,color:"#617187"}}>{item.label}</span>
         <strong style={{fontSize:22,color:"#17253c",fontVariantNumeric:"tabular-nums"}}>{money(item.value)}</strong></div>)}
     </div>
     <p style={{fontSize:11,color:"#64748b",margin:0}}>Os indicadores acima representam todo o histórico disponível. Os filtros abaixo atuam apenas sobre a matriz.</p>
