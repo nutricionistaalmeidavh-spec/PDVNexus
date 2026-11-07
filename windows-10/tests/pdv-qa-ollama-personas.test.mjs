@@ -75,7 +75,7 @@ test("seleciona controles relevantes e habilitados com ID visual reindexado, man
     disabled:i===4, name:i===85 ? "Cadastrar produto" : "Ação secundária",
     placeholder:i===92 ? "Nome do produto" : ""
   }));
-  const selected=selectPersonaControls(all,{kind:"productExists"});
+  const selected=selectPersonaControls(all,{kind:"productExists"},75,"#/produtos");
   assert.ok(selected.some(x=>x.domIndex===85), "ação útil deve permanecer visível além dos 60 primeiros controles");
   assert.ok(selected.some(x=>x.domIndex===92), "campo relevante não pode sumir da observação");
   assert.ok(selected.every(x=>!x.disabled));
