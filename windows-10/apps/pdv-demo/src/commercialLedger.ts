@@ -9,6 +9,8 @@ export interface CommercialSupplier {
   document?: string;
   phone?: string;
   createdAt: string;
+  createdById?: string;
+  createdByName?: string;
 }
 export interface PurchaseLine {
   productCode: string;
@@ -24,6 +26,10 @@ export interface CommercialPurchase {
   items: PurchaseLine[];
   receivedAt?: string;
   invoiceRef?: string;
+  createdById?: string;
+  createdByName?: string;
+  receivedById?: string;
+  receivedByName?: string;
 }
 export interface CommercialSettlement {
   id: string;
@@ -125,6 +131,44 @@ export function normalizeCommercialLedger(value: unknown): CommercialLedger {
     expenses: Array.isArray(obj.expenses) ? obj.expenses : []
   };
 }
+export interface CommercialAuditRecord {
+  id: string;
+  action: "supplier-created" | "purchase-created" | "purchase-received" | "expense-created" |
+    "purchase-settled" | "sale-settled" | "expense-settled";
+  referenceId: string;
+  performedAt: string;
+  operatorId?: string;
+  operatorName?: string;
+  amount?: number;
+  method?: string;
+}
+/** Read-only audit view derived from canonical events. Legacy rows have no invented operator. */
+export function buildCommercialAuditTrail(ledger: CommercialLedger): CommercialAuditRecord[] {
+  const events: CommercialAuditRecord[]=[];
+  for(const supplier of ledger.suppliers)
+    events.push({id:"SUP:"+supplier.id,action:"supplier-created",referenceId:supplier.id,
+      performedAt:supplier.createdAt,operatorId:supplier.createdById,operatorName:supplier.createdByName});
+  for(const purchase of ledger.purchases){
+    events.push({id:"COM:"+purchase.id,action:"purchase-created",referenceId:purchase.id,
+      performedAt:purchase.orderedAt,operatorId:purchase.createdById,operatorName:purchase.createdByName,
+      amount:purchaseTotal(purchase)});
+    if(purchase.status==="received" && purchase.receivedAt)
+      events.push({id:"REC:"+purchase.id,action:"purchase-received",referenceId:purchase.id,
+        performedAt:purchase.receivedAt,operatorId:purchase.receivedById,operatorName:purchase.receivedByName,
+        amount:purchaseTotal(purchase)});
+  }
+  for(const expense of ledger.expenses)
+    events.push({id:"DES:"+expense.id,action:"expense-created",referenceId:expense.id,
+      performedAt:expense.occurredAt,operatorId:expense.createdById,operatorName:expense.createdByName,
+      amount:expense.amount});
+  for(const payment of ledger.settlements)
+    events.push({id:"SET:"+payment.id,
+      action:payment.kind==="purchase"?"purchase-settled":payment.kind==="sale"?"sale-settled":"expense-settled",
+      referenceId:payment.referenceId,performedAt:payment.paidAt,operatorId:payment.operatorId,
+      operatorName:payment.operatorName,amount:payment.amount,method:payment.method});
+  return events.sort((a,b)=>b.performedAt.localeCompare(a.performedAt)||a.id.localeCompare(b.id));
+}
+
 export function purchaseTotal(purchase: CommercialPurchase) {
   return money(purchase.items.reduce((sum, row) => sum + row.quantity * row.unitCost, 0));
 }
@@ -157,6 +201,7 @@ export function receivePurchase<T extends CommercialCatalogProduct>(input: {
   movements: PdvStockMovement[];
   purchaseId: string;
   receivedAt: string;
+  operator?: { id: string; name: string };
 }): { ledger: CommercialLedger; catalog: T[]; movements: PdvStockMovement[] } {
   const purchase = input.ledger.purchases.find((p) => p.id === input.purchaseId);
   if (!purchase) throw new Error("Compra não encontrada.");
@@ -196,7 +241,7 @@ export function receivePurchase<T extends CommercialCatalogProduct>(input: {
     ledger: {
       ...input.ledger,
       purchases: input.ledger.purchases.map((p) => p.id === purchase.id ?
-        { ...p, status: "received" as const, receivedAt: input.receivedAt } : p)
+        { ...p, status: "received" as const, receivedAt: input.receivedAt, receivedById:input.operator?.id, receivedByName:input.operator?.name } : p)
     }
   };
 }
