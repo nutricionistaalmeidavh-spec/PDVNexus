@@ -64,3 +64,15 @@
 .nexus-reports__detail>strong{display:block;text-align:right;padding-top:12px;font-size:16px}
 .nexus-reports__detail .nexus-reports__table{min-width:450px}
 @media(max-width:750px){.nexus-reports__export-tools{margin-top:12px}.nexus-reports__export-tools button{flex:1 1 145px}.nexus-reports__compare-grid{grid-template-columns:1fr}.nexus-reports__extras{align-items:stretch}.nexus-reports__extras label{flex-basis:100%}.nexus-reports__paging{justify-content:center}.nexus-reports__paging span{flex-basis:100%;text-align:center}}
+
+.nexus-reports__training-confirm,.nexus-reports__training-archive{border:1px solid #c8d8ef;border-radius:9px;padding:14px;background:#fafcff;color:#173d69;margin:15px 0}
+.nexus-reports__training-confirm strong{font-size:14px}
+.nexus-reports__training-confirm p,.nexus-reports__training-archive p{color:#566c83;font-size:12px;line-height:1.5}
+.nexus-reports__training-confirm label{display:grid;gap:6px;font-size:12px;font-weight:600;max-width:560px}
+.nexus-reports__training-confirm input{border:1px solid #c5d5e9;border-radius:7px;padding:10px;background:white;color:#233e59;min-height:40px;width:100%;font:inherit}
+.nexus-reports__training-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.nexus-reports__training-confirm button:disabled{opacity:.5;cursor:not-allowed}
+.nexus-reports__training-archive summary{font-weight:700;cursor:pointer;outline-offset:4px}
+.nexus-reports__training-archive .nexus-reports__table-wrap{margin-top:10px}
+.nexus-reports__training-archive .nexus-reports__table{min-width:720px}
+@media(max-width:640px){.nexus-reports__training-actions>*{width:100%}}
