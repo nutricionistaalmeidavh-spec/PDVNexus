@@ -43,16 +43,15 @@ export function getPdvOpsRuntime() {
 }
 
 export async function reconcileSaleObservationsToStore() {
-  reconcileSaleObservationsToBrowserStore();
   const bridge = getDesktopPdvStoreBridge();
-  if (!bridge) return;
+  if (!bridge) { reconcileSaleObservationsToBrowserStore(); return; }
 
   try {
     const row = await bridge.load(PDV_STORE_KEY);
     if (!row?.snapshotJson) return;
     previousSnapshotJson = row.snapshotJson;
     const merged = mergeSaleObservationsIntoSnapshot(row.snapshotJson);
-    if (merged.changed) await bridge.save(PDV_STORE_KEY, merged.snapshotJson);
+    if (merged.changed) await bridge.save(PDV_STORE_KEY, merged.snapshotJson, row.revision);
   } catch {
     // Decoradores auxiliares nunca devem bloquear venda, persistencia ou impressao.
   }
@@ -75,10 +74,10 @@ export function installDesktopSaleObservationPersistence() {
   }
 
   const original = bridge.save.bind(bridge);
-  const wrapped: DesktopPdvStoreBridge["save"] = async (storeKey, snapshotJson) => {
-    if (storeKey !== PDV_STORE_KEY) return original(storeKey, snapshotJson);
+  const wrapped: DesktopPdvStoreBridge["save"] = async (storeKey, snapshotJson, expectedRevision) => {
+    if (storeKey !== PDV_STORE_KEY) return original(storeKey, snapshotJson, expectedRevision);
     const merged = mergeSaleObservationsIntoSnapshot(snapshotJson);
-    const result = await original(storeKey, merged.snapshotJson);
+    const result = await original(storeKey, merged.snapshotJson, expectedRevision);
     publishPdvSnapshotDiff(eventBus, previousSnapshotJson, merged.snapshotJson);
     previousSnapshotJson = merged.snapshotJson;
     return result;

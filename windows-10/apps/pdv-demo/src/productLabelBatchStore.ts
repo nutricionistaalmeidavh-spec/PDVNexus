@@ -58,7 +58,11 @@ export async function reconcileProductBatchFefoFromCurrentSnapshot() {
 }
 
 export async function commitBatchStockEntry(draft: BatchStockEntryDraft) {
-  const originalSnapshotJson = await loadMainPdvSnapshot();
+  const desktop = getDesktopPdvStoreBridge();
+  const initialRow = desktop ? await desktop.load(PDV_STORE_KEY) : null;
+  if (desktop && !initialRow?.snapshotJson) throw new Error("Dados canônicos do PDV indisponíveis; recebimento bloqueado.");
+  const originalSnapshotJson = initialRow?.snapshotJson ?? await loadMainPdvSnapshot();
+  const expectedRevision = initialRow?.revision ?? 0;
   const originalStore = await loadProductLabelBatchStore();
   const nowIso = new Date().toISOString();
   const result = applyBatchStockEntryToSnapshot({
@@ -69,22 +73,27 @@ export async function commitBatchStockEntry(draft: BatchStockEntryDraft) {
     createdAt: new Date().toLocaleString("pt-BR")
   });
 
-  await saveMainPdvSnapshot(result.snapshot);
+  const stored = await saveMainPdvSnapshot(result.snapshot, expectedRevision);
   try {
     const store = await saveProductLabelBatchStore(result.store);
     return { ...result, store };
   } catch (error) {
-    try { await saveMainPdvSnapshot(originalSnapshotJson); } catch { /* rollback best effort; erro original continua sendo reportado */ }
+    // Compensating rollback only when nobody else wrote since the receipt.
+    try { await saveMainPdvSnapshot(originalSnapshotJson, stored.revision); }
+    catch { /* Preserve newer canonical data if concurrent write happened. */ }
     throw error;
   }
 }
 
-export async function saveMainPdvSnapshot(snapshot: unknown) {
+export async function saveMainPdvSnapshot(snapshot: unknown, expectedRevision: number) {
   const serialized = typeof snapshot === "string" ? snapshot : JSON.stringify(snapshot);
   const desktop = getDesktopPdvStoreBridge();
-  if (desktop) await desktop.save(PDV_STORE_KEY, serialized);
+  if (desktop) {
+    const result = await desktop.save(PDV_STORE_KEY, serialized, expectedRevision);
+    return { serialized, revision: result.revision };
+  }
   writeLocal(PDV_STORE_KEY, serialized);
-  return serialized;
+  return { serialized, revision: expectedRevision + 1 };
 }
 
 export async function saveProductLabelBatchStore(store: ProductLabelBatchStore) {

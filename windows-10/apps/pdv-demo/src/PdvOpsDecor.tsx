@@ -70,10 +70,17 @@ async function readSnapshot() {
   return window.localStorage.getItem(PDV_STORE_KEY);
 }
 
-async function writeSnapshot(snapshot: SnapshotLike) {
+async function writeSnapshot(snapshot: SnapshotLike, original: SnapshotLike) {
   const raw = JSON.stringify({ ...snapshot, updatedAt: new Date().toISOString() });
   const bridge = getDesktopPdvStoreBridge();
-  if (bridge) await bridge.save(PDV_STORE_KEY, raw);
+  if (bridge) {
+    const latest = await bridge.load(PDV_STORE_KEY);
+    if (!latest?.snapshotJson || JSON.stringify(parseSnapshot(latest.snapshotJson)) !== JSON.stringify(original)) {
+      throw new Error("REVISION_CONFLICT: dados atualizados durante importação. Recarregue o PDV antes de tentar novamente.");
+    }
+    await bridge.save(PDV_STORE_KEY, raw, latest.revision);
+    return;
+  }
   window.localStorage.setItem(PDV_STORE_KEY, raw);
 }
 
@@ -187,7 +194,7 @@ export function PdvOpsDecor() {
         setMessage(`Importação bloqueada: ${preview.issues.slice(0, 3).map((issue) => `linha ${issue.row}: ${issue.message}`).join("; ")}`);
         return;
       }
-      await writeSnapshot(mergeProducts(current, preview.products));
+      await writeSnapshot(mergeProducts(current, preview.products), current);
       setMessage(`${preview.products.length} produto(s) importado(s). Recarregando o PDV.`);
     } else {
       const existingIds = (current.registeredCustomers ?? []).map((customer) => customer.id);
@@ -196,7 +203,7 @@ export function PdvOpsDecor() {
         setMessage(`Importação bloqueada: ${preview.issues.slice(0, 3).map((issue) => `linha ${issue.row}: ${issue.message}`).join("; ")}`);
         return;
       }
-      await writeSnapshot(mergeCustomers(current, preview.customers));
+      await writeSnapshot(mergeCustomers(current, preview.customers), current);
       setMessage(`${preview.customers.length} cliente(s) importado(s). Recarregando o PDV.`);
     }
 
