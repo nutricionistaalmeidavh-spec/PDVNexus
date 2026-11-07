@@ -1,0 +1,189 @@
+{
+  "id": "pdv-tutorial-real-produto-primeira-venda",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "desktopStoreSet",
+      "key": "nexus-core:pdv-store:v1",
+      "name": "reset-pdv",
+      "value": {}
+    },
+    {
+      "action": "reload",
+      "name": "reload-reset"
+    },
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-reset-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/produtos\"]",
+      "name": "open-produtos",
+      "holdMs": 650
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/produtos",
+      "name": "produtos-route",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Novo produto",
+      "exact": true,
+      "name": "novo-produto",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Código *\"]",
+      "value": "QA900",
+      "name": "codigo",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Código de barras (opcional)\"]",
+      "value": "QA900BAR",
+      "name": "barras",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Descrição *\"]",
+      "value": "Produto QA 900",
+      "name": "descricao",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Categoria (opcional)\"]",
+      "value": "Testes",
+      "name": "categoria",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Preço de venda *\"]",
+      "value": "19,90",
+      "name": "preco",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Estoque inicial (opcional)\"]",
+      "value": "5",
+      "name": "estoque",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Estoque mínimo (opcional)\"]",
+      "value": "1",
+      "name": "minimo",
+      "holdMs": 650
+    },
+    {
+      "action": "click",
+      "text": "Cadastrar produto",
+      "exact": true,
+      "name": "cadastrar-produto",
+      "holdMs": 650
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 300,
+      "name": "persistir-produto"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Produto QA 900",
+      "exact": true,
+      "name": "produto-visivel",
+      "holdMs": 500
+    },
+    {
+      "action": "expectDesktopStoreJson",
+      "key": "nexus-core:pdv-store:v1",
+      "path": "catalogProducts.5.productCode",
+      "expected": "QA900",
+      "name": "produto-persistido"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "voltar-caixa-apos-cadastro",
+      "holdMs": 650
+    },
+    {
+      "action": "clickIfVisible",
+      "text": "Abrir caixa",
+      "exact": true,
+      "name": "abrir-caixa-apos-cadastro",
+      "holdMs": 650
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F2",
+      "name": "iniciar-primeira-venda",
+      "holdMs": 650
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "value": "QA900",
+      "name": "buscar-produto-cadastrado",
+      "holdMs": 650
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "Enter",
+      "name": "adicionar-produto-venda",
+      "holdMs": 650
+    },
+    {
+      "action": "expectVisible",
+      "text": "1 UN x R$ 19,90",
+      "exact": true,
+      "name": "produto-cadastrado-na-cesta",
+      "holdMs": 500
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F6",
+      "name": "registrar-pagamento",
+      "holdMs": 650
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F8",
+      "name": "finalizar-venda-tutorial",
+      "holdMs": 650
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]",
+      "name": "confirmar-comprovante-tutorial",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Fechar",
+      "exact": true,
+      "name": "fechar-comprovante-tutorial",
+      "holdMs": 650
+    }
+  ]
+}
