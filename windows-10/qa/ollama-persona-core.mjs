@@ -19,6 +19,32 @@ export async function readPersonaConfig(filename) {
   return validateConfig(JSON.parse(await readFile(filename, "utf8")));
 }
 
+/** Escolhe controles DOM visíveis, habilitados e relacionados ao objetivo, sem inventar ações. */
+export function selectPersonaControls(controls, goal, limit = 75) {
+  const kind = String(goal?.kind || "");
+  const navigationOnly = kind === "route" || kind === "routeText";
+  const valid = controls.filter((c) => c && !c.disabled &&
+    Number.isSafeInteger(c.domIndex ?? c.id) &&
+    (c.tag === "A" ? String(c.href || "").startsWith("#/") : true));
+  const candidates = navigationOnly
+    ? valid.filter((c) => c.tag === "A" && String(c.href || "").startsWith("#/"))
+    : valid;
+  const focusTerms = kind === "productExists" ? ["produto", "cadastr", "nome", "código", "codigo", "preço", "preco", "salvar", "estoque", "mercadoria"]
+    : kind === "saleCompleted" ? ["caixa", "venda", "pagamento", "vista", "iniciar", "bipe", "pesquise", "adicionar", "finalizar", "total", "f8"]
+    : kind === "cashOpen" ? ["caixa", "inicial", "abrir", "dinheiro", "movimentações"] : [];
+  const score = (c) => {
+    const name = [c.name, c.placeholder, c.href].join(" ").toLocaleLowerCase("pt-BR");
+    return focusTerms.reduce((sum, term) => sum + (name.includes(term) ? 5 : 0), 0)
+      + (c.tag === "INPUT" && kind === "productExists" ? 2 : 0)
+      + (c.tag === "A" && String(c.href).includes(kind === "productExists" ? "/produtos" : "/caixa") ? 4 : 0);
+  };
+  const selected = candidates
+    .sort((a, b) => score(b) - score(a) || (a.domIndex ?? a.id) - (b.domIndex ?? b.id))
+    .slice(0, Math.max(1, Math.min(100, limit)))
+    .sort((a, b) => (a.domIndex ?? a.id) - (b.domIndex ?? b.id));
+  return selected.map((c, index) => ({ ...c, domIndex: c.domIndex ?? c.id, id: index + 1 }));
+}
+
 export function buildDecisionSchema(controls) {
   const allowedIds = controls.filter(c => !c.disabled && Number.isSafeInteger(c.id)).map(c => c.id);
   if (!allowedIds.length) throw new Error("Nenhum controle disponivel para a decisao");
@@ -63,10 +89,21 @@ export function parseDecision(message, controls) {
 export function goalAchieved(goal, state) {
   if (goal.kind === "route") return String(state.route).includes(goal.value);
   if (goal.kind === "routeText") return String(state.route).includes(goal.route) && String(state.pageText).includes(goal.text);
-  if (goal.kind === "cashOpen") return state.store?.cashSession != null && Number.isFinite(Number(state.store.cashSession.initialAmount)) && !state.store.cashSession.closedAt;
-  if (goal.kind === "saleCompleted") return (state.store?.completedSales?.length || 0) >= 1;
-  if (goal.kind === "productExists") return (state.store?.catalogProducts || []).some((p) => String(p.productName || "").toLowerCase().includes(String(goal.value).toLowerCase()));
-  if (goal.kind === "customerExists") return (state.store?.registeredCustomers || []).some((p) => String(p.name || "").toLowerCase().includes(String(goal.value).toLowerCase()));
+  if (goal.kind === "cashOpen") {
+    const cash = state.store?.cashSession;
+    if (!cash || cash.closedAt || !Number.isFinite(Number(cash.initialAmount))) return false;
+    return goal.initialAmount === undefined || Math.abs(Number(cash.initialAmount) - Number(goal.initialAmount)) <= 0.01;
+  }
+  if (goal.kind === "saleCompleted") return (state.store?.completedSales || []).some(s =>
+    (!goal.productCode || s.items?.some(i => String(i.productCode) === String(goal.productCode))) &&
+    (!goal.paymentMethod || s.payments?.some(p => p.method === goal.paymentMethod && Number(p.amount) > 0)) &&
+    (goal.total === undefined || Math.abs(Number(s.netTotal) - Number(goal.total)) <= 0.01));
+  if (goal.kind === "productExists") return (state.store?.catalogProducts || []).some(p =>
+    String(p.productName || "").toLowerCase().includes(String(goal.value).toLowerCase()) &&
+    (!goal.code || String(p.productCode) === String(goal.code)) &&
+    (goal.unitPrice === undefined || Math.abs(Number(p.unitPrice) - Number(goal.unitPrice)) <= 0.01));
+  if (goal.kind === "customerExists") return (state.store?.registeredCustomers || []).some(p =>
+    String(p.name || "").toLowerCase().includes(String(goal.value).toLowerCase()));
   return false;
 }
 
@@ -76,6 +113,7 @@ export function buildPrompt(persona, state, history, maxSteps) {
     "Perfil: " + persona.profile,
     "Objetivo: " + persona.objective,
     "Acione somente controles listados e observe os resultados; nao invente sucesso.",
+    "Escolha apenas elementId presente em Controles visiveis. Se a ação falhar, reavalie a tela e busque outro controle.",
     "Use apenas JSON: {\"action\":\"click|fill|press|select|done\",\"elementId\":0,\"value\":\"\",\"key\":\"Enter\",\"reason\":\"curto\"}.",
     "Para fill, value e texto; para select, value deve ser um valor das options; press aceita Enter/Escape/Tab/F2/F6/F8.",
     "Para navegar, use um dos links A com href correspondente a rota desejada. Os IDs dos controles sao numeros pequenos sequenciais e devem vir EXATAMENTE da lista, sem inventar ID.",
