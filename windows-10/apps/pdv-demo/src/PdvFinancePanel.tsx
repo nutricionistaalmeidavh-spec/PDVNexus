@@ -104,8 +104,8 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
       {[
-        {label:"Contas a pagar · em aberto",value:summary.payableOpen},
-        {label:"Contas a receber · em aberto",value:summary.receivableOpen},
+        {label:"A pagar",value:summary.payableOpen},
+        {label:"A receber",value:summary.receivableOpen},
         {label:"Despesas registradas",value:summary.expensesTotal}
       ].map(item=><div key={item.label} style={box}><span style={{fontSize:11,color:"#617187"}}>{item.label}</span>
         <strong style={{fontSize:22,color:"#17253c",fontVariantNumeric:"tabular-nums"}}>{money(item.value)}</strong></div>)}
