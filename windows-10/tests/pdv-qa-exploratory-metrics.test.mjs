@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PDV_ROUTES, inspectCanonicalStore, canonicalSignature, classifyExploration } from "../qa/exploratory-metrics.mjs";
+import { PDV_ROUTES, inspectCanonicalStore, canonicalSignature, classifyExploration, businessStateDelta } from "../qa/exploratory-metrics.mjs";
 
 test("cobre todos os menus operacionais, sem focar apenas na tela de caixa", () => {
   assert.deepEqual(PDV_ROUTES.map(([name]) => name), ["caixa", "produtos", "clientes", "financeiro", "administracao", "balanca", "configuracoes"]);
@@ -34,4 +34,21 @@ test("nunca trata falta de dados canonicos como sucesso", () => {
 test("sem eventos DOM reais, resultado deve falhar para evitar falso positivo", () => {
   const r=classifyExploration({route:"#/caixa",expectedRoute:"#/caixa",before:{},after:{},actions:0});
   assert.equal(r.critical[0].type,"no-random-actions");
+});
+
+
+test("contabiliza apenas efeitos persistidos na fonte canonica, nao cliques", () => {
+  const before={catalogProducts:[{productCode:"P1",stock:8}],registeredCustomers:[],completedSales:[],
+    paymentOptions:[{name:"DINHEIRO"}],cashSession:null,extensions:{inventoryMovements:[]}};
+  const after={...before,catalogProducts:[{productCode:"P1",stock:7}],
+    completedSales:[{id:"s1",netTotal:10}],paymentOptions:[...before.paymentOptions,{name:"PIX"}],
+    cashSession:{initialAmount:100},extensions:{inventoryMovements:[{id:"M1"}]}};
+  const delta=businessStateDelta(before,after);
+  assert.equal(delta.changed,true);
+  assert.equal(delta.stocksModified,1);
+  assert.equal(delta.salesCreated,1);
+  assert.equal(delta.paymentMethodsAdded,1);
+  assert.equal(delta.inventoryMovements,1);
+  assert.equal(delta.cashSessionChanged,true);
+  assert.equal(businessStateDelta(before,structuredClone(before)).changed,false);
 });

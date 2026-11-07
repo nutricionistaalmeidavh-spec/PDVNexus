@@ -43,7 +43,10 @@ export function canonicalSignature(snapshot) {
     products: p.map(x => [x.productCode, x.stock, x.unitPrice, x.productName]),
     sales: s.map(x => [x.id, x.netTotal, x.status]),
     customers: c.map(x => [x.id, x.name, x.creditUsed]),
-    cash: snapshot.cashSession
+    cash: snapshot.cashSession,
+    paymentOptions: (snapshot.paymentOptions || []).map(x=>[x.name,x.feePercent,x.kind,x.active]),
+    inventoryMovements: snapshot.extensions?.inventoryMovements || [],
+    cancelledSales: snapshot.extensions?.cancelledSales || []
   });
 }
 
@@ -57,4 +60,27 @@ export function classifyExploration({ route, expectedRoute, before, after, error
   }
   if (actions < 1) findings.push({ type: "no-random-actions", severity: "critical", description: "Nenhum evento DOM de interacao foi observado: nao afirmar cobertura" });
   return { findings, critical: findings.filter(x => x.severity === "critical"), warnings: findings.filter(x => x.severity !== "critical") };
+}
+
+
+export function businessStateDelta(before, after) {
+  // Indicadores de efeito REAL na fonte canonica, sem ler dados de clientes.
+  const arr=(store,key)=>Array.isArray(store?.[key])?store[key]:[];
+  const nested=(store,key)=>Array.isArray(store?.extensions?.[key])?store.extensions[key]:[];
+  const stockMap=store=>new Map(arr(store,"catalogProducts").map(p=>[String(p.productCode),Number(p.stock)]));
+  const stocksA=stockMap(before),stocksB=stockMap(after);
+  const modifiedStocks=[...stocksA.keys()].filter(key=>stocksB.has(key)&&stocksA.get(key)!==stocksB.get(key)).length;
+  const delta=(key)=>arr(after,key).length-arr(before,key).length;
+  const paymentMethodDelta=delta("paymentOptions");
+  const movementsDelta=nested(after,"inventoryMovements").length-nested(before,"inventoryMovements").length;
+  return {
+    changed: canonicalSignature(before)!==canonicalSignature(after),
+    productsAdded:delta("catalogProducts"),
+    customersAdded:delta("registeredCustomers"),
+    salesCreated:delta("completedSales"),
+    paymentMethodsAdded:paymentMethodDelta,
+    inventoryMovements:movementsDelta,
+    stocksModified:modifiedStocks,
+    cashSessionChanged:JSON.stringify(before?.cashSession ?? null)!==JSON.stringify(after?.cashSession ?? null)
+  };
 }

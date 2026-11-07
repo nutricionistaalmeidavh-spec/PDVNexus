@@ -6,7 +6,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "../tools/artisys-qa/node_modules/playwright/index.mjs";
 import { PDV_BUSINESS_BASELINE, MAIN_PDV_STORE_KEY } from "./pdv-business-baseline.mjs";
-import { PDV_ROUTES, canonicalSignature, classifyExploration } from "./exploratory-metrics.mjs";
+import { PDV_ROUTES, canonicalSignature, classifyExploration, businessStateDelta } from "./exploratory-metrics.mjs";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(dir, "..");
@@ -50,7 +50,7 @@ async function runScenario(name,hash,seed) {
   const folder=path.join(output,id);
   const temp=await fs.mkdtemp(path.join(os.tmpdir(),"pdv-exploratory-"));
   await fs.mkdir(folder,{recursive:true});
-  const result={id,route:hash,seed,status:"failed",actions:0,issues:[],a11y:[],pageErrors:[],screenshots:[]};
+  const result={id,route:hash,seed,status:"failed",actions:0,issues:[],a11y:[],pageErrors:[],screenshots:[],businessEffects:null};
   let app,context,page,traceStarted=false;
   try {
     app=await electron.launch({
@@ -72,6 +72,7 @@ async function runScenario(name,hash,seed) {
     await page.locator('a[href="'+hash+'"]').click();
     await page.waitForTimeout(200);
     if (await page.evaluate(()=>location.hash)!==hash) throw new Error("Falha ao entrar em "+hash);
+    const baselineStore=await readStore(page);
     await page.screenshot({path:path.join(folder,"01-inicio.png")});
     result.screenshots.push("01-inicio.png");
     await page.addScriptTag({path:axeScript});
@@ -121,6 +122,7 @@ async function runScenario(name,hash,seed) {
     result.screenshots.push("02-fuzz.png");
     await page.waitForTimeout(500);
     const before=await readStore(page);
+    result.businessEffects=businessStateDelta(baselineStore,before);
     await page.reload({waitUntil:"domcontentloaded"});
     await page.locator('a[href="#/caixa"]').waitFor({timeout:20000});
     const after=await readStore(page);
@@ -152,13 +154,22 @@ async function main(){
     results.push(await runScenario(name,hash,20261106+i));
   const summary={total:results.length,checked:results.filter(x=>x.status==="checked").length,
     failed:results.filter(x=>x.status==="failed").length,plannedActions:results.length*actions,
-    observedEvents:results.reduce((total,r)=>total+r.actions,0),results};
+    observedEvents:results.reduce((total,r)=>total+r.actions,0),
+    campaignsWithBusinessChanges:results.filter(r=>r.businessEffects?.changed===true).length,
+    businessChangesByScenario:results.map(r=>({scenario:r.id,...(r.businessEffects||{changed:false})})),
+    results};
   await fs.writeFile(path.join(output,"summary.json"),JSON.stringify(summary,null,2)+"\n");
   const lines=["# PDV Nexus - Exploracao independente da IA","",
     "Gremlins.js 2.2.0 + axe-core + Playwright/Electron; testes locais e isolados.","",
-    "Cenarios: "+summary.total+" | Interacoes programadas: "+summary.plannedActions+" | Eventos DOM realmente observados: "+summary.observedEvents+" | Sem falhas criticas: "+summary.checked+" | Falhas: "+summary.failed,"",
-    "| Cenario | Resultado | Acoes | Achados |","|---|---|---:|---:|",
-    ...results.map(r=>"| "+r.id+" | "+r.status+" | "+r.actions+" | "+r.issues.length+" |"),"",
+    "Cenarios: "+summary.total+" | Ataques programados: "+summary.plannedActions+" | Eventos DOM observados: "+summary.observedEvents+
+    " | Campanhas com alteracao canonica: "+summary.campaignsWithBusinessChanges+" | Falhas criticas: "+summary.failed,"",
+    "| Cenario | Resultado | Eventos DOM | Dados do negocio mudaram? | Achados |","|---|---|---:|---|---:|",
+    ...results.map(r=>"| "+r.id+" | "+r.status+" | "+r.actions+" | "+(r.businessEffects?.changed===true?"Sim":"Nao")+
+      " | "+r.issues.length+" |"),"",
+    "## Efeito nas fontes canonicas",
+    ...results.map(r=>"- "+r.id+": "+JSON.stringify(r.businessEffects)),
+    "",
+    "Interpretacao: evento DOM nao equivale a operacao comercial. Se nao houve alteracao canonica, a campanha so comprovou robustez de interacao; nao conclusao de negocio.","",
     "## Achados",...results.flatMap(r=>r.issues.slice(0,8).map(f=>"- "+r.id+" ["+f.severity+"] "+f.type+": "+f.description)),"",
     "Sem falha critica nao significa ausência de bugs. Cobertura funcional dos 25 fluxos permanece em outra suite.",
     "Traces, logs, prints e seeds permitem reproduzir cada achado. A quantidade de eventos nao prova cobertura de negocio.",""];
