@@ -2712,6 +2712,204 @@
           "name": "grupo-persistido"
         }
       ]
+    },
+    {
+      "id": "finance-kanban-canonical-move",
+      "category": "financeiro",
+      "critical": true,
+      "steps": [
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/caixa\"]",
+          "name": "pdv-ready",
+          "timeoutMs": 20000
+        },
+        {
+          "action": "desktopStoreSet",
+          "key": "nexus-core:pdv-store:v1",
+          "name": "seed-finance-kanban",
+          "value": {
+            "extensions": {
+              "commercialLedger": {
+                "suppliers": [
+                  {
+                    "id": "FOR-K",
+                    "name": "Fornecedor Kanban",
+                    "createdAt": "2026-11-07T10:00:00.000Z"
+                  }
+                ],
+                "purchases": [
+                  {
+                    "id": "COM-K",
+                    "supplierId": "FOR-K",
+                    "status": "received",
+                    "orderedAt": "2026-11-07T10:00:00.000Z",
+                    "receivedAt": "2026-11-07T10:00:00.000Z",
+                    "dueDate": "2026-10-01",
+                    "items": [
+                      {
+                        "productCode": "00101",
+                        "quantity": 1,
+                        "unitCost": 100
+                      }
+                    ]
+                  }
+                ],
+                "settlements": [],
+                "expenses": []
+              }
+            }
+          }
+        },
+        {
+          "action": "reload",
+          "name": "reload-ledger"
+        },
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "config-ready"
+        },
+        {
+          "action": "click",
+          "selector": "a[href=\"#/configuracoes\"]",
+          "name": "open-settings"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Selecionar operador para entrar\"]",
+          "value": "GER-001",
+          "name": "select-manager"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+          "value": "123456",
+          "name": "manager-pin"
+        },
+        {
+          "action": "click",
+          "text": "Entrar",
+          "exact": true,
+          "name": "authenticate-manager"
+        },
+        {
+          "action": "click",
+          "selector": "a[href=\"#/financeiro\"]",
+          "name": "open-finance"
+        },
+        {
+          "action": "click",
+          "text": "Kanban",
+          "exact": true,
+          "name": "open-kanban"
+        },
+        {
+          "action": "expectVisible",
+          "selector": "[data-pdv-kanban-column=\"vencidas\"] [data-pdv-kanban-item=\"payable:COM-K\"]",
+          "name": "overdue-before"
+        },
+        {
+          "action": "dragTo",
+          "selector": "[data-pdv-kanban-item=\"payable:COM-K\"]",
+          "targetSelector": "[data-pdv-kanban-column=\"a_vencer\"]",
+          "name": "drag-overdue-to-upcoming"
+        },
+        {
+          "action": "expectVisible",
+          "text": "Mover para A vencer",
+          "exact": true,
+          "name": "review-reschedule"
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Novo vencimento no Kanban\"]",
+          "value": "2028-12-20",
+          "name": "reschedule-date"
+        },
+        {
+          "action": "fill",
+          "selector": "textarea[aria-label=\"Motivo da movimentação do Kanban\"]",
+          "value": "Acordo formal com fornecedor",
+          "name": "reschedule-reason"
+        },
+        {
+          "action": "click",
+          "text": "Confirmar alteração",
+          "exact": true,
+          "name": "confirm-reschedule"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "extensions.commercialLedger.purchases.0.dueDate",
+          "expected": "2028-12-20",
+          "name": "canonical-due-date-saved"
+        },
+        {
+          "action": "expectVisible",
+          "selector": "[data-pdv-kanban-column=\"a_vencer\"] [data-pdv-kanban-item=\"payable:COM-K\"]",
+          "name": "upcoming-after"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Mover COM-K para outra coluna\"]",
+          "value": "parciais",
+          "name": "select-mobile-partial"
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Valor confirmado para mover no Kanban\"]",
+          "value": "30",
+          "name": "partial-payment"
+        },
+        {
+          "action": "click",
+          "text": "Confirmar alteração",
+          "exact": true,
+          "name": "confirm-partial"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "extensions.commercialLedger.settlements.0.amount",
+          "expected": 30,
+          "name": "canonical-partial-settlement"
+        },
+        {
+          "action": "expectVisible",
+          "selector": "[data-pdv-kanban-column=\"parciais\"] [data-pdv-kanban-item=\"payable:COM-K\"]",
+          "name": "partial-lane"
+        },
+        {
+          "action": "selectOption",
+          "selector": "select[aria-label=\"Mover COM-K para outra coluna\"]",
+          "value": "liquidadas",
+          "name": "select-fully-paid"
+        },
+        {
+          "action": "click",
+          "text": "Confirmar alteração",
+          "exact": true,
+          "name": "confirm-full-payment"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "extensions.commercialLedger.settlements.1.amount",
+          "expected": 70,
+          "name": "canonical-full-settlement"
+        },
+        {
+          "action": "expectVisible",
+          "selector": "[data-pdv-kanban-column=\"liquidadas\"] [data-pdv-kanban-item=\"payable:COM-K\"]",
+          "name": "settled-lane"
+        },
+        {
+          "action": "screenshot",
+          "name": "kanban-canonical-saved"
+        }
+      ]
     }
   ]
 }

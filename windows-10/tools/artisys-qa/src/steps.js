@@ -59,6 +59,11 @@ export async function executeStep({ page, step, index, screenshotsDir, baseURL, 
     case 'check': await locator(page, step).check(); break;
     case 'uncheck': await locator(page, step).uncheck(); break;
     case 'hover': await locator(page, step).hover(); break;
+    case 'dragTo': {
+      if (!step.targetSelector) throw new Error(`${label}: dragTo requires targetSelector`);
+      await locator(page, step).dragTo(page.locator(step.targetSelector));
+      break;
+    }
     case 'selectOption': await locator(page, step).selectOption(resolveSecret(step, env)); break;
     case 'reload': await page.reload({ waitUntil: step.waitUntil || 'domcontentloaded' }); break;
     case 'waitFor': await locator(page, step).waitFor({ state: step.state || 'visible', timeout: step.timeoutMs }); break;
