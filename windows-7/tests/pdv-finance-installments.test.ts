@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {buildCreditInstallments,settleReceivable,emptyCommercialLedger} from "../apps/pdv-demo/src/commercialLedger";
 import {buildPdvFinanceRows,buildPdvFinanceKanban} from "../apps/pdv-demo/src/financeMatrix";
+import { buildPdvFinanceReport, exportPdvFinanceCsv } from "../apps/pdv-demo/src/financeReporting";
+import { buildPdvFinanceXlsx } from "../apps/pdv-demo/src/financeExportDocuments";
+import { buildCommercialAuditTrail } from "../apps/pdv-demo/src/commercialLedger";
 
 test("crediário: três parcelas mensais somam centavo a centavo, inclusive em fim de mês",()=>{
  const installments=buildCreditInstallments(100,"2026-01-31",3);
@@ -37,4 +40,23 @@ test("matriz e Kanban exibem títulos independentes com baixa parcial FIFO sem d
  assert.deepEqual(JSON.stringify({sale,ledger}),before);
  const next=settleReceivable(ledger,{id:"R3",referenceId:"VD-TEST",amount:50,method:"PIX",paidAt:"2026-02-07T09:00:00Z"},[sale],["A PRAZO"]);
  assert.deepEqual(buildPdvFinanceRows({ledger:next,sales:[sale],creditMethods:["A PRAZO"]}).map(x=>x.open),[0,0,0]);
+});
+
+test("parcelas e auditoria são exportadas em CSV/XLSX com referências rastreáveis",()=>{
+ const installments=buildCreditInstallments(100,"2026-01-31",3);
+ const sale={number:"VD-CRED",finalizedAt:"2026-01-02",netTotal:100,payments:[{method:"A PRAZO",amount:100}],items:[],installments};
+ const ledger={...emptyCommercialLedger(),settlements:[
+  {id:"REC-A",kind:"sale" as const,referenceId:"VD-CRED",amount:10,method:"PIX",paidAt:"2026-01-18",operatorId:"GER",operatorName:"Gerente"}
+ ]};
+ const rows=buildPdvFinanceRows({ledger,sales:[sale],creditMethods:["A PRAZO"]});
+ const csv=exportPdvFinanceCsv(rows);
+ assert.match(csv,/VD-CRED · Parcela 1\/3/);
+ const audit=buildCommercialAuditTrail(ledger);
+ assert.equal(audit.length,1);
+ const report=buildPdvFinanceReport({ledger,sales:[sale],creditMethods:["A PRAZO"]});
+ const xlsx=buildPdvFinanceXlsx(rows,report,audit);
+ const text=new TextDecoder().decode(xlsx);
+ assert.match(text,/Auditoria/);
+ assert.match(text,/Gerente/);
+ assert.match(text,/VD-CRED/);
 });
