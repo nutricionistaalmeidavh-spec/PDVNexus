@@ -3,10 +3,12 @@ import { summarizeCommercial, buildCommercialAuditTrail, type CommercialLedger, 
 import { PdvGuidedDialog, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
 import {
  buildPdvFinanceRows, filterPdvFinanceRows, buildPdvFinanceKanban,
- type PdvFinanceFilters, type PdvFinanceRow, type PdvFinanceKind
+ type PdvFinanceFilters, type PdvFinanceRow, type PdvFinanceKind, type PdvKanbanColumnId
 } from "./financeMatrix";
 import { buildPdvFinanceReport, exportPdvFinanceCsv } from "./financeReporting";
 import { buildPdvFinanceXlsx, buildPdvFinancePdf } from "./financeExportDocuments";
+import {applyPdvFinanceKanbanMove,type PdvFinanceMoveResult} from "./financeKanbanActions";
+import {PdvKanbanMoveDialog,type KanbanMoveFields} from "./PdvKanbanMoveDialog";
 
 const money=(n:number)=>n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const styleBox:CSSProperties={border:"1px solid #dce4ee",borderRadius:12,padding:14,background:"#fff",display:"grid",gap:10};
@@ -31,14 +33,20 @@ type Props={
  allowed:boolean;
  onOpenSettlement:(kind:"purchase"|"sale"|"expense",reference?:string)=>void;
  onOpenExpense:()=>void;
+ onCommitMove:(result:PdvFinanceMoveResult)=>void;
+ operator?:{id:string;name:string};
  storeName?:string;
 };
 /** No duplicate finance store: every row and kanban lane is computed from canonical purchases, sales and settlements. */
-export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,onOpenSettlement,onOpenExpense,storeName="PDV Nexus"}:Props){
+export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,onOpenSettlement,onOpenExpense,onCommitMove,operator,storeName="PDV Nexus"}:Props){
  const [tab,setTab]=useState<FinanceTab>("matrix");
  const [filters,setFilters]=useState<PdvFinanceFilters>({kind:"all",status:"all",search:"",from:"",to:""});
  const [detail,setDetail]=useState<string|null>(null);
  const [exportError,setExportError]=useState("");
+ const [moving,setMoving]=useState<{rowKey:string;target:PdvKanbanColumnId}|null>(null);
+ const [moveError,setMoveError]=useState("");
+ const [dragging,setDragging]=useState<string|null>(null);
+ const [dropColumn,setDropColumn]=useState<PdvKanbanColumnId|null>(null);
  const summary=useMemo(()=>summarizeCommercial({ledger,sales,creditMethods}),[ledger,sales,creditMethods]);
  const rows=useMemo(()=>buildPdvFinanceRows({ledger,sales,creditMethods,customers}),[ledger,sales,creditMethods,customers]);
  const filtered=useMemo(()=>filterPdvFinanceRows(rows,filters),[rows,filters]);
@@ -46,6 +54,28 @@ export function PdvFinancePanel({ledger,sales,creditMethods,customers,allowed,on
  const audit=useMemo(()=>buildCommercialAuditTrail(ledger),[ledger]);
  const report=useMemo(()=>buildPdvFinanceReport({ledger,sales,creditMethods,from:filters.from,to:filters.to}),[ledger,sales,creditMethods,filters.from,filters.to]);
  const selected=rows.find(row=>row.key===detail);
+ const movingRow=rows.find(row=>row.key===moving?.rowKey);
+ const beginMove=(rowKey:string,target:PdvKanbanColumnId)=>{
+   if(!allowed)return;
+   const row=rows.find(item=>item.key===rowKey);
+   if(!row)return;
+   if(board.some(column=>column.id===target&&column.rows.some(item=>item.key===rowKey)))return;
+   setMoveError("");
+   setMoving({rowKey,target});
+   setDetail(null);
+ };
+ const confirmMove=(fields:KanbanMoveFields)=>{
+   if(!moving||!movingRow||!operator)return;
+   try{
+     const next=applyPdvFinanceKanbanMove({
+       ledger,sales,creditMethods,rowKey:moving.rowKey,target:moving.target,operator,
+       allowed,today:todayLocal(),now:new Date().toISOString(),
+       eventId:"FIN-"+crypto.randomUUID(),...fields
+     });
+     onCommitMove(next);
+     setMoving(null);setMoveError("");setDragging(null);setDropColumn(null);
+   }catch(error){setMoveError(error instanceof Error?error.message:"Não foi possível confirmar a operação.");}
+ };
  const selectedTotal=filtered.reduce((sum,row)=>sum+(row.open??0),0);
  const updateFilter=<K extends keyof PdvFinanceFilters>(key:K,value:PdvFinanceFilters[K])=>setFilters(v=>({...v,[key]:value}));
  const launch=(row:PdvFinanceRow)=>{
