@@ -252,6 +252,18 @@
         },
         {
           "action": "fill",
+          "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+          "value": "0",
+          "name": "cheques-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir OUTROS\"]",
+          "value": "0",
+          "name": "outros-conferidos"
+        },
+        {
+          "action": "fill",
           "selector": "input[placeholder=\"PIN do gerente (obrigatório)\"]",
           "value": "123456",
           "name": "autorizacao-gerente"
@@ -374,6 +386,18 @@
           "selector": "input[placeholder=\"Débito conferido\"]",
           "value": "0",
           "name": "debito-contado"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+          "value": "0",
+          "name": "cheques-conferidos"
+        },
+        {
+          "action": "fill",
+          "selector": "input[placeholder=\"Conferir OUTROS\"]",
+          "value": "0",
+          "name": "outros-conferidos"
         },
         {
           "action": "fill",
