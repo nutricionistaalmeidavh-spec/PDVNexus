@@ -19,7 +19,9 @@ test("catalogo indica quando os cinco produtos sao exemplos e nao um limite", ()
   assert.match(source, /sem limite de cinco/);
 });
 
-test("navegacao deixa os relatorios visiveis no nome do menu financeiro", () => {
-  assert.match(source, /label: "Financeiro e relatórios"/);
-  assert.match(shell, /financeiro: "Financeiro e relatórios"/);
+test("navegacao separa relatorios em Vendas e operacional em Financeiro", () => {
+  assert.match(source, /key: "vendas", label: "Vendas e relatórios", path: "\/vendas"/);
+  assert.match(source, /key: "financeiro", label: "Financeiro", path: "\/financeiro"/);
+  assert.match(shell, /vendas: "Vendas e relatórios"/);
+  assert.match(shell, /financeiro: "Financeiro"/);
 });
