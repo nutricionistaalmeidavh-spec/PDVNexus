@@ -85,3 +85,51 @@ test("SQLite real: malformed duplicated product rolls back deletes, preserving p
   assert.equal(count(db,"pdv_sales"),251);
  } finally { db.close(); }
 });
+
+
+test("Benchmark canônico: 2000 vendas e 2500 movimentos sobrevivem a revisões, sem truncar histórico", () => {
+ const db = createDb();
+ const synthetic = state(2000, 900);
+ synthetic.extensions.inventoryMovements = Array.from({ length: 2500 }, (_, index) => ({
+  id: `MOV-PERF-${index}`, productCode: "00101",
+  createdAt: "2026-11-07", quantityDelta: 1, stockBefore: index, stockAfter: index + 1
+ }));
+ const writeDurationsMs = [];
+ const readDurationsMs = [];
+ try {
+  for (let revision = 0; revision < 3; revision += 1) {
+   const started = performance.now();
+   write(db, "loja", synthetic, new Date().toISOString(), revision);
+   writeDurationsMs.push(Math.round((performance.now() - started) * 100) / 100);
+   const readStart = performance.now();
+   const saved = row(db);
+   const parsed = JSON.parse(saved.snapshotJson);
+   readDurationsMs.push(Math.round((performance.now() - readStart) * 100) / 100);
+   assert.equal(saved.revision, revision + 1);
+   assert.equal(parsed.completedSales.length, 2000);
+   assert.equal(parsed.extensions.inventoryMovements.length, 2500);
+  }
+  assert.equal(count(db, "pdv_sales"), 2000);
+  assert.equal(count(db, "pdv_sale_items"), 2000);
+  assert.equal(count(db, "pdv_inventory_movements"), 2500);
+  assert.equal(count(db, "pdv_products"), 1);
+  const orderedWrites = [...writeDurationsMs].sort((a, b) => a - b);
+  const orderedReads = [...readDurationsMs].sort((a, b) => a - b);
+  const metrics = {
+   dataset: { sales: 2000, movements: 2500, products: 1, revisions: 3 },
+   writeMs: writeDurationsMs,
+   writeP50Ms: orderedWrites[1],
+   writeMaxMs: orderedWrites[2],
+   readParseMs: readDurationsMs,
+   readParseP50Ms: orderedReads[1],
+   readParseMaxMs: orderedReads[2],
+   environment: "SQLite node:sqlite em GitHub Actions runner"
+  };
+  console.log("PDV_SQLITE_VOLUME_BENCHMARK " + JSON.stringify(metrics));
+  // Gate amplo e estável, apenas para detectar regressões catastróficas em runners compartilhados.
+  assert.ok(metrics.writeMaxMs < 15000, "Gravação canônica excedeu 15s no runner de QA");
+  assert.ok(metrics.readParseMaxMs < 5000, "Leitura da base canônica excedeu 5s no runner de QA");
+ } finally {
+  db.close();
+ }
+});
