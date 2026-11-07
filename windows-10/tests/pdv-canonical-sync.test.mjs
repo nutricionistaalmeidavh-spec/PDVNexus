@@ -18,3 +18,13 @@ test("SQLite revision and canonical tables must commit in the same transaction",
   assert.match(write,/INSERT INTO pdv_store/);
   assert.match(write,/COMMIT/);
 });
+
+const legacy = fs.readFileSync(new URL("../../windows-7/apps/nexus-desktop/main.cjs", import.meta.url),"utf8");
+test("Windows 7 canonical JSON store must also require revision and token, never pretend it is SQLite", () => {
+  assert.match(legacy,/pdv-nexus-data\.json/);
+  assert.match(legacy,/path: getDesktopStorePath\(\)/);
+  assert.match(legacy,/REVISION_CONFLICT/);
+  assert.match(legacy,/expectedRevision/);
+  assert.match(legacy,/Token de sincroniza[cç][aã]o obrigat[oó]rio/i);
+  assert.doesNotMatch(legacy,/if \(!token\) return true/);
+});
