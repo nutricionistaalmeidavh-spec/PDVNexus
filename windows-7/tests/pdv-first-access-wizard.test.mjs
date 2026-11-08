@@ -38,5 +38,7 @@ for (const edition of ["windows-10", "windows-7"]) {
     assert.match(app, /setGuideDismissed\(false\)/);
     assert.match(app, /setGuideDismissed\(true\)/);
     assert.match(app, /data-pdv-first-use-guide/);
+    assert.match(app, /completedSales\\.length === 0 \\|\\| guideManuallyOpened/);
+    assert.match(app, /setGuideManuallyOpened\\(true\\)/);
   });
 }
