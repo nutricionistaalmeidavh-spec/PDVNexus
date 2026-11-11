@@ -73,11 +73,17 @@ function migrateLegacyPdvData({ app, DatabaseSync = null } = {}) {
   const sqliteTarget = path.join(destinationDir, SQLITE_FILE);
   const jsonTarget = path.join(destinationDir, JSON_FILE);
   // Uma instalação com dados próprios nunca deve ser sobrescrita por outra edição.
-  if (fs.existsSync(sqliteTarget) || fs.existsSync(jsonTarget)) return { status: 'already-initialized' };
-
   const sqliteSource = path.join(sourceDir, SQLITE_FILE);
   const jsonSource = path.join(sourceDir, JSON_FILE);
   const jsonBackup = jsonSource + '.bak';
+  const importedMarker = path.join(destinationDir, 'pdv-legacy-imported.json');
+  if (fs.existsSync(sqliteTarget) || fs.existsSync(jsonTarget)) {
+    const legacyExists = [sqliteSource, jsonSource, jsonBackup].some(file => fs.existsSync(file));
+    if (legacyExists && !fs.existsSync(importedMarker)) {
+      return { status: 'parallel-installations', sourceDir, destinationDir };
+    }
+    return { status: 'already-initialized' };
+  }
   if (![sqliteSource, jsonSource, jsonBackup].some(file => fs.existsSync(file))) return { status: 'no-legacy-data' };
 
   const usesSqlite = Boolean(DatabaseSync);
@@ -118,6 +124,12 @@ function migrateLegacyPdvData({ app, DatabaseSync = null } = {}) {
     const backup = path.join(backupDir, 'legacy-before-import-' + Date.now() + '-' + filename);
     fs.copyFileSync(tmp, backup, fs.constants.COPYFILE_EXCL);
     fs.renameSync(tmp, target);
+    // Marcador impede confundir uma importação concluída com duas bases independentes.
+    try {
+      fs.writeFileSync(importedMarker, JSON.stringify({ sourceDir, backup, importedAt: new Date().toISOString() }), { flag: 'wx' });
+    } catch {
+      // A cópia íntegra permanece válida mesmo se o marcador não puder ser criado.
+    }
     return { status: 'imported', sourceDir, backup, target };
   } catch (error) {
     try { fs.unlinkSync(tmp); } catch {}
