@@ -37,6 +37,6 @@ test('instaladores anteriores saem da pasta dos clientes somente após cópia ve
   const verifyPosition = workflow.indexOf('rclone check "archive-stage"');
   const deletePosition = workflow.indexOf('rclone deletefile');
   assert.ok(archivePosition >= 0 && verifyPosition > archivePosition && deletePosition > verifyPosition);
-  assert.match(workflow, /--drive-root-folder-id "\\$ARCHIVE_ID"/);
-  assert.doesNotMatch(workflow, /rclone mkdir "\\$\{REMOTE\}:\$\{PREVIOUS_FOLDER\}"/);
+  assert.ok(workflow.includes('--drive-root-folder-id "$ARCHIVE_ID"'));
+  assert.ok(!workflow.includes('rclone mkdir "${REMOTE}:${PREVIOUS_FOLDER}"'));
 });
