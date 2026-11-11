@@ -1,0 +1,88 @@
+{
+  "id": "pdv-tutorial-real-consulta-ajuste-estoque",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-reset-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/produtos\"]",
+      "name": "open-produtos",
+      "holdMs": 700
+    },
+    {
+      "action": "expectVisible",
+      "selector": "article:has(h2:text-is(\"Estoque\"))",
+      "name": "painel-estoque-disponivel",
+      "holdMs": 500
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/produtos",
+      "name": "produtos-route",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "name": "abrir-estoque",
+      "holdMs": 700,
+      "selector": "article:has(h2:text-is(\"Estoque\")) button[aria-expanded=\"false\"]"
+    },
+    {
+      "action": "selectOption",
+      "selector": "select:has(option[value=\"00101\"])",
+      "value": "00101",
+      "name": "produto-teclado",
+      "holdMs": 700
+    },
+    {
+      "action": "selectOption",
+      "selector": "select:has(option[value=\"entry\"])",
+      "value": "entry",
+      "name": "tipo-entrada",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Quantidade\"]",
+      "value": "4",
+      "name": "quantidade",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Motivo\"]",
+      "value": "Compra fornecedor QA",
+      "name": "motivo",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Revisar movimento",
+      "exact": true,
+      "name": "abrir-revisao-movimento",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Confirmar movimento",
+      "exact": true,
+      "name": "confirmar-movimento",
+      "holdMs": 700
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 300,
+      "name": "persistir"
+    }
+  ]
+}
