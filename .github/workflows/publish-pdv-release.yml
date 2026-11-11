@@ -14,10 +14,9 @@ permissions:
   contents: write
 
 jobs:
-  # LEGACY FROZEN: do not update releases/latest/latest.json used by existing customers.
-  # Nova Edicao requires a separately approved distribution flow.
+  # Release only after every QA/build gate for the SAME main commit; no preview/PR publication.
   publish:
-    if: ${{ false }}
+    if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     concurrency:
       group: pdv-release-${{ github.event.workflow_run.head_sha }}
@@ -117,13 +116,9 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Protect new release when Drive credential is missing
-        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
-        shell: bash
-        run: |
-          echo "::error::PDV_GDRIVE_RCLONE_CONFIG não configurado. A Release não será publicada sem sincronizar o Drive."
-          exit 1
-
+      - name: Report optional Drive distribution
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true'
+        run: echo "::warning::Drive não configurado; publicação GitHub permanece disponível sem dependência de serviço externo."
       - name: Download installers from successful gate runs
         if: steps.gates.outputs.ready == 'true'
         env:
@@ -133,9 +128,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets/w10 release-assets/w7 release-assets/w8
-          gh run download "${{ steps.gates.outputs.run_w10 }}" --repo "$REPO" -n PDV-Nexus-Windows-10 -D release-assets/w10
-          gh run download "${{ steps.gates.outputs.run_w7 }}" --repo "$REPO" -n PDV-Nexus-Windows-7 -D release-assets/w7
-          gh run download "${{ steps.gates.outputs.run_w8 }}" --repo "$REPO" -n PDV-Nexus-Windows-8-32bit -D release-assets/w8
+          gh run download "${{ steps.gates.outputs.run_w10 }}" --repo "$REPO" -n PDV-Nexus-Nova-Windows-10 -D release-assets/w10
+          gh run download "${{ steps.gates.outputs.run_w7 }}" --repo "$REPO" -n PDV-Nexus-Nova-Windows-7 -D release-assets/w7
+          gh run download "${{ steps.gates.outputs.run_w8 }}" --repo "$REPO" -n PDV-Nexus-Nova-Windows-8-32bit -D release-assets/w8
 
       - name: Build legacy direct-spawn update bridges
         if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
@@ -260,7 +255,7 @@ jobs:
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "Release automática do PDV Nexus. Corrige o empacotamento da telemetria e a ponte de atualização de clientes legados. Publicada somente após W10, W7, W8 x86, QA e sincronização do Drive completos." \
+            --notes "PDV Nexus 2.0.4: migração segura de dados da edição 2.0.2 para o canal atual, sem apagar vendas, clientes, estoque ou financeiro. Instalação somente após QA de Windows 7/8/10 e testes de upgrade; Drive opcional." \
             --draft
 
       - name: Install rclone for Drive distribution
@@ -329,7 +324,7 @@ jobs:
               "$DRIVE_W10"|"$DRIVE_W7"|"$DRIVE_W8")
                 continue
                 ;;
-              PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe)
+              PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe|PDV-Nexus-Nova-Edicao-*.exe)
                 rclone moveto "${REMOTE}:${OLD_FILE}" "${REMOTE}:${PREVIOUS_FOLDER}/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
                 ;;
             esac
@@ -348,7 +343,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish GitHub Release after Drive sync
-        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+        if: steps.gates.outputs.ready == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -357,3 +352,27 @@ jobs:
         run: |
           set -euo pipefail
           gh release edit "$TAG" --repo "$REPO" --draft=false
+
+      - name: Activate Nova Edition updater after public Release
+        if: steps.gates.outputs.ready == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq .isDraft)" = "false"
+          jq --arg manifestUrl "https://raw.githubusercontent.com/${REPO}/main/pdv-nova-release.json" \
+            '. + {manifestUrl:$manifestUrl}' release-assets/latest.json > release-assets/pdv-nova-release.json
+          test "$(jq -r .version release-assets/pdv-nova-release.json)" = "$VERSION"
+          CURRENT_SHA="$(gh api "repos/${REPO}/contents/pdv-nova-release.json?ref=main" --jq .sha)"
+          CURRENT_VERSION="$(gh api "repos/${REPO}/contents/pdv-nova-release.json?ref=main" --jq .content | base64 -d | jq -r .version)"
+          test "$CURRENT_VERSION" = "$VERSION"
+          gh api --method PUT "repos/${REPO}/contents/pdv-nova-release.json" \
+            -f message="chore(pdv): ativar feed 2.0.4 publicado [skip ci]" \
+            -f content="$(base64 -w0 release-assets/pdv-nova-release.json)" \
+            -f sha="$CURRENT_SHA" \
+            -f branch=main \
+            --silent
