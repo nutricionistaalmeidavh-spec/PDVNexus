@@ -130,3 +130,37 @@ test("erro de execução bloqueada vira mensagem amigável e mantém o PDV abert
   assert.match(detail, /PDV continuará aberto/i);
   assert.doesNotMatch(detail, /spawn installer EACCES/i);
 });
+
+test("upgrade 2.0.2 -> 2.0.4 preserva dados ainda existentes no WAL durante backup", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-upgrade-wal-"));
+  const dbPath = path.join(tempDir, "pdv-nexus.sqlite");
+  const backupDir = path.join(tempDir, "backups");
+  seed018Database(dbPath);
+  const active = new DatabaseSync(dbPath);
+  let reader;
+  try {
+    active.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0");
+    active.prepare("UPDATE pdv_meta SET value=? WHERE name=?").run("2.0.2", "installed-pdv-version");
+    active.prepare("INSERT INTO pdv_sales VALUES (?, ?, ?, ?)").run("default", "wal-1", "2026-11-11", '{"amount":42}');
+    reader = new DatabaseSync(dbPath, { readOnly: true });
+    reader.exec("BEGIN");
+    reader.prepare("SELECT COUNT(*) AS total FROM pdv_sales").get();
+    active.prepare("INSERT INTO pdv_sales VALUES (?, ?, ?, ?)").run("default", "wal-2", "2026-11-11", '{"amount":99}');
+
+    const result = preparePdvVersionMigration({ DatabaseSync, dbPath, backupDir, currentVersion: "2.0.4" });
+    const backup = new DatabaseSync(result.backupPath, { readOnly: true });
+    try {
+      assert.equal(result.previousVersion, "2.0.2");
+      assert.equal(backup.prepare("PRAGMA quick_check").get().quick_check, "ok");
+      assert.equal(backup.prepare("SELECT COUNT(*) AS total FROM pdv_sales").get().total, 3);
+      assert.equal(backup.prepare("SELECT value FROM pdv_meta WHERE name='installed-pdv-version'").get().value, "2.0.2");
+      assert.equal(new DatabaseSync(dbPath, { readOnly: true }).prepare("SELECT COUNT(*) AS total FROM pdv_sales").get().total, 3);
+    } finally {
+      backup.close();
+    }
+  } finally {
+    try { reader?.exec("ROLLBACK"); reader?.close(); } catch {}
+    active.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
