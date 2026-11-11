@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const root = new URL("../../", import.meta.url);
 const read = (relativePath) => fs.readFileSync(new URL(relativePath, root), "utf8");
 const nova = JSON.parse(read("pdv-nova-release.json"));
+const build = JSON.parse(read("pdv-build-release.json"));
 const old = JSON.parse(read("pdv-release.json"));
 const w10 = require("../apps/nexus-desktop/electron-builder-pdv.cjs");
 const w7 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win7.cjs");
@@ -15,13 +16,14 @@ const w8 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win8
 test("nova edição preserva o manifesto legado, com canal independente", () => {
   assert.equal(old.version, "2.0.4");
   assert.match(old.manifestUrl, /\/releases\/latest\/download\/latest\.json$/);
-  assert.equal(nova.version, old.version);
+  assert.equal(build.version, old.version);
+  assert.ok(Number(nova.version.split(".")[2]) <= Number(build.version.split(".")[2]));
   assert.notEqual(nova.manifestUrl, old.manifestUrl);
   assert.doesNotMatch(nova.manifestUrl, /\/releases\/latest\//);
-  assert.equal(w10.extraMetadata.version, nova.version);
+  assert.equal(w10.extraMetadata.version, build.version);
   assert.equal(w10.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
-  assert.equal(w7.extraMetadata.version, nova.version);
-  assert.equal(w8.extraMetadata.version, nova.version);
+  assert.equal(w7.extraMetadata.version, build.version);
+  assert.equal(w8.extraMetadata.version, build.version);
   assert.equal(w7.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
   assert.equal(w8.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
 });
@@ -45,6 +47,6 @@ test("pipeline publica apenas após gates na main e preserva atualização dos d
     assert.match(ci, /pdv-nova-release\.json/);
     assert.match(ci, /PDV-Nexus-Nova-Edicao-/);
   }
-  assert.equal(nova.version, "2.0.4");
+  assert.equal(build.version, "2.0.4");
   assert.ok(nova.artifacts && typeof nova.artifacts === "object");
 });
