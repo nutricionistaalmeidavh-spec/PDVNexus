@@ -154,7 +154,9 @@ test("upgrade 2.0.2 -> 2.0.4 preserva dados ainda existentes no WAL durante back
       assert.equal(backup.prepare("PRAGMA quick_check").get().quick_check, "ok");
       assert.equal(backup.prepare("SELECT COUNT(*) AS total FROM pdv_sales").get().total, 3);
       assert.equal(backup.prepare("SELECT value FROM pdv_meta WHERE name='installed-pdv-version'").get().value, "2.0.2");
-      assert.equal(new DatabaseSync(dbPath, { readOnly: true }).prepare("SELECT COUNT(*) AS total FROM pdv_sales").get().total, 3);
+      const current = new DatabaseSync(dbPath, { readOnly: true });
+      try { assert.equal(current.prepare("SELECT COUNT(*) AS total FROM pdv_sales").get().total, 3); }
+      finally { current.close(); }
     } finally {
       backup.close();
     }
