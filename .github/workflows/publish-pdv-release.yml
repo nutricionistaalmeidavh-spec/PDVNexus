@@ -278,9 +278,11 @@ jobs:
           set -euo pipefail
 
           ROOT_ID="$(jq -r '.distribution.googleDrive.rootFolderId' pdv-release.json)"
+          ARCHIVE_ID="$(jq -r '.distribution.googleDrive.archiveFolderId' pdv-release.json)"
           PREVIOUS_FOLDER="$(jq -r '.distribution.googleDrive.previousFolderName' pdv-release.json)"
           REMOTE="$(jq -r '.distribution.googleDrive.remoteName' pdv-release.json)"
           test -n "$ROOT_ID" && test "$ROOT_ID" != "null"
+          test -n "$ARCHIVE_ID" && test "$ARCHIVE_ID" != "null" && test "$ARCHIVE_ID" != "$ROOT_ID"
           test -n "$PREVIOUS_FOLDER" && test "$PREVIOUS_FOLDER" != "null"
           test -n "$REMOTE" && test "$REMOTE" != "null"
 
@@ -309,7 +311,7 @@ jobs:
           STAGE=".pdv-release-staging/${VERSION}-${GITHUB_RUN_ID}"
 
           rclone lsf "${REMOTE}:" "${RCLONE_FLAGS[@]}" >/dev/null
-          rclone mkdir "${REMOTE}:${PREVIOUS_FOLDER}" "${RCLONE_FLAGS[@]}"
+          rclone lsf "${REMOTE}:" --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" >/dev/null
           rclone copy drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --checksum
           rclone check drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --one-way
 
@@ -326,7 +328,16 @@ jobs:
                 continue
                 ;;
               PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe|PDV-Nexus-Nova-Edicao-*.exe)
-                rclone moveto "${REMOTE}:${OLD_FILE}" "${REMOTE}:${PREVIOUS_FOLDER}/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                # Copy and check outside the customer-visible PDV Nexus folder before removal.
+                mkdir -p archive-stage
+                rclone copyto "${REMOTE}:${OLD_FILE}" "archive-stage/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                rclone copyto "archive-stage/${OLD_FILE}" "${REMOTE}:${OLD_FILE}" \
+                  --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" --ignore-existing
+                rclone check "archive-stage" "${REMOTE}:" \
+                  --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" \
+                  --one-way --include "$OLD_FILE"
+                rclone deletefile "${REMOTE}:${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                rm -f "archive-stage/${OLD_FILE}"
                 ;;
             esac
           done
@@ -340,7 +351,7 @@ jobs:
             echo "- W10: ${DRIVE_W10}"
             echo "- W7: ${DRIVE_W7}"
             echo "- W8 32-bit: ${DRIVE_W8}"
-            echo "- Versões anteriores: ${PREVIOUS_FOLDER}/"
+            echo "- Instaladores anteriores arquivados fora da pasta dos clientes (Drive ID ${ARCHIVE_ID})."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish GitHub Release after Drive sync
