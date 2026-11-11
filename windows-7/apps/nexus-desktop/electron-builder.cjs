@@ -44,6 +44,7 @@ module.exports = {
   files: [
     "bootstrap.cjs",
     "main.cjs",
+    "ramuzaNetwork.cjs",
     "pdv-lifecycle.cjs",
     "pdv-telemetry.cjs",
     "preload.cjs",
