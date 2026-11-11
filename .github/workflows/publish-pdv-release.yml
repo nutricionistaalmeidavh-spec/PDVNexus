@@ -16,7 +16,7 @@ permissions:
 jobs:
   # Release only after every QA/build gate for the SAME main commit; no preview/PR publication.
   publish:
-    if: ${{ github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     concurrency:
       group: pdv-release-${{ github.event.workflow_run.head_sha }}
@@ -45,7 +45,7 @@ jobs:
               -f branch="main" \
               -f status="completed" \
               -f per_page=20 \
-              --jq '.workflow_runs | map(select(.conclusion == "success")) | first | .id // empty'
+              --jq '.workflow_runs | map(select(.conclusion == "success" and .event == "push")) | first | .id // empty'
           }
 
           RUN_W10="$(find_successful_run build-windows10-pdv.yml)"
