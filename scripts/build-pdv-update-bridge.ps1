@@ -56,17 +56,18 @@ if (-not $makensis) {
   if ((Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne $expectedSha512) {
     throw "Downloaded NSIS bundle SHA-512 mismatch"
   }
-  $sevenZip = Get-Command "7z.exe" -ErrorAction SilentlyContinue
-  if (-not $sevenZip) {
+  $sevenZipCommand = Get-Command "7z.exe" -ErrorAction SilentlyContinue
+  $sevenZipPath = if ($sevenZipCommand) { $sevenZipCommand.Source } else { $null }
+  if (-not $sevenZipPath) {
     foreach ($candidate in @("C:\Program Files\7-Zip\7z.exe", "C:\Program Files (x86)\7-Zip\7z.exe")) {
       if (Test-Path -LiteralPath $candidate) {
-        $sevenZip = Get-Item $candidate
+        $sevenZipPath = $candidate
         break
       }
     }
   }
-  if (-not $sevenZip) { throw "7-Zip executable unavailable on Windows runner" }
-  & $sevenZip.Source x "-o$unpackDir" -y $archive
+  if (-not $sevenZipPath) { throw "7-Zip executable unavailable on Windows runner" }
+  & $sevenZipPath x "-o$unpackDir" -y $archive
   if ($LASTEXITCODE -ne 0) { throw "Cannot extract verified NSIS bundle" }
   $makensis = Get-ChildItem -LiteralPath $unpackDir -Recurse -File -Filter "makensis.exe" |
     Select-Object -First 1
