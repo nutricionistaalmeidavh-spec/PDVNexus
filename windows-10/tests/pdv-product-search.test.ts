@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findPdvProducts, calculatePdvGrossMargin } from "../apps/pdv-demo/src/productSearch";
+import { findPdvProducts, checkoutSuggestions, calculatePdvGrossMargin } from "../apps/pdv-demo/src/productSearch";
+import { resolveProductSupplier, supplierSnapshotForProduct } from "../apps/pdv-demo/src/supplierCatalog";
 import { completePdvSale } from "../packages/database/src/pdv";
 
 const products = [
@@ -44,4 +45,22 @@ test("histórico de vendas persiste para além das 100 últimas vendas", () => {
   });
   assert.equal(result.completedSales.length, 251);
   assert.equal(result.completedSales[250].number, "ANT-249");
+});
+
+test("autocomplete mostra nomes e preserva scanners numéricos", () => {
+  assert.deepEqual(checkoutSuggestions(products, "caf").map(p => p.productCode), ["10001", "10002"]);
+  assert.deepEqual(checkoutSuggestions(products, "PILAO").map(p => p.productCode), ["10001"]);
+  assert.deepEqual(checkoutSuggestions(products, "7891234567895"), []);
+  assert.deepEqual(checkoutSuggestions(products, "c"), []);
+  assert.deepEqual(checkoutSuggestions(products, "café", 1).map(p => p.productCode), ["10001"]);
+});
+
+test("fornecedor usa ID canônico e captura nome no item", () => {
+  const suppliers = [{ id: "FOR-1", name: "Distribuidora Alfa" }, { id: "FOR-2", name: "Moinho Beta" }];
+  assert.deepEqual(resolveProductSupplier("FOR-2", suppliers), suppliers[1]);
+  assert.equal(resolveProductSupplier(undefined, suppliers), null);
+  assert.deepEqual(supplierSnapshotForProduct({ supplierId: "FOR-2" }, suppliers),
+    { supplierId: "FOR-2", supplierName: "Moinho Beta" });
+  assert.deepEqual(supplierSnapshotForProduct({}, suppliers), {});
+  assert.throws(() => supplierSnapshotForProduct({ supplierId: "FOR-INEXISTENTE" }, suppliers), /fornecedor/i);
 });
