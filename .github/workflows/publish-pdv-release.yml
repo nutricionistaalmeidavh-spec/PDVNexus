@@ -139,57 +139,28 @@ jobs:
           gh run download "${{ steps.gates.outputs.run_w7 }}" --repo "$REPO" -n PDV-Nexus-Windows-7 -D release-assets/w7
           gh run download "${{ steps.gates.outputs.run_w8 }}" --repo "$REPO" -n PDV-Nexus-Windows-8-32bit -D release-assets/w8
 
-      - name: Build legacy direct-spawn update bridges
-        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+      - name: Copy bridges produced by Windows installer builds
+        if: steps.gates.outputs.ready == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq nsis
           mkdir -p release-assets/bridges
-
-          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          test -n "$W10" && test -n "$W7" && test -n "$W8"
-
-          build_bridge() {
-            local source="$1"
-            local channel="$2"
-            local embedded="$3"
-            local out="release-assets/bridges/PDV-Nexus-Update-Bridge-${channel}-${VERSION}.exe"
-            local nsi="release-assets/bridges/bridge-${channel}.nsi"
-            local source_abs
-            local out_abs
-            source_abs="$(realpath "$source")"
-            out_abs="$(realpath -m "$out")"
-
-            cat > "$nsi" <<EOF
-          Unicode true
-          Name "PDV Nexus Update Bridge"
-          OutFile "${out_abs}"
-          RequestExecutionLevel user
-          SilentInstall silent
-          ShowInstDetails nevershow
-          Section
-            SetOutPath "\$TEMP"
-            File /oname=${embedded} "${source_abs}"
-            ExecShell "runas" "\$TEMP\\${embedded}"
-          SectionEnd
-          EOF
-
-            makensis -V2 "$nsi"
-            test -s "$out"
-          }
-
-          build_bridge "$W10" "Windows-10" "PDV-Nexus-Windows-10-Setup-${VERSION}.exe"
-          build_bridge "$W7" "Windows-7" "PDV-Nexus-Windows-7-Setup-${VERSION}.exe"
-          build_bridge "$W8" "Windows-8-32bit" "PDV-Nexus-Windows-8-32bit-Setup-${VERSION}.exe"
+          for channel in Windows-10 Windows-7 Windows-8-32bit; do
+            case "$channel" in
+              Windows-10) source_dir=release-assets/w10 ;;
+              Windows-7) source_dir=release-assets/w7 ;;
+              Windows-8-32bit) source_dir=release-assets/w8 ;;
+            esac
+            name="PDV-Nexus-Update-Bridge-${channel}-${VERSION}.exe"
+            test -s "${source_dir}/${name}"
+            cp "${source_dir}/${name}" "release-assets/bridges/${name}"
+            test -s "release-assets/bridges/${name}"
+          done
 
       - name: Generate update manifest
-        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'false'
+        if: steps.gates.outputs.ready == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
         env:
           REPO: ${{ github.repository }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -198,9 +169,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W10="$(find release-assets/w10 -maxdepth 1 -type f -name 'PDV-Nexus-Setup-*.exe' -print -quit)"
+          W7="$(find release-assets/w7 -maxdepth 1 -type f -name 'PDV-Nexus-Windows-7-Setup-*.exe' -print -quit)"
+          W8="$(find release-assets/w8 -maxdepth 1 -type f -name 'PDV-Nexus-Windows-8-32bit-Setup-*.exe' -print -quit)"
           W10_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-10-${VERSION}.exe"
           W7_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-7-${VERSION}.exe"
           W8_BRIDGE="release-assets/bridges/PDV-Nexus-Update-Bridge-Windows-8-32bit-${VERSION}.exe"
@@ -265,14 +236,36 @@ jobs:
             --notes "PDV Nexus 2.0.4: atualização direta da instalação 2.0.2, com a mesma identidade com suporte a vendas, estoque, fornecedores, CSV e busca instantânea. Publicado após testes Windows 7/8/10 e QA." \
             --draft
 
-      - name: Install rclone for Drive distribution
-        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true'
+      - name: Restore release assets into an existing draft
+        if: steps.gates.outputs.ready == 'true' && steps.existing.outputs.exists == 'true' && steps.existing.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq rclone
-          rclone version
+          gh release upload "$TAG" release-assets/*.exe release-assets/latest.json --repo "$REPO" --clobber
+
+      - name: Install pinned rclone from verified upstream GitHub release
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RCLONE_VERSION="v1.76.0"
+          RCLONE_ZIP="rclone-v1.76.0-linux-amd64.zip"
+          RCLONE_SHA256="b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7"
+          mkdir -p "${RUNNER_TEMP}/rclone-dist" "${RUNNER_TEMP}/rclone-tools"
+          gh release download "$RCLONE_VERSION" -R rclone/rclone -p "$RCLONE_ZIP" -D "${RUNNER_TEMP}"
+          printf '%s  %s\n' "$RCLONE_SHA256" "${RUNNER_TEMP}/${RCLONE_ZIP}" | sha256sum --check -
+          unzip -q "${RUNNER_TEMP}/${RCLONE_ZIP}" -d "${RUNNER_TEMP}/rclone-dist"
+          RCLONE_BIN="$(find "${RUNNER_TEMP}/rclone-dist" -type f -name rclone -print -quit)"
+          test -n "$RCLONE_BIN" && test -s "$RCLONE_BIN"
+          install -m 755 "$RCLONE_BIN" "${RUNNER_TEMP}/rclone-tools/rclone"
+          echo "${RUNNER_TEMP}/rclone-tools" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/rclone-tools/rclone" version
 
       - name: Sync stable installers to Google Drive
         if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true'
@@ -297,9 +290,9 @@ jobs:
           chmod 600 "$RCLONE_CONFIG_PATH"
           rclone listremotes --config "$RCLONE_CONFIG_PATH" | grep -Fx "${REMOTE}:"
 
-          W10="$(find release-assets/w10 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W7="$(find release-assets/w7 -maxdepth 1 -type f -name '*.exe' -print -quit)"
-          W8="$(find release-assets/w8 -maxdepth 1 -type f -name '*.exe' -print -quit)"
+          W10="$(find release-assets/w10 -maxdepth 1 -type f -name 'PDV-Nexus-Setup-*.exe' -print -quit)"
+          W7="$(find release-assets/w7 -maxdepth 1 -type f -name 'PDV-Nexus-Windows-7-Setup-*.exe' -print -quit)"
+          W8="$(find release-assets/w8 -maxdepth 1 -type f -name 'PDV-Nexus-Windows-8-32bit-Setup-*.exe' -print -quit)"
           test -n "$W10" && test -n "$W7" && test -n "$W8"
           [[ "$(basename "$W10")" == *"${VERSION}"* ]]
           [[ "$(basename "$W7")" == *"${VERSION}"* ]]
