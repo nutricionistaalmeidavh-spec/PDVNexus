@@ -8,9 +8,9 @@ const appMap = {
     rendererDir: "../meu-engenheiro/dist"
   },
   "pdv-demo": {
-    appId: "br.com.artisys.pdvnexus.nova",
-    productName: "PDV Nexus Nova Edição",
-    artifactName: "PDV-Nexus-Nova-Edicao-Setup-${version}.${ext}",
+    appId: "com.nexuscore.pdv",
+    productName: "PDV Nexus",
+    artifactName: "PDV-Nexus-Setup-${version}.${ext}",
     rendererDir: "../pdv-demo/dist"
   },
   "oficina-demo": {
