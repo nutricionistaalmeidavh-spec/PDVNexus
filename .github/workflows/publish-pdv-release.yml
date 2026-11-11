@@ -14,10 +14,9 @@ permissions:
   contents: write
 
 jobs:
-  # LEGACY FROZEN: do not update releases/latest/latest.json used by existing customers.
-  # Nova Edicao requires a separately approved distribution flow.
+  # Release only after every QA/build gate for the SAME main commit; no preview/PR publication.
   publish:
-    if: ${{ false }}
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     concurrency:
       group: pdv-release-${{ github.event.workflow_run.head_sha }}
@@ -46,7 +45,7 @@ jobs:
               -f branch="main" \
               -f status="completed" \
               -f per_page=20 \
-              --jq '.workflow_runs | map(select(.conclusion == "success")) | first | .id // empty'
+              --jq '.workflow_runs | map(select(.conclusion == "success" and .event == "push")) | first | .id // empty'
           }
 
           RUN_W10="$(find_successful_run build-windows10-pdv.yml)"
@@ -117,11 +116,14 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Protect new release when Drive credential is missing
-        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+      - name: Report optional Drive distribution
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true'
+        run: echo "::warning::Drive não configurado; publicação GitHub permanece disponível sem dependência de serviço externo."
+      - name: Require Drive credential before customer distribution
+        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured != 'true'
         shell: bash
         run: |
-          echo "::error::PDV_GDRIVE_RCLONE_CONFIG não configurado. A Release não será publicada sem sincronizar o Drive."
+          echo "::error::Drive de clientes sem configuração; não publicar release que ainda não possa ser distribuída."
           exit 1
 
       - name: Download installers from successful gate runs
@@ -260,7 +262,7 @@ jobs:
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "Release automática do PDV Nexus. Corrige o empacotamento da telemetria e a ponte de atualização de clientes legados. Publicada somente após W10, W7, W8 x86, QA e sincronização do Drive completos." \
+            --notes "PDV Nexus 2.0.4: atualização direta da instalação 2.0.2, com a mesma identidade com suporte a vendas, estoque, fornecedores, CSV e busca instantânea. Publicado após testes Windows 7/8/10 e QA." \
             --draft
 
       - name: Install rclone for Drive distribution
@@ -282,9 +284,11 @@ jobs:
           set -euo pipefail
 
           ROOT_ID="$(jq -r '.distribution.googleDrive.rootFolderId' pdv-release.json)"
+          ARCHIVE_ID="$(jq -r '.distribution.googleDrive.archiveFolderId' pdv-release.json)"
           PREVIOUS_FOLDER="$(jq -r '.distribution.googleDrive.previousFolderName' pdv-release.json)"
           REMOTE="$(jq -r '.distribution.googleDrive.remoteName' pdv-release.json)"
           test -n "$ROOT_ID" && test "$ROOT_ID" != "null"
+          test -n "$ARCHIVE_ID" && test "$ARCHIVE_ID" != "null" && test "$ARCHIVE_ID" != "$ROOT_ID"
           test -n "$PREVIOUS_FOLDER" && test "$PREVIOUS_FOLDER" != "null"
           test -n "$REMOTE" && test "$REMOTE" != "null"
 
@@ -313,7 +317,7 @@ jobs:
           STAGE=".pdv-release-staging/${VERSION}-${GITHUB_RUN_ID}"
 
           rclone lsf "${REMOTE}:" "${RCLONE_FLAGS[@]}" >/dev/null
-          rclone mkdir "${REMOTE}:${PREVIOUS_FOLDER}" "${RCLONE_FLAGS[@]}"
+          rclone lsf "${REMOTE}:" --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" >/dev/null
           rclone copy drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --checksum
           rclone check drive-assets "${REMOTE}:${STAGE}" "${RCLONE_FLAGS[@]}" --one-way
 
@@ -329,8 +333,17 @@ jobs:
               "$DRIVE_W10"|"$DRIVE_W7"|"$DRIVE_W8")
                 continue
                 ;;
-              PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe)
-                rclone moveto "${REMOTE}:${OLD_FILE}" "${REMOTE}:${PREVIOUS_FOLDER}/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+              PDV-Nexus-Windows-10-Setup-*.exe|PDV-Nexus-Setup-*.exe|PDV-Nexus-Windows-7-Setup-*.exe|PDV-Nexus-Windows-8-32bit-Setup-*.exe|PDV-Nexus-Nova-Edicao-*.exe)
+                # Copy and check outside the customer-visible PDV Nexus folder before removal.
+                mkdir -p archive-stage
+                rclone copyto "${REMOTE}:${OLD_FILE}" "archive-stage/${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                rclone copyto "archive-stage/${OLD_FILE}" "${REMOTE}:${OLD_FILE}" \
+                  --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" --ignore-existing
+                rclone check "archive-stage" "${REMOTE}:" \
+                  --config "$RCLONE_CONFIG_PATH" --drive-root-folder-id "$ARCHIVE_ID" \
+                  --one-way --include "$OLD_FILE"
+                rclone deletefile "${REMOTE}:${OLD_FILE}" "${RCLONE_FLAGS[@]}"
+                rm -f "archive-stage/${OLD_FILE}"
                 ;;
             esac
           done
@@ -344,11 +357,11 @@ jobs:
             echo "- W10: ${DRIVE_W10}"
             echo "- W7: ${DRIVE_W7}"
             echo "- W8 32-bit: ${DRIVE_W8}"
-            echo "- Versões anteriores: ${PREVIOUS_FOLDER}/"
+            echo "- Instaladores anteriores arquivados fora da pasta dos clientes (Drive ID ${ARCHIVE_ID})."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish GitHub Release after Drive sync
-        if: steps.gates.outputs.ready == 'true' && steps.drive_auth.outputs.configured == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
+        if: steps.gates.outputs.ready == 'true' && (steps.existing.outputs.exists == 'false' || steps.existing.outputs.draft == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
