@@ -75,3 +75,15 @@ Qualquer evolucao do licenciamento no mesmo Worker deve preservar as rotas de te
 ## Ativacao no instalador
 
 Os builds oficiais usam o endpoint de producao acima. `PDV_TELEMETRY_ENDPOINT` continua podendo sobrescrever o destino no build. Mesmo com endpoint configurado, o cliente so envia eventos apos consentimento explicito.
+
+## Telemetria geográfica agregada
+
+- A região é inferida **somente no Worker** pelos campos `request.cf.country`, `request.cf.regionCode` e `request.cf.city`.
+- O coletor só processa essas observações quando recebe **lotes autenticados** de instalações que já autorizaram a telemetria técnica. Instalações sem consentimento não enviam esses lotes.
+- O banco armazena **contagem de requisições de lotes recebidos** por dia, país, UF/região, cidade aproximada e versão, com data da última atividade. **Não armazena IP, coordenadas nem ID de instalação na tabela geográfica.**
+- As contagens **não são usuários ou instalações únicas**. Uma instalação ativa pode gerar várias observações, e localidades de VPN/proxy podem diferir da localização real.
+- Os agregados possuem janela de 30 dias; dados antigos são removidos durante a próxima ingestão. Não há dados geográficos retroativos anteriores à implantação.
+- Falha no geo agregador não interrompe vendas, estoque, atualização ou telemetria técnica.
+- Cloudflare é um **adaptador opcional** para enriquecimento geográfico; o coletor self-hosted continua independente e sem dependências comerciais.
+- Configure o segredo administrativo `TELEMETRY_ADMIN_TOKEN` no Worker (não no repositório ou navegador).
+- Painel: `GET /admin/geography` (solicita token em memória; não usa localStorage). API: `GET /v1/admin/geography?days=7`, com `Authorization: Bearer <token>`. Período: 1–30 dias.

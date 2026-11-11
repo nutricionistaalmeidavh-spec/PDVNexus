@@ -1,6 +1,6 @@
 # Política de Privacidade — PDV Nexus
 
-Última atualização: 10 de agosto de 2026.
+Última atualização: 12 de outubro de 2026.
 
 O PDV Nexus é um aplicativo de ponto de venda desenvolvido e publicado pela ArtiSys. Esta política explica como o aplicativo trata os dados cadastrados pelo estabelecimento que o utiliza.
 
@@ -11,13 +11,19 @@ O aplicativo permite que o próprio usuário cadastre informações necessárias
 ## Armazenamento e transmissão
 
 - Os dados operacionais são armazenados localmente no computador em que o aplicativo está instalado.
-- O PDV Nexus não envia esses dados à ArtiSys, não utiliza publicidade e não inclui rastreamento ou análise de comportamento.
+- O PDV Nexus não envia os dados operacionais à ArtiSys e não utiliza publicidade.
+- A telemetria técnica é opcional e exige consentimento específico no aplicativo. Quando autorizada, pode enviar identificador aleatório de instalação, versão, sessões, atividade técnica e erros sem dados operacionais ou pessoais cadastrados.
+- No recebimento dos lotes autorizados, o servidor Cloudflare pode usar a localização aproximada da conexão (país, UF/região e cidade) **somente para gerar contagens agregadas por dia e versão**. O banco de dados de distribuição geográfica não guarda IP, coordenadas ou identificadores de instalação, e as contagens não identificam usuários individuais.
 - Exportações, importações, cópias de segurança e impressões somente ocorrem quando iniciadas pelo usuário.
 - Pagamentos por cartão e PIX são confirmados manualmente no aplicativo. Esta versão não transmite dados para maquininhas, adquirentes ou instituições financeiras.
 
 ## Finalidade e controle dos dados
 
 Os dados são usados exclusivamente para executar as funções solicitadas pelo usuário, como registrar vendas, controlar estoque e caixa, gerar relatórios e imprimir comprovantes não fiscais. O estabelecimento é responsável pelos dados pessoais que decide cadastrar e pode alterá-los ou excluí-los no próprio aplicativo.
+
+## Telemetria e controle
+
+O consentimento para telemetria pode ser recusado, sem impedir o uso do PDV. Os eventos técnicos ficam disponíveis por até 30 dias; os agregados regionais ficam limitados aos últimos 30 dias e são expurgados na próxima ingestão após vencerem. Sem telemetria autorizada, não há geração desses agregados por instalação.
 
 ## Retenção e segurança
 
