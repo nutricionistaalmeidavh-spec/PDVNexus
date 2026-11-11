@@ -4,46 +4,41 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const root = new URL("../../", import.meta.url);
-const read = (relativePath) => fs.readFileSync(new URL(relativePath, root), "utf8");
+const read = rel => fs.readFileSync(new URL("../../" + rel, import.meta.url),"utf8");
+const release = JSON.parse(read("pdv-release.json"));
 const nova = JSON.parse(read("pdv-nova-release.json"));
-const old = JSON.parse(read("pdv-release.json"));
 const w10 = require("../apps/nexus-desktop/electron-builder-pdv.cjs");
 const w7 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win7.cjs");
 const w8 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs");
 
-test("nova edição preserva o manifesto legado, com canal independente", () => {
-  assert.equal(old.version, "2.0.2");
-  assert.match(old.manifestUrl, /\/releases\/latest\/download\/latest\.json$/);
-  assert.ok(nova.version !== old.version);
-  assert.notEqual(nova.manifestUrl, old.manifestUrl);
-  assert.doesNotMatch(nova.manifestUrl, /\/releases\/latest\//);
-  assert.equal(w10.extraMetadata.version, nova.version);
-  assert.equal(w10.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
-  assert.equal(w7.extraMetadata.version, nova.version);
-  assert.equal(w8.extraMetadata.version, nova.version);
-  assert.equal(w7.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
-  assert.equal(w8.extraMetadata.pdvUpdateManifestUrl, nova.manifestUrl);
-});
-
-test("nova edição instala em identidade e pasta separadas, sem substituir o legado", () => {
-  for (const config of [w10, w7, w8]) {
-    assert.equal(config.appId, "br.com.artisys.pdvnexus.nova");
-    assert.equal(config.productName, "PDV Nexus Nova Edição");
-    assert.equal(config.nsis.shortcutName, "PDV Nexus Nova Edição");
-    assert.notEqual(config.appId, "com.nexuscore.pdv");
-    assert.match(config.artifactName, /^PDV-Nexus-Nova-Edicao-/);
+test("upgrade 2.0.4 preserva appId, diretório e canal dos clientes 2.0.2", () => {
+  assert.equal(release.version, "2.0.4");
+  assert.match(release.manifestUrl, /\/releases\/latest\/download\/latest\.json$/);
+  for (const config of [w10,w7,w8]) {
+    assert.equal(config.appId, "com.nexuscore.pdv");
+    assert.equal(config.productName, "PDV Nexus");
+    assert.equal(config.nsis.shortcutName, "PDV Nexus");
+    assert.equal(config.extraMetadata.version, release.version);
+    assert.equal(config.extraMetadata.pdvUpdateManifestUrl, release.manifestUrl);
+    assert.doesNotMatch(config.artifactName, /Nova-Edicao/);
   }
 });
 
-test("pipeline não pode atualizar clientes legados ou publicar nova versão automaticamente", () => {
-  const publish = read(".github/workflows/publish-pdv-release.yml");
-  assert.match(publish, /if:\s*\$\{\{\s*false\s*\}\}/);
-  for (const workflow of ["build-windows10-pdv.yml", "build-windows7-pdv.yml", "build-windows8-x86-pdv.yml"]) {
-    const ci = read(".github/workflows/" + workflow);
-    assert.match(ci, /pdv-nova-release\.json/);
-    assert.match(ci, /PDV-Nexus-Nova-Edicao-/);
-  }
+test("feed antigo da edição paralela permanece inerte para não apagar nada", () => {
   assert.equal(nova.version, "2.0.3");
   assert.deepEqual(nova.artifacts, {});
+  assert.notEqual(nova.manifestUrl, release.manifestUrl);
+});
+
+test("pipeline publica apenas na main após os três builds e QA", () => {
+  const publish = read(".github/workflows/publish-pdv-release.yml");
+  assert.match(publish,/head_branch == 'main'/);
+  assert.match(publish,/github.event.workflow_run.event == 'push'/);
+  assert.doesNotMatch(publish,/if:\s*\$\{\{\s*false\s*\}\}/);
+  for(const workflow of ["build-windows10-pdv.yml","build-windows7-pdv.yml","build-windows8-x86-pdv.yml"]){
+    const source = read(".github/workflows/" + workflow);
+    assert.match(source,/pdv-release\.json/);
+    assert.doesNotMatch(source,/pdv-nova-release\.json/);
+    assert.doesNotMatch(source,/PDV-Nexus-Nova-/);
+  }
 });
