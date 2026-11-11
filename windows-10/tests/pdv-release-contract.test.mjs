@@ -34,8 +34,9 @@ test("pacote desktop inclui todos os módulos locais exigidos pelo bootstrap", (
 
 test("manifesto de atualização usa bridge sem elevação para clientes legados e preserva o instalador real", () => {
   assert.match(publishWorkflow, /PDV-Nexus-Update-Bridge-/);
-  assert.match(publishWorkflow, /RequestExecutionLevel user/);
-  assert.match(publishWorkflow, /ExecShell "runas"/);
+  const bridgeScript = fs.readFileSync(new URL("../../scripts/build-pdv-update-bridge.ps1", import.meta.url), "utf8");
+  assert.match(bridgeScript, /RequestExecutionLevel user/);
+  assert.match(bridgeScript, /ExecShell "runas"/);
   assert.match(publishWorkflow, /legacyDirectSpawnCompatible:true/);
   assert.match(publishWorkflow, /installerFile:\$w10InstallerFile/);
 });
