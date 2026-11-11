@@ -7,8 +7,8 @@ const releaseConfig = JSON.parse(fs.readFileSync(new URL("../../pdv-release.json
 const publishWorkflow = fs.readFileSync(new URL("../../.github/workflows/publish-pdv-release.yml", import.meta.url), "utf8");
 const desktopBuilder = fs.readFileSync(new URL("../apps/nexus-desktop/electron-builder.cjs", import.meta.url), "utf8");
 
-test("release atual do PDV é 2.0.2", () => {
-  assert.equal(releaseConfig.version, "2.0.2");
+test("release de compatibilidade preparada para 2.0.4", () => {
+  assert.equal(releaseConfig.version, "2.0.4");
   assert.match(releaseConfig.version, /^\d+\.\d+\.\d+$/);
 });
 
@@ -28,6 +28,7 @@ test("pacote desktop inclui todos os módulos locais exigidos pelo bootstrap", (
   assert.match(desktopBuilder, /"bootstrap\.cjs"/);
   assert.match(desktopBuilder, /"main\.cjs"/);
   assert.match(desktopBuilder, /"pdv-lifecycle\.cjs"/);
+  assert.match(desktopBuilder, /"pdv-legacy-migration\.cjs"/);
   assert.match(desktopBuilder, /"pdv-telemetry\.cjs"/);
   assert.match(desktopBuilder, /"preload\.cjs"/);
 });
