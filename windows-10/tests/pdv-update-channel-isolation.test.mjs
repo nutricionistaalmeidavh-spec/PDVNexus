@@ -13,9 +13,9 @@ const w7 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win7
 const w8 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs");
 
 test("nova edição preserva o manifesto legado, com canal independente", () => {
-  assert.equal(old.version, "2.0.2");
+  assert.equal(old.version, "2.0.4");
   assert.match(old.manifestUrl, /\/releases\/latest\/download\/latest\.json$/);
-  assert.ok(nova.version !== old.version);
+  assert.equal(nova.version, old.version);
   assert.notEqual(nova.manifestUrl, old.manifestUrl);
   assert.doesNotMatch(nova.manifestUrl, /\/releases\/latest\//);
   assert.equal(w10.extraMetadata.version, nova.version);
@@ -36,14 +36,15 @@ test("nova edição instala em identidade e pasta separadas, sem substituir o le
   }
 });
 
-test("pipeline não pode atualizar clientes legados ou publicar nova versão automaticamente", () => {
+test("pipeline publica apenas após gates na main e preserva atualização dos dois canais", () => {
   const publish = read(".github/workflows/publish-pdv-release.yml");
-  assert.match(publish, /if:\s*\$\{\{\s*false\s*\}\}/);
+  assert.match(publish, /Protect published version from overwrite/);
+  assert.match(publish, /head_branch/);
   for (const workflow of ["build-windows10-pdv.yml", "build-windows7-pdv.yml", "build-windows8-x86-pdv.yml"]) {
     const ci = read(".github/workflows/" + workflow);
     assert.match(ci, /pdv-nova-release\.json/);
     assert.match(ci, /PDV-Nexus-Nova-Edicao-/);
   }
-  assert.equal(nova.version, "2.0.3");
-  assert.deepEqual(nova.artifacts, {});
+  assert.equal(nova.version, "2.0.4");
+  assert.ok(nova.artifacts && typeof nova.artifacts === "object");
 });
