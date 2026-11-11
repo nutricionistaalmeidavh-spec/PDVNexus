@@ -30,3 +30,13 @@ test('release artifacts are downloaded even when a Release already exists so Dri
   assert.ok(start >= 0, 'download step block missing');
   assert.doesNotMatch(block, /steps\.existing\.outputs\.exists == 'false'/);
 });
+
+test('instaladores anteriores saem da pasta dos clientes somente após cópia verificada para arquivo externo', () => {
+  assert.equal(release.distribution?.googleDrive?.archiveFolderId, '1kn7s1ZaBiWq2nSG5w7zhVCjSoVyathc-');
+  const archivePosition = workflow.indexOf('rclone copyto "archive-stage/');
+  const verifyPosition = workflow.indexOf('rclone check "archive-stage"');
+  const deletePosition = workflow.indexOf('rclone deletefile');
+  assert.ok(archivePosition >= 0 && verifyPosition > archivePosition && deletePosition > verifyPosition);
+  assert.match(workflow, /--drive-root-folder-id "\\$ARCHIVE_ID"/);
+  assert.doesNotMatch(workflow, /rclone mkdir "\\$\{REMOTE\}:\$\{PREVIOUS_FOLDER\}"/);
+});
