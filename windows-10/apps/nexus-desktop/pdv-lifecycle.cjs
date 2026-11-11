@@ -46,15 +46,32 @@ function preparePdvVersionMigration({ DatabaseSync, dbPath, backupDir, currentVe
       return { status: "already-current", previousVersion, currentVersion };
     }
 
-    try { db.exec("PRAGMA wal_checkpoint(FULL)"); } catch { /* database may not use WAL */ }
-
     ensureDir(backupDir);
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     backupPath = path.join(
       backupDir,
       `pdv-nexus-${safeFilePart(previousVersion || "unknown")}-to-${safeFilePart(currentVersion)}-${timestamp}.sqlite`
     );
-    fs.copyFileSync(dbPath, backupPath);
+    // Raw fs.copyFileSync(dbPath) drops uncheckpointed WAL transactions.
+    // VACUUM INTO creates a consistent SQLite snapshot while preserving the live database.
+    const temporaryBackupPath = backupPath + ".tmp";
+    try {
+      const quotedPath = temporaryBackupPath.replace(/'/g, "''");
+      db.exec(`VACUUM INTO '${quotedPath}'`);
+      const backupDb = new DatabaseSync(temporaryBackupPath, { readOnly: true });
+      try {
+        const integrity = backupDb.prepare("PRAGMA quick_check").get();
+        if (String(integrity?.quick_check || Object.values(integrity || {})[0] || "") !== "ok") {
+          throw new Error("Backup SQLite não passou na verificação de integridade.");
+        }
+      } finally {
+        backupDb.close();
+      }
+      fs.renameSync(temporaryBackupPath, backupPath);
+    } catch (error) {
+      try { fs.unlinkSync(temporaryBackupPath); } catch {}
+      throw error;
+    }
 
     db.exec("BEGIN IMMEDIATE");
     try {
