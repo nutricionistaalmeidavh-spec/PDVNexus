@@ -6,12 +6,14 @@ on:
     paths:
       - ".github/workflows/build-windows10-pdv.yml"
       - "pdv-release.json"
+      - "scripts/**"
       - "windows-10/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build-windows10-pdv.yml"
       - "pdv-release.json"
+      - "scripts/**"
       - "windows-10/**"
   workflow_dispatch:
 
@@ -67,11 +69,23 @@ jobs:
           Write-Host "Size: $($exe.Length) bytes"
           Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
 
+      - name: Build compatible legacy update bridge
+        run: |
+          $version = (Get-Content ../pdv-release.json | ConvertFrom-Json).version
+          $installer = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo" -Filter "PDV-Nexus-Setup-*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Installer missing for update bridge" }
+          & ../scripts/build-pdv-update-bridge.ps1 -InstallerPath $installer.FullName -Channel "Windows-10" -Version $version
+          if ($LASTEXITCODE -ne 0) { throw "NSIS bridge generation failed" }
+          $bridge = Join-Path "apps/nexus-desktop/dist-desktop/pdv-demo" "PDV-Nexus-Update-Bridge-Windows-10-$version.exe"
+          if (-not (Test-Path $bridge)) { throw "Bridge output missing: $bridge" }
+
       - name: Upload installer artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-Windows-10
-          path: windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Setup-*.exe
+          path: |
+            windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Setup-*.exe
+            windows-10/apps/nexus-desktop/dist-desktop/pdv-demo/PDV-Nexus-Update-Bridge-Windows-10-*.exe
           if-no-files-found: error
           retention-days: 7
