@@ -50,7 +50,7 @@ test('não sobrescreve dados 2.0.3 quando existe banco na Nova Edição', t => {
   seedSqlite(path.join(old,'pdv-nexus.sqlite'));
   const target = path.join(modern,'pdv-nexus.sqlite');
   fs.writeFileSync(target,'dados atuais');
-  assert.equal(migrateLegacyPdvData({app,DatabaseSync}).status,'already-initialized');
+  assert.equal(migrateLegacyPdvData({app,DatabaseSync}).status,'parallel-installations');
   assert.equal(fs.readFileSync(target,'utf8'),'dados atuais');
 });
 
@@ -85,4 +85,12 @@ test('evita migração silenciosa entre arquiteturas incompatíveis',t=>{
   const {old,app}=setup(t);
   fs.writeFileSync(path.join(old,'pdv-nexus-data.json'),'{}');
   assert.throws(()=>migrateLegacyPdvData({app,DatabaseSync}),/SQLite compatível/);
+});
+
+test('recusa migrar SQLite danificado e não cria uma loja vazia', t => {
+  const {old,modern,app}=setup(t);
+  fs.writeFileSync(path.join(old,'pdv-nexus.sqlite'),'dados de teste danificados');
+  assert.throws(()=>migrateLegacyPdvData({app,DatabaseSync}));
+  assert.equal(fs.existsSync(path.join(modern,'pdv-nexus.sqlite')),false);
+  assert.ok(fs.existsSync(path.join(old,'pdv-nexus.sqlite')));
 });
