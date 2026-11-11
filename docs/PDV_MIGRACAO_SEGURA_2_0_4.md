@@ -8,6 +8,7 @@ A versão 2.0.4 usa **o mesmo código do PDV Nexus** para quem já recebeu a 2.0
 - Clientes 2.0.3 consultam `pdv-nova-release.json`, que **permanece na versão 2.0.3 até existir uma Release pública com executáveis e SHA-256**.
 - Os instaladores 2.0.4 são compilados conforme `pdv-build-release.json`. Somente depois de publicar GitHub Release o pipeline atualiza o manifesto dos clientes 2.0.3.
 - O Google Drive é apenas canal opcional para entrega; não existe dependência de plano pago.
+- Quando o Drive estiver configurado, as versões antigas serão copiadas e verificadas na pasta separada **Pdv antigos**, fora da pasta PDV Nexus enviada aos clientes, antes de serem retiradas desta última.
 
 ## Primeira execução de uma instalação que veio da 2.0.2
 
