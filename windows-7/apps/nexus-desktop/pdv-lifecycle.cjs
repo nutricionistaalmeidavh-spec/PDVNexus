@@ -96,6 +96,53 @@ function preparePdvVersionMigration({ DatabaseSync, dbPath, backupDir, currentVe
   }
 }
 
+
+function preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion }) {
+  const fallback = jsonPath + ".bak";
+  if (!fs.existsSync(jsonPath) && !fs.existsSync(fallback)) return { status: "new-installation" };
+  ensureDir(backupDir);
+  const marker = path.join(backupDir, "pdv-json-upgrade-" + safeFilePart(currentVersion) + ".json");
+  if (fs.existsSync(marker)) return { status: "already-backed-up", marker };
+
+  const verify = file => {
+    const raw = fs.readFileSync(file);
+    const parsed = JSON.parse(raw.toString("utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Banco JSON inválido: estrutura principal ausente.");
+    }
+    for (const state of Object.values(parsed.pdvSnapshots || {})) {
+      if (state && typeof state.snapshotJson === "string") JSON.parse(state.snapshotJson);
+    }
+    return raw;
+  };
+  let source = jsonPath;
+  let raw;
+  try {
+    raw = verify(source);
+  } catch (error) {
+    if (!fs.existsSync(fallback)) throw error;
+    source = fallback;
+    raw = verify(source);
+  }
+
+  const backupPath = path.join(backupDir,
+    "pdv-json-before-" + safeFilePart(currentVersion) + "-" +
+    new Date().toISOString().replace(/[:.]/g, "-") + "-" + crypto.randomBytes(4).toString("hex") + ".json");
+  fs.copyFileSync(source, backupPath, fs.constants.COPYFILE_EXCL);
+  try {
+    const copied = verify(backupPath);
+    if (sha256File(backupPath) !== crypto.createHash("sha256").update(raw).digest("hex") ||
+        !copied.equals(raw)) {
+      throw new Error("Cópia do banco JSON não coincide com os dados de origem.");
+    }
+    fs.writeFileSync(marker, JSON.stringify({ currentVersion, backupPath, source, createdAt: new Date().toISOString() }), { flag: "wx" });
+    return { status: source === fallback ? "backed-up-from-fallback" : "backed-up", backupPath };
+  } catch (error) {
+    try { fs.unlinkSync(backupPath); } catch {}
+    throw error;
+  }
+}
+
 function requestBuffer(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 5) return reject(new Error("Muitos redirecionamentos ao buscar atualização."));
@@ -215,6 +262,7 @@ async function startPdvAutoUpdater({ app, dialog, channel, manifestUrl }) {
 module.exports = {
   compareVersions,
   preparePdvVersionMigration,
+  preparePdvJsonVersionBackup,
   selectArtifact,
   sha256File,
   startPdvAutoUpdater
