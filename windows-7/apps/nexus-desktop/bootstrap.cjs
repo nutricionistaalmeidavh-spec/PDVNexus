@@ -1,4 +1,5 @@
 const path = require("node:path");
+const fs = require("node:fs");
 const electron = require("electron");
 const { app, dialog } = electron;
 const safeStorage = electron.safeStorage || null;
@@ -16,11 +17,13 @@ try {
 
 const isPdv = process.env.NEXUS_APP === "pdv-demo" || Boolean(pkg.pdvUpdateChannel);
 let migrationError = null;
+let parallelInstallations = false;
 let telemetry = null;
 
 if (isPdv) {
   try {
-    migrateLegacyPdvData({ app, DatabaseSync });
+    const legacyMigration = migrateLegacyPdvData({ app, DatabaseSync });
+    parallelInstallations = legacyMigration.status === "parallel-installations";
     preparePdvVersionMigration({
       DatabaseSync,
       dbPath: path.join(app.getPath("userData"), "pdv-nexus.sqlite"),
@@ -45,6 +48,26 @@ if (migrationError) {
   });
 } else {
   require("./main.cjs");
+
+  if (isPdv && parallelInstallations) {
+    app.whenReady().then(async () => {
+      const marker = path.join(app.getPath("userData"), "pdv-parallel-installations-notified.txt");
+      if (fs.existsSync(marker)) return;
+      try {
+        await dialog.showMessageBox({
+          type: "warning",
+          title: "PDV Nexus — duas bases existentes",
+          message: "Há registros nas instalações antiga e nova.",
+          detail: "Nenhuma base foi sobrescrita. As vendas feitas nas duas edições não são combinadas automaticamente. Utilize apenas a edição atual e solicite uma conferência assistida antes de excluir a instalação antiga.",
+          buttons: ["Entendi"],
+          noLink: true
+        });
+        fs.writeFileSync(marker, new Date().toISOString(), { flag: "wx" });
+      } catch {
+        // Um aviso não deve interromper o PDV.
+      }
+    });
+  }
 
   if (isPdv) {
     app.whenReady().then(async () => {
