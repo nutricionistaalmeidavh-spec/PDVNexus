@@ -4,6 +4,7 @@ const { app, dialog } = electron;
 const safeStorage = electron.safeStorage || null;
 const pkg = require("./package.json");
 const { preparePdvVersionMigration, startPdvAutoUpdater } = require("./pdv-lifecycle.cjs");
+const { migrateLegacyPdvData } = require("./pdv-legacy-migration.cjs");
 const { createPdvTelemetry } = require("./pdv-telemetry.cjs");
 
 let DatabaseSync = null;
@@ -19,6 +20,7 @@ let telemetry = null;
 
 if (isPdv) {
   try {
+    migrateLegacyPdvData({ app, DatabaseSync });
     preparePdvVersionMigration({
       DatabaseSync,
       dbPath: path.join(app.getPath("userData"), "pdv-nexus.sqlite"),
