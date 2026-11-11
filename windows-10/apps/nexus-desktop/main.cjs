@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
-const net = require("node:net");
+const { probeRamuzaAtena2Lan } = require("./ramuzaNetwork.cjs");
 const os = require("node:os");
 const path = require("node:path");
 const { SerialPort } = require("serialport");
@@ -878,35 +878,8 @@ ipcMain.handle("nexus-print:receipt", async (_event, options) => {
   return result;
 });
 
-// Diagnostico passivo de conectividade; nao envia comandos sem protocolo homologado.
-ipcMain.handle("nexus-ramuza:probe", async (_event, ip, requestedPort) => {
-  const host = typeof ip === "string" ? ip.trim() : "";
-  const parts = host.split(".").map(Number);
-  const validLan = net.isIP(host) === 4 && parts.length === 4 && (
-    parts[0] === 10 ||
-    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-    (parts[0] === 192 && parts[1] === 168) ||
-    (parts[0] === 169 && parts[1] === 254) ||
-    parts[0] === 127
-  );
-  if (!validLan) throw new Error("Informe um endereco IPv4 privado da rede local (ex.: 192.168.0.150).");
-  const port = Number(requestedPort ?? 33581);
-  if (port !== 33581) throw new Error("A porta permitida para o teste Atena II e 33581.");
-  return await new Promise((resolve) => {
-    const socket = net.createConnection({ host, port });
-    let finished = false;
-    const finish = (reachable) => {
-      if (finished) return;
-      finished = true;
-      socket.destroy();
-      resolve({ host, port, reachable });
-    };
-    socket.setTimeout(1600);
-    socket.once("connect", () => finish(true));
-    socket.once("timeout", () => finish(false));
-    socket.once("error", () => finish(false));
-  });
-});
+// Abre apenas a conexao local; nunca transmite comandos nao documentados.
+ipcMain.handle("nexus-ramuza:probe", (_event, host, port) => probeRamuzaAtena2Lan(host, port));
 
 ipcMain.handle("nexus-serial:list", async () => {
   return SerialPort.list();
