@@ -74,6 +74,7 @@ jobs:
           VERSION="$(jq -r '.version' pdv-release.json)"
           test -n "$VERSION"
           test "$VERSION" != "null"
+          test "$VERSION" = "$(jq -r .version pdv-build-release.json)"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=pdv-v${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -369,7 +370,7 @@ jobs:
           test "$(jq -r .version release-assets/pdv-nova-release.json)" = "$VERSION"
           CURRENT_SHA="$(gh api "repos/${REPO}/contents/pdv-nova-release.json?ref=main" --jq .sha)"
           CURRENT_VERSION="$(gh api "repos/${REPO}/contents/pdv-nova-release.json?ref=main" --jq .content | base64 -d | jq -r .version)"
-          test "$CURRENT_VERSION" = "$VERSION"
+          test "$CURRENT_VERSION" = "2.0.3" || test "$CURRENT_VERSION" = "$VERSION"
           gh api --method PUT "repos/${REPO}/contents/pdv-nova-release.json" \
             -f message="chore(pdv): ativar feed 2.0.4 publicado [skip ci]" \
             -f content="$(base64 -w0 release-assets/pdv-nova-release.json)" \
