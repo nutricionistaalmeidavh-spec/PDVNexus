@@ -62,5 +62,6 @@ test("fornecedor usa ID canônico e captura nome no item", () => {
   assert.deepEqual(supplierSnapshotForProduct({ supplierId: "FOR-2" }, suppliers),
     { supplierId: "FOR-2", supplierName: "Moinho Beta" });
   assert.deepEqual(supplierSnapshotForProduct({}, suppliers), {});
-  assert.throws(() => supplierSnapshotForProduct({ supplierId: "FOR-INEXISTENTE" }, suppliers), /fornecedor/i);
+  assert.deepEqual(supplierSnapshotForProduct({ supplierId: "FOR-INEXISTENTE" }, suppliers),
+    { supplierId: "FOR-INEXISTENTE", supplierName: "Não informado" });
 });
