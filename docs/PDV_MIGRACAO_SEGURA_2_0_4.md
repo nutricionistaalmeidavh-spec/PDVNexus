@@ -22,6 +22,7 @@ A versão 2.0.4 usa **o mesmo código do PDV Nexus** para quem já recebeu a 2.0
 ## Limitações que não devem ser ocultadas
 
 - **Esta entrega não desinstala a edição antiga**. Quem usou as duas instalações e registrou vendas diferentes em cada base precisa de reconciliação orientada antes de eliminar qualquer delas.
+- Quando as duas bases já existirem antes da importação, o aplicativo avisa uma vez que os históricos podem divergir, sem sobrescrever nenhum arquivo.
 - A aplicação não deve funcionar simultaneamente nas duas edições depois da migração, pois isto gera históricos divergentes.
 - Migração automática de um banco JSON de Windows 7/8 para SQLite de Windows 10, ou de SQLite para JSON, **não é suportada**; o processo bloqueia em vez de descartar registros.
 - Testes de CI com dados sintéticos verificam a lógica, mas não substituem testes em uma máquina representativa antes da liberação final.
