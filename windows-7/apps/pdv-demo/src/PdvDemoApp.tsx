@@ -69,7 +69,8 @@ import {
   type PromotionGroup
 } from "./catalogPromotions";
 
-import { findPdvProducts, calculatePdvGrossMargin } from "./productSearch";
+import { findPdvProducts, checkoutSuggestions, calculatePdvGrossMargin } from "./productSearch";
+import { resolveProductSupplier, supplierSnapshotForProduct } from "./supplierCatalog";
 import { PdvProductPicker } from "./PdvProductPicker";
 import { PdvGuidedDialog, guidedFieldStyle, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
 import { normalizePdvCustomerPhone, updatePdvCustomerContact } from "./customerPhone";
@@ -82,11 +83,11 @@ type PaymentMethod = string;
 type PaymentOption = { name: string; feePercent: number; showsInCashflow: boolean; active?: boolean; kind?: "cash" | "pix" | "credit" | "debit" | "store-credit" | "check" | "other"; };
 type PaymentDraft = { method: PaymentMethod; amount: number };
 type ProductComboDraft = { quantity: string; bundlePrice: string; };
-type ProductDraft = { code: string; barcode: string; name: string; category: string; brand: string; producer: string; cost: string; type: "unit" | "weight"; price: string; stock: string; minimumStock: string; quantityPriceRules: ProductComboDraft[]; productKind: CatalogProductKind; parentProductCode: string; variantLabel: string; promotionGroupId: string; };
+type ProductDraft = { code: string; barcode: string; name: string; category: string; brand: string; producer: string; supplierId: string; cost: string; type: "unit" | "weight"; price: string; stock: string; minimumStock: string; quantityPriceRules: ProductComboDraft[]; productKind: CatalogProductKind; parentProductCode: string; variantLabel: string; promotionGroupId: string; };
 type PromotionGroupDraft = { name: string; quantityPriceRules: ProductComboDraft[]; };
-type CatalogProduct = ScaleProductRecord & { brand?: string; producer?: string; costPrice?: number; barcode: string; unitLabel: string; stock: number; minStock: number; category: string; active?: boolean; quantityPriceRules?: QuantityPriceRule[]; productKind?: CatalogProductKind; parentProductCode?: string; variantLabel?: string; promotionGroupId?: string; };
+type CatalogProduct = ScaleProductRecord & { brand?: string; producer?: string; supplierId?: string; costPrice?: number; barcode: string; unitLabel: string; stock: number; minStock: number; category: string; active?: boolean; quantityPriceRules?: QuantityPriceRule[]; productKind?: CatalogProductKind; parentProductCode?: string; variantLabel?: string; promotionGroupId?: string; };
 type Customer = { id: string; name: string; phone?: string; document: string; city: string; creditLimit: number; creditUsed: number; };
-type SaleItem = { unitCostAtSale?: number; id: string; productCode: string; productName: string; brand?: string; producer?: string; unitLabel: string; quantity: number; unitPrice: number; totalPrice: number; source: "catalog" | "scale"; regularTotalPrice?: number; promotionDiscount?: number; pricingLabel?: string; };
+type SaleItem = { unitCostAtSale?: number; id: string; productCode: string; productName: string; brand?: string; producer?: string; supplierId?: string; supplierName?: string; unitLabel: string; quantity: number; unitPrice: number; totalPrice: number; source: "catalog" | "scale"; regularTotalPrice?: number; promotionDiscount?: number; pricingLabel?: string; };
 type SaleState = { number: string; openedAt: string; customerId: string; seller: string; dueDate?: string; installmentCount?: number; installments?: CommercialSaleInstallment[]; discountPercent: number; items: SaleItem[]; payments: PaymentDraft[]; paymentItemAssignments?: ItemPaymentAssignment[]; itemPaymentAllocations?: ItemPaymentAllocation[]; terminalId?: string; operatorId?: string; };
 type CompletedSale = SaleState & { reportExclusion?: ReportExclusion; reportExclusionEvents?: ReportExclusionEvent[]; finalizedAt: string; netTotal: number; paymentSummary: PdvPaymentSummary; status?: "completed" | "cancelled"; cancelledAt?: string; cancelReason?: string; cancelledById?: string; authorizedById?: string; };
 type CashSession = { openedAt: string; initialAmount: number; closedAt?: string; withdrawals: Array<{ amount: number; note: string; createdAt: string }>; };
@@ -141,7 +142,7 @@ const defaultExtensions: PdvExtensions = { inventoryMovements: [], cashClosings:
 const defaultPdvStore: PdvStoreDefaults = { catalogProducts: seedProducts, registeredCustomers: seedCustomers, completedSales: [], cashSession: null, paymentOptions: defaultPaymentOptions, deviceConfig: defaultConfig, extensions: defaultExtensions };
 
 function createEmptyProductDraft(): ProductDraft {
-  return { code: "", barcode: "", name: "", category: "", brand: "", producer: "", cost: "", type: "unit", price: "", stock: "", minimumStock: "", quantityPriceRules: [], productKind: "standard", parentProductCode: "", variantLabel: "", promotionGroupId: "" };
+  return { code: "", barcode: "", name: "", category: "", brand: "", producer: "", supplierId: "", cost: "", type: "unit", price: "", stock: "", minimumStock: "", quantityPriceRules: [], productKind: "standard", parentProductCode: "", variantLabel: "", promotionGroupId: "" };
 }
 function createEmptyPromotionGroupDraft(): PromotionGroupDraft { return { name: "", quantityPriceRules: [] }; }
 
@@ -241,6 +242,7 @@ export function PdvDemoApp() {
   const [cashClosePinDraft, setCashClosePinDraft] = useState("");
   const [cashReviewApproverId, setCashReviewApproverId] = useState<string | null>(null);
   const [entryValue, setEntryValue] = useState("");
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const [selectedCustomerId, setSelectedCustomerId] = useState("CLI-001");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
@@ -306,6 +308,7 @@ export function PdvDemoApp() {
   const extraCountMethods = paymentOptions.filter((opt) => opt.active !== false && opt.showsInCashflow !== false && opt.kind !== "store-credit" && !["A VISTA","PIX","CREDITO","DEBITO"].includes(opt.name.toUpperCase())).map((opt) => opt.name);
   const canReviewCash = Boolean(cashReviewApproverId && users.some((u) => u.id === cashReviewApproverId && u.active && (u.role === "manager" || u.role === "admin")));
   const sellableCatalogProducts = useMemo(() => catalogProducts.filter(isSellableCatalogProduct), [catalogProducts]);
+  const searchSuggestions = useMemo(() => checkoutSuggestions(sellableCatalogProducts, entryValue), [sellableCatalogProducts, entryValue]);
   const parentProducts = useMemo(() => catalogProducts.filter((product) => (product.productKind ?? "standard") === "parent"), [catalogProducts]);
   const filteredProducts = useMemo(() => {
     const search = catalogSearch.trim().toLowerCase();
@@ -671,13 +674,14 @@ export function PdvDemoApp() {
   const addCatalogProduct = (product: CatalogProduct, quantity = 1) => {
     if (!isSellableCatalogProduct(product)) return setLastEvent(`${product.productName} é um produto principal. Lance uma de suas variações.`);
     if (product.active === false) return setLastEvent(`${product.productName} está excluído do catálogo de venda.`);
+    const supplierSnapshot = supplierSnapshotForProduct(product, commercialLedger.suppliers);
     const currentQuantity = sale?.items.filter((item) => item.source === "catalog" && item.productCode === product.productCode).reduce((sum, item) => sum + item.quantity, 0) ?? 0;
     const nextQuantity = roundStock(currentQuantity + quantity);
     if (nextQuantity > product.stock) return setLastEvent(`Estoque insuficiente para ${product.productName}. Disponivel: ${product.stock}.`);
-    if (product.itemType !== "unit") { addSaleItem({ id: `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, brand: product.brand, producer: product.producer, unitLabel: product.unitLabel, quantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * quantity), source: "catalog" }); return; }
+    if (product.itemType !== "unit") { addSaleItem({ id: `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, brand: product.brand, producer: product.producer, ...supplierSnapshot, unitLabel: product.unitLabel, quantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * quantity), source: "catalog" }); return; }
     if (!Number.isInteger(nextQuantity)) return setLastEvent("Combos por quantidade aceitam apenas unidades inteiras.");
     const existingItem = sale?.items.find((item) => item.source === "catalog" && item.productCode === product.productCode);
-    const nextItem: SaleItem = { id: existingItem?.id ?? `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, brand: product.brand, producer: product.producer, unitLabel: product.unitLabel, quantity: nextQuantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * nextQuantity), source: "catalog", regularTotalPrice: roundCurrency(product.unitPrice * nextQuantity), promotionDiscount: 0 };
+    const nextItem: SaleItem = { id: existingItem?.id ?? `${product.productCode}-${Date.now()}`, productCode: product.productCode, productName: product.productName, brand: product.brand, producer: product.producer, ...supplierSnapshot, unitLabel: product.unitLabel, quantity: nextQuantity, unitPrice: product.unitPrice, totalPrice: roundCurrency(product.unitPrice * nextQuantity), source: "catalog", regularTotalPrice: roundCurrency(product.unitPrice * nextQuantity), promotionDiscount: 0 };
     if (!sale) startNewSale([nextItem]); else setSale((current) => { if (!current) return current; let replaced = false; const items = current.items.flatMap((item) => { if (item.source === "catalog" && item.productCode === product.productCode) { if (replaced) return []; replaced = true; return [nextItem]; } return [item]; }); return { ...current, items: repricePromotionSaleItems(replaced ? items : [...items, nextItem], catalogProducts, promotionGroups) }; });
     const promotion = describeProductPromotion(product, catalogProducts, promotionGroups);
     setLastEvent(promotion === "-" ? `${product.productName} adicionado ao caixa.` : `${product.productName} adicionado. ${promotion}.`);
@@ -709,7 +713,7 @@ export function PdvDemoApp() {
     });
     setLastEvent(nextQuantity === 0 ? `${visibleItem.productName} removido da venda.` : `Quantidade de ${visibleItem.productName} ajustada para ${nextQuantity}.`);
   };
-  const addWeightedSaleItem = (item: { productCode: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; }) => addSaleItem({ id: `${item.productCode}-${Date.now()}`, productCode: item.productCode, productName: item.productName, brand: catalogProducts.find((product) => product.productCode === item.productCode)?.brand, producer: catalogProducts.find((product) => product.productCode === item.productCode)?.producer, unitLabel: "KG", quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice, source: "scale" });
+  const addWeightedSaleItem = (item: { productCode: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; }) => { const linked = catalogProducts.find((product) => product.productCode === item.productCode); addSaleItem({ id: `${item.productCode}-${Date.now()}`, productCode: item.productCode, productName: item.productName, brand: catalogProducts.find((product) => product.productCode === item.productCode)?.brand, producer: linked?.producer, ...supplierSnapshotForProduct(linked ?? {}, commercialLedger.suppliers), unitLabel: "KG", quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice, source: "scale" }); };
 
   const addQuantityPriceRuleDraft = () => setProductDraft((current) => ({ ...current, quantityPriceRules: [...current.quantityPriceRules, { quantity: "", bundlePrice: "" }] }));
   const updateQuantityPriceRuleDraft = (index: number, patch: Partial<ProductComboDraft>) => setProductDraft((current) => ({ ...current, quantityPriceRules: current.quantityPriceRules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule) }));
@@ -735,7 +739,8 @@ export function PdvDemoApp() {
     const quantityPriceRules = usesOwnRules ? parsedRulesResult.rules : [];
     const existingProduct = catalogProducts.find((item) => item.productCode === editingProductCode);
     const stock = productKind === "parent" ? 0 : requestedStock; const minimumStock = productKind === "parent" ? 0 : requestedMinimumStock;
-    const product: CatalogProduct = { productCode: code, barcode: productDraft.barcode.trim() || createBarcodeFromProductCode(code), productName: name, brand: productDraft.brand.trim() || undefined, producer: productDraft.producer.trim().slice(0, 120) || undefined, costPrice, unitPrice: price, itemType: productDraft.type, shelfLifeDays: 0, unitLabel: productDraft.type === "weight" ? "KG" : "UN", stock, minStock: minimumStock, category: normalizeProductCategory(productDraft.category), active: existingProduct?.active ?? true, quantityPriceRules, productKind, parentProductCode: productKind === "variant" ? parent!.productCode : undefined, variantLabel: productKind === "variant" ? (productDraft.variantLabel.trim() || name) : undefined, promotionGroupId: productKind === "standard" ? productDraft.promotionGroupId || undefined : undefined };
+    if (productDraft.supplierId && !resolveProductSupplier(productDraft.supplierId, commercialLedger.suppliers)) return setLastEvent("Selecione um fornecedor cadastrado em Gestão comercial.");
+    const product: CatalogProduct = { productCode: code, barcode: productDraft.barcode.trim() || createBarcodeFromProductCode(code), productName: name, brand: productDraft.brand.trim() || undefined, producer: productDraft.producer.trim().slice(0, 120) || undefined, supplierId: productDraft.supplierId || undefined, costPrice, unitPrice: price, itemType: productDraft.type, shelfLifeDays: 0, unitLabel: productDraft.type === "weight" ? "KG" : "UN", stock, minStock: minimumStock, category: normalizeProductCategory(productDraft.category), active: existingProduct?.active ?? true, quantityPriceRules, productKind, parentProductCode: productKind === "variant" ? parent!.productCode : undefined, variantLabel: productKind === "variant" ? (productDraft.variantLabel.trim() || name) : undefined, promotionGroupId: productKind === "standard" ? productDraft.promotionGroupId || undefined : undefined };
     setCatalogProducts((current) => {
       const next = editingProductCode ? current.map((item) => item.productCode === editingProductCode ? product : item) : [...current, product];
       return editingProductCode && editingProductCode !== code ? next.map((item) => item.parentProductCode === editingProductCode ? { ...item, parentProductCode: code } : item) : next;
@@ -743,7 +748,7 @@ export function PdvDemoApp() {
     setProductDraft(createEmptyProductDraft()); setEditingProductCode(""); setProductFormOpen(false); setLastEvent(editingProductCode ? `${name} atualizado no catalogo.` : `${name} cadastrado no catalogo.`);
   };
 
-  const editProduct = (product: CatalogProduct) => { setEditingProductCode(product.productCode); setProductFormOpen(true); setProductAdvancedOpen(Boolean((product.productKind ?? "standard") !== "standard" || product.promotionGroupId || product.quantityPriceRules?.length)); setProductDraft({ code: product.productCode, barcode: product.barcode, name: product.productName, category: product.category, brand: product.brand ?? "", producer: product.producer ?? "", cost: product.costPrice === undefined ? "" : String(product.costPrice), type: product.itemType, price: String(product.unitPrice), stock: String(product.stock), minimumStock: String(product.minStock), quantityPriceRules: (product.quantityPriceRules ?? []).map((rule) => ({ quantity: String(rule.quantity), bundlePrice: String(rule.bundlePrice) })), productKind: product.productKind ?? "standard", parentProductCode: product.parentProductCode ?? "", variantLabel: product.variantLabel ?? "", promotionGroupId: product.promotionGroupId ?? "" }); };
+  const editProduct = (product: CatalogProduct) => { setEditingProductCode(product.productCode); setProductFormOpen(true); setProductAdvancedOpen(Boolean((product.productKind ?? "standard") !== "standard" || product.promotionGroupId || product.quantityPriceRules?.length)); setProductDraft({ code: product.productCode, barcode: product.barcode, name: product.productName, category: product.category, brand: product.brand ?? "", producer: product.producer ?? "", supplierId: product.supplierId ?? "", cost: product.costPrice === undefined ? "" : String(product.costPrice), type: product.itemType, price: String(product.unitPrice), stock: String(product.stock), minimumStock: String(product.minStock), quantityPriceRules: (product.quantityPriceRules ?? []).map((rule) => ({ quantity: String(rule.quantity), bundlePrice: String(rule.bundlePrice) })), productKind: product.productKind ?? "standard", parentProductCode: product.parentProductCode ?? "", variantLabel: product.variantLabel ?? "", promotionGroupId: product.promotionGroupId ?? "" }); };
   const cancelProductEdit = () => { setEditingProductCode(""); setProductFormOpen(false); setProductAdvancedOpen(false); setProductDraft(createEmptyProductDraft()); setLastEvent("Edição de produto cancelada."); };
   const removeProduct = (product: CatalogProduct) => { if (sale?.items.some((item) => item.productCode === product.productCode)) return setLastEvent(`Remova ${product.productName} da venda em aberto antes de excluir.`); if ((product.productKind ?? "standard") === "parent" && catalogProducts.some((item) => item.parentProductCode === product.productCode)) return setLastEvent(`Remova ou desvincule as variações de ${product.productName} antes de excluir o produto principal.`); setCatalogProducts((current) => current.filter((item) => item.productCode !== product.productCode)); setStockProductCode((current) => current === product.productCode ? "" : current); setLastEvent(`${product.productName} foi excluído do catálogo. As vendas e movimentações já registradas permanecem no histórico.`); };
 
