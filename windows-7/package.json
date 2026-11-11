@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "docs:check": "node -e \"console.log('docs ok')\"",
-    "test:pdv-payments": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-payment.test.js .tmp-tests/tests/pdv-quantity-pricing.test.js .tmp-tests/tests/pdv-sale-observation.test.js .tmp-tests/tests/pdv-product-labels.test.js .tmp-tests/tests/pdv-batch-inventory.test.js .tmp-tests/tests/pdv-batch-physical-tracking.test.js .tmp-tests/tests/pdv-ops.test.js .tmp-tests/tests/sales-reporting.test.js .tmp-tests/tests/sale-item-payments.test.js .tmp-tests/tests/pdv-cashier-safety.test.js .tmp-tests/tests/pdv-customer-phone.test.js .tmp-tests/tests/pdv-performance.test.js .tmp-tests/tests/pdv-finance-matrix.test.js .tmp-tests/tests/pdv-finance-workflow.test.js .tmp-tests/tests/pdv-finance-performance.test.js .tmp-tests/tests/pdv-finance-authorization.test.js .tmp-tests/tests/pdv-finance-installments.test.js .tmp-tests/tests/pdv-finance-audit.test.js .tmp-tests/tests/pdv-finance-kanban-actions.test.js",
+    "test:pdv-payments": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-payment.test.js .tmp-tests/tests/pdv-quantity-pricing.test.js .tmp-tests/tests/pdv-sale-observation.test.js .tmp-tests/tests/pdv-product-labels.test.js .tmp-tests/tests/pdv-batch-inventory.test.js .tmp-tests/tests/pdv-batch-physical-tracking.test.js .tmp-tests/tests/pdv-ops.test.js .tmp-tests/tests/sales-reporting.test.js .tmp-tests/tests/sale-item-payments.test.js .tmp-tests/tests/pdv-cashier-safety.test.js .tmp-tests/tests/pdv-customer-phone.test.js .tmp-tests/tests/pdv-performance.test.js .tmp-tests/tests/pdv-finance-matrix.test.js .tmp-tests/tests/pdv-finance-workflow.test.js .tmp-tests/tests/pdv-finance-performance.test.js .tmp-tests/tests/pdv-finance-authorization.test.js .tmp-tests/tests/pdv-finance-installments.test.js .tmp-tests/tests/pdv-finance-audit.test.js .tmp-tests/tests/pdv-finance-kanban-actions.test.js .tmp-tests/tests/pdv-ramuza-atena2.test.js tests/pdv-ramuza-network.test.mjs",
     "test:pdv-upgrade": "node --test tests/pdv-upgrade.test.mjs tests/pdv-release-contract.test.mjs tests/pdv-telemetry.test.mjs tests/pdv-first-access-wizard.test.mjs",
     "tef:bridge-demo": "node scripts/tef-bridge-demo.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.base.json",
@@ -22,7 +22,8 @@
     "desktop:pack": "npm run build:meu-engenheiro && npm run build:pdv-demo && npm run pack --workspace @nexus-core/nexus-desktop",
     "desktop:dist:meu-engenheiro": "npm run build:meu-engenheiro && npm run dist:meu-engenheiro --workspace @nexus-core/nexus-desktop",
     "desktop:dist:pdv": "npm run build:pdv-demo && npm run dist:pdv --workspace @nexus-core/nexus-desktop",
-    "desktop:dist:pdv:win7": "npm run build:pdv-demo && npm run dist:pdv:win7 --workspace @nexus-core/nexus-desktop"
+    "desktop:dist:pdv:win7": "npm run build:pdv-demo && npm run dist:pdv:win7 --workspace @nexus-core/nexus-desktop",
+    "test:ramuza-atena-2": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/pdv-ramuza-atena2.test.js tests/pdv-ramuza-network.test.mjs"
   },
   "devDependencies": {
     "electron": "22.3.27",

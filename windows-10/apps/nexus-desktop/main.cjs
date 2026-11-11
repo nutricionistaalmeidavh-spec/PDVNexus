@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage, session } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
+const { probeRamuzaAtena2Lan } = require("./ramuzaNetwork.cjs");
 const os = require("node:os");
 const path = require("node:path");
 const { SerialPort } = require("serialport");
@@ -876,6 +877,9 @@ ipcMain.handle("nexus-print:receipt", async (_event, options) => {
   printWindow.close();
   return result;
 });
+
+// Abre apenas a conexao local; nunca transmite comandos nao documentados.
+ipcMain.handle("nexus-ramuza:probe", (_event, host, port) => probeRamuzaAtena2Lan(host, port));
 
 ipcMain.handle("nexus-serial:list", async () => {
   return SerialPort.list();

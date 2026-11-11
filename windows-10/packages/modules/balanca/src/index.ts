@@ -1,14 +1,16 @@
+export { buildRamuzaAtena2Load, encodeRamuzaWindows1252, RAMUZA_ATENA2_DEFAULT_PORT } from "./ramuzaAtena2";
+export type { RamuzaAtena2Product, RamuzaAtena2File, RamuzaAtena2Load } from "./ramuzaAtena2";
 ﻿import { defineModule } from "@nexus-core/core";
 
 export type BalanceBarcodeStrategy = "ean13-prefixado" | "custom";
 export type BalanceDataMode = "price" | "weight";
 export type PosInputSource = "barcode-scanner" | "scale" | "manual";
-export type ScaleBrand = "toledo" | "urano" | "generic";
+export type ScaleBrand = "toledo" | "urano" | "ramuza" | "generic";
 export type ScaleSerialBrand = "toledo" | "filizola" | "generic-request-response" | "generic-streaming";
 export type ScaleItemType = "weight" | "unit";
 export type UsbDeviceConnectionType = "keyboard-wedge" | "serial" | "hid";
 export type UsbDeviceKind = "barcode-scanner" | "scale";
-export type ScaleBarcodeProfileKey = "DEFAULT_WEIGHT" | "DEFAULT_PRICE" | "EXTENDED_PRODUCT";
+export type ScaleBarcodeProfileKey = "DEFAULT_WEIGHT" | "DEFAULT_PRICE" | "EXTENDED_PRODUCT" | "RAMUZA_PRICE_6";
 export type BarcodeProfileMode = ScaleBarcodeProfileKey | "legacy-brasil";
 export type ScaleSerialStatus = "ok" | "unstable" | "negative" | "overload" | "empty" | "unknown";
 
@@ -209,6 +211,13 @@ export const toledoDefaultProfile: ScaleProfile = {
   brand: "toledo"
 };
 
+export const ramuzaAtena2DefaultProfile: ScaleProfile = {
+  ...defaultBrazilianScaleProfile,
+  id: "ramuza-atena-2",
+  name: "Ramuza Atena II (etiqueta tipo 03)",
+  brand: "ramuza"
+};
+
 export const uranoDefaultProfile: ScaleProfile = {
   ...defaultBrazilianScaleProfile,
   id: "urano-integra",
@@ -238,6 +247,18 @@ export const SCALE_BARCODE_PROFILES: Record<ScaleBarcodeProfileKey, ScaleBarcode
     productCodeLength: 5,
     valueStart: 6,
     valueLength: 6,
+    valueType: "price",
+    decimalPlaces: 2
+  },
+  RAMUZA_PRICE_6: {
+    key: "RAMUZA_PRICE_6",
+    name: "Ramuza Atena II - 6 digitos / preco (tipo 06)",
+    prefix: "2",
+    prefixLength: 1,
+    productCodeStart: 1,
+    productCodeLength: 6,
+    valueStart: 7,
+    valueLength: 5,
     valueType: "price",
     decimalPlaces: 2
   },

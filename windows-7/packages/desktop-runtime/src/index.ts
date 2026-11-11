@@ -29,6 +29,10 @@ export interface SerialErrorEvent {
   message: string;
 }
 
+export interface DesktopRamuzaNetworkBridge {
+  probe(host: string, port?: number): Promise<{ host: string; port: number; reachable: boolean }>;
+}
+
 export interface DesktopSerialBridge {
   list(): Promise<SerialPortInfo[]>;
   open(options: SerialOpenOptions): Promise<boolean>;
@@ -131,6 +135,7 @@ declare global {
         isEncryptionAvailable(): Promise<boolean>;
       };
       serial?: DesktopSerialBridge;
+      ramuza?: DesktopRamuzaNetworkBridge;
       store?: DesktopStoreBridge;
       backup?: DesktopBackupBridge;
       pdvStore?: DesktopPdvStoreBridge;
@@ -194,6 +199,10 @@ export function createUserSecretStore(): UserSecretStore {
   }
 
   return new BrowserSecretStore();
+}
+
+export function getDesktopRamuzaNetworkBridge(): DesktopRamuzaNetworkBridge | undefined {
+  return typeof window === "undefined" ? undefined : window.nexusDesktop?.ramuza;
 }
 
 export function getDesktopSerialBridge(): DesktopSerialBridge | undefined {
