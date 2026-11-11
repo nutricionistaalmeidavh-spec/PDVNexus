@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
-const { compareVersions, preparePdvVersionMigration, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
+const { compareVersions, preparePdvVersionMigration, preparePdvJsonVersionBackup, selectArtifact } = require("../apps/nexus-desktop/pdv-lifecycle.cjs");
 
 function seed018Database(dbPath) {
   const db = new DatabaseSync(dbPath);
@@ -79,4 +79,40 @@ test("manifesto seleciona apenas o canal e arquitetura corretos", () => {
   };
   assert.equal(selectArtifact(manifest, "windows7-x64", "x64").file, "w7.exe");
   assert.throws(() => selectArtifact(manifest, "windows8-x86", "x64"), /Arquitetura incompatível/);
+});
+
+test("upgrade Windows 7/8 2.0.2 -> 2.0.4 mantém JSON e cria backup independente", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-upgrade-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const jsonPath = path.join(dir, "pdv-nexus-data.json");
+  const backupDir = path.join(dir, "pdv-upgrade-backups");
+  const oldState = { pdvSnapshots: { default: { snapshotJson: JSON.stringify({ catalogProducts: [{ stock: 25 }], completedSales: [{ number: "1" }] }) } }, appSnapshots: {} };
+  const original = JSON.stringify(oldState);
+  fs.writeFileSync(jsonPath, original, "utf8");
+  const result = preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.4" });
+  assert.equal(result.status, "backed-up");
+  assert.equal(fs.readFileSync(jsonPath, "utf8"), original);
+  assert.equal(fs.readFileSync(result.backupPath, "utf8"), original);
+  assert.equal(preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.4" }).status, "already-backed-up");
+});
+
+test("upgrade JSON inválido sem backup não abre base vazia", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-corrupt-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const jsonPath = path.join(dir, "pdv-nexus-data.json");
+  fs.writeFileSync(jsonPath, "{invalid");
+  assert.throws(() => preparePdvJsonVersionBackup({jsonPath, backupDir: path.join(dir, "backups"), currentVersion:"2.0.4"}));
+  assert.equal(fs.readFileSync(jsonPath, "utf8"), "{invalid");
+});
+
+test("upgrade JSON recupera backup .bak válido sem sobrescrever arquivo original", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-fallback-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const jsonPath = path.join(dir, "pdv-nexus-data.json");
+  fs.writeFileSync(jsonPath, "{invalid");
+  fs.writeFileSync(jsonPath+".bak", JSON.stringify({pdvSnapshots:{default:{snapshotJson:"{}"}}}));
+  const result = preparePdvJsonVersionBackup({jsonPath, backupDir:path.join(dir, "backups"), currentVersion:"2.0.4"});
+  assert.equal(result.status, "backed-up-from-fallback");
+  assert.equal(fs.readFileSync(jsonPath, "utf8"), "{invalid");
+  assert.equal(JSON.parse(fs.readFileSync(result.backupPath,"utf8")).pdvSnapshots.default.snapshotJson, "{}");
 });
