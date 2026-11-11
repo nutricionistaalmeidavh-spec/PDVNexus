@@ -44,7 +44,7 @@ test("pipeline publica apenas após gates na main e preserva atualização dos d
   assert.match(publish, /head_branch/);
   for (const workflow of ["build-windows10-pdv.yml", "build-windows7-pdv.yml", "build-windows8-x86-pdv.yml"]) {
     const ci = read(".github/workflows/" + workflow);
-    assert.match(ci, /pdv-nova-release\.json/);
+    assert.match(ci, /pdv-build-release\.json/);
     assert.match(ci, /PDV-Nexus-Nova-Edicao-/);
   }
   assert.equal(build.version, "2.0.4");
