@@ -76,6 +76,8 @@ jobs:
           Get-FileHash -Algorithm SHA256 $exe.FullName | Format-List
 
       - name: Build compatible legacy update bridge
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content ../pdv-release.json | ConvertFrom-Json).version
           $installer = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86" -Filter "PDV-Nexus-Windows-8-32bit-Setup-*.exe" | Select-Object -First 1
