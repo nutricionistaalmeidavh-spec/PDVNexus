@@ -4,7 +4,7 @@ export interface ReportSale {
   number: string; finalizedAt: string; seller?: string; customerId?: string; terminalId?: string;
   status?: "completed" | "cancelled"; netTotal: number; reportExclusion?: { reason: string; excludedAt: string; excludedBy: string };
   reportExclusionEvents?: Array<{action: "exclude" | "restore"; reason: string; excludedBy: string; excludedAt: string}>;
-  items: Array<{ id?: string; productCode: string; productName: string; brand?: string; producer?: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
+  items: Array<{ id?: string; productCode: string; productName: string; brand?: string; producer?: string; supplierId?: string; supplierName?: string; unitLabel?: string; quantity: number; unitPrice?: number; totalPrice: number }>;
   payments: Array<{ method: string; amount: number }>;
   paymentSummary?: { changeDue?: number };
   itemPaymentAllocations?: Array<{ itemId: string; method: string; quantity: number; amount: number }>;
@@ -17,7 +17,7 @@ export interface ReportFilters {
 }
 export interface ReportLine {
   date: string; number: string; terminalId: string; operator: string; customer: string; status: string;
-  productCode: string; productName: string; brand: string; producer: string; unit: string; quantity: number;
+  productCode: string; productName: string; brand: string; producer: string; supplier: string; unit: string; quantity: number;
   unitPrice: number; gross: number; discount: number; net: number; payments: string;
 }
 export interface ReportSaleRow {
@@ -96,7 +96,7 @@ export function buildSalesReport(
     if (producer && !sale.items.some(i => norm(i.producer ?? "") === producer)) return false;
     if (query) {
       const terms = [sale.number, sale.seller ?? "", names.get(sale.customerId ?? "") ?? sale.customerId ?? "",
-        ...sale.items.flatMap(i => [i.productCode, i.productName, i.brand ?? "", i.producer ?? ""])];
+        ...sale.items.flatMap(i => [i.productCode, i.productName, i.brand ?? "", i.producer ?? "", i.supplierName ?? ""])];
       if (!terms.some(t => norm(t).includes(query))) return false;
     }
     return true;
@@ -151,7 +151,7 @@ export function buildSalesReport(
       payShares.forEach((share, shareIndex) => {
         const grossPart = grossByIndex[shareIndex] ?? 0;
         lines.push({ date: sale.finalizedAt, number: sale.number, terminalId: sale.terminalId ?? "", operator: seller,
-          customer, status, productCode: item.productCode, productName: item.productName, brand: item.brand ?? "", producer: item.producer ?? "",
+          customer, status, productCode: item.productCode, productName: item.productName, brand: item.brand ?? "", producer: item.producer ?? "", supplier: item.supplierName?.trim() || "Não informado",
           unit: item.unitLabel ?? "UN", quantity: share.qty, unitPrice: item.unitPrice ?? 0,
           gross: asAmount(grossPart), discount: asAmount(grossPart - share.net),
           net: active ? asAmount(share.net) : 0, payments: share.method });
@@ -198,9 +198,9 @@ function writeCsv(headers: string[], rows: Array<Array<string | number>>) {
 export function exportSalesReportCsv(report: ReportResult, view: ReportView): string {
   if (view === "lines") return writeCsv(
     ["data", "venda", "operador", "cliente", "status", "codigo", "produto", "unidade", "quantidade",
-      "marca", "empreendimento", "preco_unitario", "bruto", "desconto", "total_liquido", "pagamento_do_item"],
+      "marca", "empreendimento", "fornecedor", "preco_unitario", "bruto", "desconto", "total_liquido", "pagamento_do_item"],
     report.lines.map(r => [r.date, r.number, r.operator, r.customer, r.status, r.productCode, r.productName,
-      r.unit, String(r.quantity).replace(".", ","), r.brand, r.producer, money(r.unitPrice), money(r.gross),
+      r.unit, String(r.quantity).replace(".", ","), r.brand, r.producer, r.supplier, money(r.unitPrice), money(r.gross),
       money(r.discount), money(r.net), r.payments])
   );
   if (view === "sales") return writeCsv(
