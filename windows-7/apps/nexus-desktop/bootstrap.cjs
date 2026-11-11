@@ -3,7 +3,7 @@ const electron = require("electron");
 const { app, dialog } = electron;
 const safeStorage = electron.safeStorage || null;
 const pkg = require("./package.json");
-const { preparePdvVersionMigration, startPdvAutoUpdater } = require("./pdv-lifecycle.cjs");
+const { preparePdvVersionMigration, preparePdvJsonVersionBackup, startPdvAutoUpdater } = require("./pdv-lifecycle.cjs");
 const { createPdvTelemetry } = require("./pdv-telemetry.cjs");
 
 let DatabaseSync = null;
@@ -19,12 +19,20 @@ let telemetry = null;
 
 if (isPdv) {
   try {
-    preparePdvVersionMigration({
-      DatabaseSync,
-      dbPath: path.join(app.getPath("userData"), "pdv-nexus.sqlite"),
-      backupDir: path.join(app.getPath("userData"), "pdv-upgrade-backups"),
-      currentVersion: pkg.version
-    });
+    if (!DatabaseSync) {
+      preparePdvJsonVersionBackup({
+        jsonPath: path.join(app.getPath("userData"), "pdv-nexus-data.json"),
+        backupDir: path.join(app.getPath("userData"), "pdv-upgrade-backups"),
+        currentVersion: pkg.version
+      });
+    } else {
+      preparePdvVersionMigration({
+        DatabaseSync,
+        dbPath: path.join(app.getPath("userData"), "pdv-nexus.sqlite"),
+        backupDir: path.join(app.getPath("userData"), "pdv-upgrade-backups"),
+        currentVersion: pkg.version
+      });
+    }
   } catch (error) {
     migrationError = error;
   }
