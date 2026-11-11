@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld("nexusDesktop", {
     remove: (key) => ipcRenderer.invoke("nexus-secret:remove", key),
     isEncryptionAvailable: () => ipcRenderer.invoke("nexus-secret:encryption-available")
   },
+  ramuza: {
+    probe: (host, port) => ipcRenderer.invoke("nexus-ramuza:probe", host, port)
+  },
   serial: {
     list: () => ipcRenderer.invoke("nexus-serial:list"),
     open: (options) => ipcRenderer.invoke("nexus-serial:open", options),
