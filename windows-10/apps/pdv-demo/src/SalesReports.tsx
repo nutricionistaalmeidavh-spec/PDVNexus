@@ -403,9 +403,9 @@ export function SalesReports({ completedSales, cancelledSales, customers, cashMe
       <div className="nexus-reports__table-wrap">
         <table className="nexus-reports__table">
           {view === "lines" && <>
-            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Marca</th><th>Empreendimento</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento do item</th><th>Operador</th><th>Situação</th></tr></thead>
+            <thead><tr><th>Data</th><th>Venda</th><th>Produto</th><th>Marca</th><th>Empreendimento</th><th>Fornecedor</th><th>Qtd.</th><th>Unitário</th><th>Desconto</th><th>Líquido</th><th>Pagamento do item</th><th>Operador</th><th>Situação</th></tr></thead>
             <tbody>{report.lines.slice(offset, offset + 100).map((r, i) => <tr key={r.number + "/" + r.productCode + "/" + i}>
-              <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td><td>{r.brand || "Não informada"}</td><td>{r.producer || "Não informado"}</td>
+              <td>{r.date}</td><td>#{r.number}</td><td><strong>{r.productName}</strong><small>{r.productCode} · {r.unit}</small></td><td>{r.brand || "Não informada"}</td><td>{r.producer || "Não informado"}</td><td>{r.supplier}</td>
               <td>{number(r.quantity)}</td><td>{currency(r.unitPrice)}</td><td>{currency(r.discount)}</td>
               <td>{currency(r.net)}</td><td>{r.payments}</td><td>{r.operator}</td>
               <td>{r.status === "cancelled" ? "Cancelada" : "Concluída"}</td>

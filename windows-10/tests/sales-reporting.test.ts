@@ -322,3 +322,24 @@ test("somente gestor ativo consegue desconsiderar vendas e exige motivo",()=>{
   assert.throws(()=>changeSaleReportExclusion([original],{...identity,terminalId:"OUTRO"},"exclude",
     {id:"GER-001",role:"manager",active:true},"Treinamento",ts),/não foi encontrada/);
 });
+
+test("CSV detalhado captura fornecedor por item e não inventa fornecedor de venda antiga", () => {
+  const recorded = sale({
+    number: "SUP-1",
+    netTotal: 11,
+    items: [
+      { productCode: "F1", productName: "Farinha A", supplierId: "FOR-1", supplierName: "Moinho Teste", quantity: 1, totalPrice: 6, unitPrice: 6 },
+      { productCode: "L1", productName: "Leite legado", quantity: 1, totalPrice: 5, unitPrice: 5 }
+    ],
+    payments: [{ method: "DINHEIRO", amount: 11 }]
+  });
+  const report = buildSalesReport([recorded], [], []);
+  assert.equal(report.lines[0].supplier, "Moinho Teste");
+  assert.equal(report.lines[1].supplier, "Não informado");
+  const rows = exportSalesReportCsv(report, "lines").replace(/^\uFEFF/, "").trim().split("\r\n");
+  const headers = rows[0].split(";").map(v => v.replaceAll('"', ""));
+  const index = headers.indexOf("fornecedor");
+  assert.notEqual(index, -1);
+  assert.equal(rows[1].split(";")[index], '"Moinho Teste"');
+  assert.equal(rows[2].split(";")[index], '"Não informado"');
+});

@@ -34,10 +34,16 @@ npm run test:pdv-payments
 
 Os instaladores e demais arquivos gerados nao sao versionados; devem ser produzidos localmente pelos scripts de cada edicao.
 
-## Nova Edição (isolada dos clientes antigos)
+## Atualização para clientes existentes (2.0.2 → 2.0.4)
 
-A partir da versão 2.0.3, os builds Windows 7, 8 x86 e 10+ usam a identidade `br.com.artisys.pdvnexus.nova`, o nome de instalação **PDV Nexus Nova Edição** e instaladores `PDV-Nexus-Nova-Edicao-*`. A instalação legada e seus dados permanecem intactos. Os dados **não são copiados automaticamente**; a eventual importação deve ser explícita, após backup e validação.
+O **PDV Nexus é um produto único**. Todos os três instaladores Windows 10+, Windows 7 e Windows 8 32-bit mantêm o appId original `com.nexuscore.pdv`, nome de aplicação `PDV Nexus`, atalho e diretório `userData` do 2.0.2. Não é necessária uma "Nova Edição" nem uma importação entre instalações para atualizar o software.
 
-Os novos instaladores consultam apenas `pdv-nova-release.json`, separado do manifesto legado `pdv-release.json`. Enquanto o manifesto da Nova Edição contiver `artifacts: {}` e a versão 2.0.3, nenhum upgrade é oferecido. A publicação automática do canal legado está bloqueada em `.github/workflows/publish-pdv-release.yml` para não alterar `releases/latest/download/latest.json`, utilizado pelos clientes existentes. Não criar uma nova GitHub Release que passe a ser a `releases/latest` deste repositório. Antes de disponibilizar atualização para a Nova Edição, criar uma distribuição pública **independente** (por exemplo, outro repositório ou hospedagem estática gratuita), validar SHA-256, QA e receber aprovação explícita. A branch de desenvolvimento gera apenas artefatos de QA, não uma publicação de produção.
+O manifesto de atualização continua sendo `pdv-release.json` e os clientes já instalados verificam `https://github.com/nutricionistaalmeidavh-spec/PDVNexus/releases/latest/download/latest.json`. O sistema detecta uma nova versão, baixa o arquivo do canal e arquitetura corretos, valida SHA-256 e oferece **Instalar agora / Depois**. Os dados comerciais locais **não podem ser apagados durante o upgrade**.
 
-Verificação do isolamento: `cd windows-10 && npm ci && npm run test:pdv-upgrade`. Os testes adicionais conferem as três arquiteturas, nomes, app IDs, manifestos e congelamento do canal antigo.
+Na abertura da versão 2.0.4 o `pdv-lifecycle.cjs` prepara backup do SQLite quando necessário, e o `main.cjs` utiliza migração aditiva, sem limpeza das tabelas. Em Windows 7/8 o arquivo JSON legado permanece no mesmo local e seu gravador usa cópia `.bak` e troca atômica. O modelo de fornecedores e as melhorias de busca/CSV introduzidos pela PR #44 adicionam campos opcionais compatíveis com registros anteriores.
+
+O manifesto `pdv-nova-release.json` foi preservado apenas como arquivo de compatibilidade **inativo** (`artifacts: {}`) para não gerar atualização silenciosa em uma hipotética instalação de 2.0.3; o empacotamento, os builds e a publicação não o utilizam mais. Não publicar nem enviar ao cliente os instaladores da antiga edição paralela.
+
+A publicação do 2.0.4 exige CI verde nas três arquiteturas e QA, criação da release e sincronização dos instaladores para o Drive. A pasta de clientes deve conter somente os três instaladores atuais, tutoriais em vídeo e manual. Instaladores anteriores vão para `Pdv antigos` **fora** da pasta enviada aos clientes, após verificação da cópia.
+
+QA: `cd windows-10 && npm ci && npm run test:pdv-upgrade && npm run test:pdv-payments && npm run typecheck`; repetir em `windows-7` e verificar os três instaladores por hashes SHA-256.

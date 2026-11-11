@@ -40,3 +40,12 @@ export function calculatePdvGrossMargin(salePrice: number, costPrice?: number): 
       !Number.isFinite(salePrice) || salePrice <= 0) return null;
   return Math.round(((salePrice - costPrice) / salePrice) * 10000) / 100;
 }
+
+/** Inline suggestions exclude numeric/scanner input; scanner Enter keeps its original flow. */
+export function checkoutSuggestions<T extends PdvSearchableProduct>(
+  products: readonly T[], rawQuery: string, limit = 8
+): T[] {
+  const query = rawQuery.trim();
+  if (query.length < 2 || !/[^0-9]/.test(query)) return [];
+  return findPdvProducts(products, query).slice(0, Math.max(0, limit));
+}

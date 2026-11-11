@@ -1,12 +1,11 @@
 process.env.NEXUS_APP = "pdv-demo";
-const release = require("../../../pdv-nova-release.json");
+const release = require("../../../pdv-release.json");
 const base = require("./electron-builder.cjs");
 
 const DEFAULT_PDV_TELEMETRY_ENDPOINT = "https://pdvnexus.nutricionistaalmeidavh.workers.dev";
 
 module.exports = {
   ...base,
-  nsis: { ...base.nsis, shortcutName: "PDV Nexus Nova Edição" },
   extraMetadata: {
     ...(base.extraMetadata || {}),
     version: release.version,

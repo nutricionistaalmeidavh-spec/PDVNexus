@@ -5,13 +5,13 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/build-windows8-x86-pdv.yml"
-      - "pdv-nova-release.json"
+      - "pdv-release.json"
       - "windows-7/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build-windows8-x86-pdv.yml"
-      - "pdv-nova-release.json"
+      - "pdv-release.json"
       - "windows-7/**"
   workflow_dispatch:
 
@@ -65,8 +65,8 @@ jobs:
 
       - name: Verify installer and hash
         run: |
-          $version = (Get-Content ../pdv-nova-release.json | ConvertFrom-Json).version
-          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86" -Filter "PDV-Nexus-Nova-Edicao-Windows-8-32bit-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $version = (Get-Content ../pdv-release.json | ConvertFrom-Json).version
+          $exe = Get-ChildItem -Path "apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86" -Filter "PDV-Nexus-Windows-8-32bit-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $exe) { throw "Windows 8 x86 installer EXE not found" }
           if ($exe.Name -notmatch [regex]::Escape($version)) { throw "Installer version mismatch: expected $version, got $($exe.Name)" }
           Write-Host "Installer: $($exe.FullName)"
@@ -77,7 +77,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PDV-Nexus-Nova-Windows-8-32bit
-          path: windows-7/apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86/PDV-Nexus-Nova-Edicao-Windows-8-32bit-Setup-*.exe
+          name: PDV-Nexus-Windows-8-32bit
+          path: windows-7/apps/nexus-desktop/dist-desktop/pdv-demo-windows-8-x86/PDV-Nexus-Windows-8-32bit-Setup-*.exe
           if-no-files-found: error
           retention-days: 7
