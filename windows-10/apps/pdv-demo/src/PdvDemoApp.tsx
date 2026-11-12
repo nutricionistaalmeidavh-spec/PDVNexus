@@ -69,7 +69,7 @@ import {
   type PromotionGroup
 } from "./catalogPromotions";
 
-import { findPdvProducts, checkoutSuggestions, calculatePdvGrossMargin } from "./productSearch";
+import { findPdvProducts, buildPdvProductSearchIndex, checkoutSuggestionsIndexed, calculatePdvGrossMargin } from "./productSearch";
 import { resolveProductSupplier, supplierSnapshotForProduct } from "./supplierCatalog";
 import { PdvProductPicker } from "./PdvProductPicker";
 import { PdvGuidedDialog, guidedFieldStyle, guidedPrimaryStyle, guidedSecondaryStyle } from "./PdvGuidedDialog";
@@ -308,7 +308,8 @@ export function PdvDemoApp() {
   const extraCountMethods = paymentOptions.filter((opt) => opt.active !== false && opt.showsInCashflow !== false && opt.kind !== "store-credit" && !["A VISTA","PIX","CREDITO","DEBITO"].includes(opt.name.toUpperCase())).map((opt) => opt.name);
   const canReviewCash = Boolean(cashReviewApproverId && users.some((u) => u.id === cashReviewApproverId && u.active && (u.role === "manager" || u.role === "admin")));
   const sellableCatalogProducts = useMemo(() => catalogProducts.filter(isSellableCatalogProduct), [catalogProducts]);
-  const searchSuggestions = useMemo(() => checkoutSuggestions(sellableCatalogProducts, entryValue), [sellableCatalogProducts, entryValue]);
+  const cashierSearchIndex = useMemo(() => buildPdvProductSearchIndex(sellableCatalogProducts), [sellableCatalogProducts]);
+  const searchSuggestions = useMemo(() => checkoutSuggestionsIndexed(cashierSearchIndex, entryValue), [cashierSearchIndex, entryValue]);
   const parentProducts = useMemo(() => catalogProducts.filter((product) => (product.productKind ?? "standard") === "parent"), [catalogProducts]);
   const filteredProducts = useMemo(() => {
     const search = catalogSearch.trim().toLowerCase();
@@ -342,10 +343,10 @@ export function PdvDemoApp() {
   const change = paymentView.changeDue;
   const cashStatus = cashSession && !cashSession.closedAt ? "CAIXA ABERTO" : "CAIXA FECHADO";
   const generatedBarcode = barcodeMode === "legacy-brasil" ? "Usando padrao legado de 13 digitos" : safeEncodeScaleBarcode(manualProductCode, barcodeMode as ScaleBarcodeProfileKey);
-  const toledoFile = exportToledoItemsFile(sellableCatalogProducts);
-  const uranoFile = exportUranoProductsFile(sellableCatalogProducts);
-  const lowStockAlerts = getPdvLowStockAlerts(sellableCatalogProducts);
-  const dashboardReport = generatePdvDashboardReport({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), to: new Date().toISOString(), sales: completedSales.filter((item) => !item.reportExclusion), products: sellableCatalogProducts, cashClosings });
+  const toledoFile = useMemo(() => route === "/balanca" ? exportToledoItemsFile(sellableCatalogProducts) : "", [route, sellableCatalogProducts]);
+  const uranoFile = useMemo(() => route === "/balanca" ? exportUranoProductsFile(sellableCatalogProducts) : "", [route, sellableCatalogProducts]);
+  const lowStockAlerts = useMemo(() => getPdvLowStockAlerts(sellableCatalogProducts), [sellableCatalogProducts]);
+  const dashboardReport = useMemo(() => generatePdvDashboardReport({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), to: new Date().toISOString(), sales: completedSales.filter((item) => !item.reportExclusion), products: sellableCatalogProducts, cashClosings }), [completedSales, sellableCatalogProducts, cashClosings]);
   const activePaymentOptions = paymentOptions.filter((option) => option.active !== false);
   const salesHistory = useMemo(() => filterPdvSalesHistory({ sales: completedSales, cancelledSales, filters: { status: historyFilters.status, customerId: historyFilters.customerId || undefined, paymentMethod: historyFilters.paymentMethod || undefined, query: historyFilters.query || undefined } }), [completedSales, cancelledSales, historyFilters]);
   const storageStatusLabel = desktopStoreStatus.includes("Armazenamento canônico ativo") ? "Banco local ativo" : "Armazenamento local ativo";
