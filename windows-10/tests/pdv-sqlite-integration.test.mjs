@@ -133,3 +133,25 @@ test("Benchmark canônico: 2000 vendas e 2500 movimentos sobrevivem a revisões,
   db.close();
  }
 });
+
+
+test("P0 regressao: abrir caixa nao regrava catalogo, vendas nem movimentacoes", () => {
+ const db=createDb();
+ try {
+  const original=state(1200,300);
+  original.catalogProducts=Array.from({length:1000},(_,i)=>({
+    productCode:"SKU-"+i, productName:"Produto "+i, stock:100, unitPrice:10
+  }));
+  write(db,"loja",original,new Date().toISOString(),0);
+  const changed=structuredClone(original);
+  changed.cashSession={openedAt:"12/11/2026 09:00:00",initialAmount:150,withdrawals:[]};
+  const before=db.prepare("SELECT total_changes() AS changes").get().changes;
+  write(db,"loja",changed,new Date().toISOString(),1);
+  const delta=db.prepare("SELECT total_changes() AS changes").get().changes-before;
+  assert.ok(delta<20, "Abertura de caixa regravou "+delta+" linhas; esperado somente caixa/snapshot/revisao");
+  assert.equal(count(db,"pdv_products"),1000);
+  assert.equal(count(db,"pdv_sales"),1200);
+  assert.equal(count(db,"pdv_inventory_movements"),301);
+  assert.equal(JSON.parse(row(db).snapshotJson).cashSession.initialAmount,150);
+ } finally {db.close();}
+});
