@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { findPdvProducts, type PdvSearchableProduct } from "./productSearch";
+import { buildPdvProductSearchIndex, findPdvProductsIndexed, type PdvSearchableProduct } from "./productSearch";
 
 export type PdvPickerProduct = PdvSearchableProduct & {
   stock: number;
@@ -20,9 +20,10 @@ const formatMoney = (price: number) => price.toLocaleString("pt-BR", { style: "c
 export function PdvProductPicker<T extends PdvPickerProduct>({ products, initialSearch = "", onSelect, onClose, onCreateProduct }: Props<T>) {
   const [query, setQuery] = useState(initialSearch);
   const [page, setPage] = useState(1);
+  const searchIndex = useMemo(() => buildPdvProductSearchIndex(products), [products]);
   const matches = useMemo(() =>
-    query.trim() ? findPdvProducts(products, query) : products.filter((item) => item.active !== false),
-    [products, query]
+    query.trim() ? findPdvProductsIndexed(searchIndex, query) : searchIndex.entries.map(({ product }) => product),
+    [searchIndex, query]
   );
   const totalPages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
