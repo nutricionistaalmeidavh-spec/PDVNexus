@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findPdvProducts, checkoutSuggestions, calculatePdvGrossMargin } from "../apps/pdv-demo/src/productSearch";
+import { performance } from "node:perf_hooks";
+import { findPdvProducts, checkoutSuggestions, buildPdvProductSearchIndex, findPdvProductsIndexed, checkoutSuggestionsIndexed, calculatePdvGrossMargin } from "../apps/pdv-demo/src/productSearch";
 import { resolveProductSupplier, supplierSnapshotForProduct } from "../apps/pdv-demo/src/supplierCatalog";
 import { completePdvSale } from "../packages/database/src/pdv";
 
@@ -64,4 +65,34 @@ test("fornecedor usa ID canônico e captura nome no item", () => {
   assert.deepEqual(supplierSnapshotForProduct({}, suppliers), {});
   assert.deepEqual(supplierSnapshotForProduct({ supplierId: "FOR-INEXISTENTE" }, suppliers),
     { supplierId: "FOR-INEXISTENTE", supplierName: "Não informado" });
+});
+
+test("indice canônico de busca em 1k 10k e 50k itens preserva exatos, nomes e scanner", () => {
+  for (const size of [1000,10000,50000]) {
+    const catalog = Array.from({length:size}, (_,i)=>({
+      productCode:"SKU"+String(i).padStart(6,"0"),
+      barcode:"789"+String(i).padStart(10,"0"),
+      productName:"Cafe Especial Lote "+i,
+      category:i%2?"Mercearia":"Bebidas",
+      brand:"ArtiSys Teste",active:i%11!==0
+    }));
+    const indexStart=performance.now();
+    const index=buildPdvProductSearchIndex(catalog);
+    const indexMs=performance.now()-indexStart;
+    const durations:number[]=[];
+    for(let n=0;n<20;n++) {
+      const start=performance.now();
+      const items=checkoutSuggestionsIndexed(index,"cafe especial");
+      durations.push(performance.now()-start);
+      assert.equal(items.length,8);
+      assert.ok(items.every(p=>p.active));
+    }
+    assert.equal(findPdvProductsIndexed(index,"SKU000001")[0]?.productCode,"SKU000001");
+    assert.deepEqual(checkoutSuggestionsIndexed(index,"7890000000001"),[]);
+    const sorted=[...durations].sort((a,b)=>a-b);
+    console.log("PDV_SEARCH_STRESS "+JSON.stringify({
+      products:size,indexMs:+indexMs.toFixed(2),queryP50Ms:+sorted[10].toFixed(2),
+      queryP95Ms:+sorted[18].toFixed(2),environment:"node",dataSource:"synthetic"
+    }));
+  }
 });
