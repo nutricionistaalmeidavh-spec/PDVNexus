@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const https = require("node:https");
 const crypto = require("node:crypto");
+const { pipeline } = require("node:stream/promises");
 const { spawn } = require("node:child_process");
 
 function normalizeVersion(value) {
@@ -126,11 +127,38 @@ function requestBuffer(url, redirectCount = 0) {
   });
 }
 
-async function downloadToFile(url, targetPath) {
-  const payload = await requestBuffer(url);
+async function downloadToFile(url, targetPath, redirectCount = 0) {
+  if (redirectCount > 5) throw new Error("Muitos redirecionamentos ao baixar a atualização.");
+  const response = await new Promise((resolve, reject) => {
+    const request = https.get(url, { headers: { "User-Agent": "PDV-Nexus-Updater" } }, resolve);
+    request.once("error", reject);
+    request.setTimeout(30000, () => request.destroy(new Error("Tempo esgotado ao baixar a atualização.")));
+  });
+  const status = response.statusCode || 0;
+  if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
+    response.resume();
+    return downloadToFile(new URL(response.headers.location, url).toString(), targetPath, redirectCount + 1);
+  }
+  if (status < 200 || status >= 300) {
+    response.resume();
+    throw new Error(`Falha HTTP ${status} ao baixar a atualização.`);
+  }
   ensureDir(path.dirname(targetPath));
-  fs.writeFileSync(targetPath, payload);
+  try {
+    await pipeline(response, fs.createWriteStream(targetPath));
+  } catch (error) {
+    try { await fs.promises.rm(targetPath, { force: true }); } catch {}
+    throw error;
+  }
   return targetPath;
+}
+
+async function sha256FileAsync(filePath) {
+  const hash = crypto.createHash("sha256");
+  for await (const chunk of fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 })) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
 }
 
 function sha256File(filePath) {
@@ -225,12 +253,27 @@ async function startPdvAutoUpdater({ app, dialog, channel, manifestUrl }) {
       return { status: "current", version: app.getVersion() };
     }
 
+    const response = await dialog.showMessageBox({
+      type: "info",
+      title: "Atualização do PDV Nexus",
+      message: `A versão ${manifest.version} está disponível.`,
+      detail: "O instalador só será baixado após sua autorização. O download será verificado antes da instalação; seus dados locais serão preservados e um backup será criado.",
+      buttons: ["Baixar e instalar", "Depois"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    if (response.response !== 0) {
+      appendUpdaterLog(logPath, "Download da atualização adiado pelo usuário.");
+      return { status: "deferred", version: manifest.version };
+    }
+
     const artifact = selectArtifact(manifest, channel);
     const updateDir = ensureDir(path.join(app.getPath("temp"), "pdv-nexus-updates", safeFilePart(manifest.version)));
     const installerPath = path.join(updateDir, path.basename(artifact.file));
     await downloadToFile(artifact.url, installerPath);
 
-    const actualHash = sha256File(installerPath).toLowerCase();
+    const actualHash = (await sha256FileAsync(installerPath)).toLowerCase();
     const expectedHash = String(artifact.sha256).toLowerCase();
     if (actualHash !== expectedHash) {
       try { fs.unlinkSync(installerPath); } catch { /* ignore */ }
@@ -238,22 +281,6 @@ async function startPdvAutoUpdater({ app, dialog, channel, manifestUrl }) {
     }
 
     appendUpdaterLog(logPath, `Atualização ${manifest.version} validada em ${installerPath}.`);
-    const response = await dialog.showMessageBox({
-      type: "info",
-      title: "Atualização do PDV Nexus",
-      message: `A versão ${manifest.version} está pronta para instalar.`,
-      detail: "O instalador foi baixado e validado por SHA-256. Seus dados locais serão preservados e um backup será criado antes da troca de versão.",
-      buttons: ["Instalar agora", "Depois"],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true
-    });
-
-    if (response.response !== 0) {
-      appendUpdaterLog(logPath, "Instalação adiada pelo usuário.");
-      return { status: "deferred", version: manifest.version };
-    }
-
     await launchWindowsInstaller(installerPath);
     appendUpdaterLog(logPath, `Instalador ${manifest.version} iniciado com elevação do Windows.`);
     app.quit();
