@@ -47,3 +47,9 @@ O manifesto `pdv-nova-release.json` foi preservado apenas como arquivo de compat
 A publicação do 2.0.4 exige CI verde nas três arquiteturas e QA, criação da release e sincronização dos instaladores para o Drive. A pasta de clientes deve conter somente os três instaladores atuais, tutoriais em vídeo e manual. Instaladores anteriores vão para `Pdv antigos` **fora** da pasta enviada aos clientes, após verificação da cópia.
 
 QA: `cd windows-10 && npm ci && npm run test:pdv-upgrade && npm run test:pdv-payments && npm run typecheck`; repetir em `windows-7` e verificar os três instaladores por hashes SHA-256.
+
+## Hotfix PDV Nexus 2.0.5 — 12/11/2026
+
+Esta release corrige possíveis travamentos de interface em abertura de caixa, cadastro e pesquisa de produtos. A gravação SQLite incremental atualiza apenas entidades alteradas, preservando a transação, o controle CAS/revision, o histórico e o backup de migração. A pesquisa mantém índice normalizado do catálogo e o autocompletar exibe até 8 sugestões. O atualizador solicita consentimento antes de baixar, transmite o instalador por stream e calcula o SHA-256 de modo assíncrono.
+
+Instalações já existentes 2.0.2 e 2.0.4 devem ser atualizadas sem desinstalar, mantendo o appId e userData. Não reinstalar versão antiga 2.0.2 como rollback: continha rotina de reset de dados quando a versão mudava. A publicação da 2.0.5 depende dos builds Windows 7/8/10, QA comercial/visual verdes e sincronização do Google Drive de clientes.

@@ -166,3 +166,26 @@ test("upgrade 2.0.2 -> 2.0.4 preserva dados ainda existentes no WAL durante back
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+
+test("release 2.0.5 preserva dados, caixa e backup ao atualizar 2.0.2 ou 2.0.4", t => {
+ for (const origin of ["2.0.2", "2.0.4"]) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-upgrade-205-"));
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+  const dbPath = path.join(tempDir, "pdv-nexus.sqlite");
+  const backupDir = path.join(tempDir, "backups");
+  seed018Database(dbPath);
+  const seed = new DatabaseSync(dbPath);
+  try { seed.prepare("UPDATE pdv_meta SET value=? WHERE name=?").run(origin, "installed-pdv-version"); }
+  finally { seed.close(); }
+  const before = snapshot(dbPath);
+  const result = preparePdvVersionMigration({ DatabaseSync, dbPath, backupDir, currentVersion: "2.0.5" });
+  assert.equal(result.status, "migrated");
+  assert.equal(result.previousVersion, origin);
+  assert.equal(snapshot(dbPath).version, "2.0.5");
+  assert.deepEqual({ ...snapshot(dbPath), version: origin }, before);
+  assert.ok(result.backupPath && fs.existsSync(result.backupPath));
+  assert.deepEqual(snapshot(result.backupPath), before);
+  assert.equal(preparePdvVersionMigration({ DatabaseSync, dbPath, backupDir, currentVersion: "2.0.5" }).status, "already-current");
+ }
+});

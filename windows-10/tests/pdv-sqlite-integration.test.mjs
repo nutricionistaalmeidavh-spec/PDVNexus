@@ -133,3 +133,90 @@ test("Benchmark canônico: 2000 vendas e 2500 movimentos sobrevivem a revisões,
   db.close();
  }
 });
+
+
+test("P0 regressao: abrir caixa nao regrava catalogo, vendas nem movimentacoes", () => {
+ const db=createDb();
+ try {
+  const original=state(1200,300);
+  original.catalogProducts=Array.from({length:1000},(_,i)=>({
+    productCode:"SKU-"+i, productName:"Produto "+i, stock:100, unitPrice:10
+  }));
+  write(db,"loja",original,new Date().toISOString(),0);
+  const changed=structuredClone(original);
+  changed.cashSession={openedAt:"12/11/2026 09:00:00",initialAmount:150,withdrawals:[]};
+  const before=db.prepare("SELECT total_changes() AS changes").get().changes;
+  write(db,"loja",changed,new Date().toISOString(),1);
+  const delta=db.prepare("SELECT total_changes() AS changes").get().changes-before;
+  assert.ok(delta<20, "Abertura de caixa regravou "+delta+" linhas; esperado somente caixa/snapshot/revisao");
+  assert.equal(count(db,"pdv_products"),1000);
+  assert.equal(count(db,"pdv_sales"),1200);
+  assert.equal(count(db,"pdv_inventory_movements"),301);
+  assert.equal(JSON.parse(row(db).snapshotJson).cashSession.initialAmount,150);
+ } finally {db.close();}
+});
+
+
+test("P1 stress SQLite: 1000, 10000 e 50000 produtos com historico extenso e abertura de caixa", () => {
+ for (const size of [1000, 10000, 50000]) {
+  const db=createDb();
+  try {
+   const original=state(5000,400);
+   original.catalogProducts=Array.from({length:size},(_,i)=>({
+     productCode:"SKU-"+String(i).padStart(6,"0"),
+     productName:"Produto sintético "+i,stock:i%500+50,unitPrice:10
+   }));
+   original.extensions.inventoryMovements=Array.from({length:3000},(_,i)=>({
+     id:"MOV-"+i,productCode:"SKU-"+String(i%size).padStart(6,"0"),
+     quantityDelta:1,createdAt:"12/11/2026"
+   }));
+   const initialStart=performance.now();
+   write(db,"loja",original,new Date().toISOString(),0);
+   const initialMs=performance.now()-initialStart;
+   const durations=[];
+   let revision=1;
+   let current=original;
+   for (let i=0;i<3;i++) {
+    current={...current,cashSession:{openedAt:"12/11/2026 09:00",initialAmount:100+i,withdrawals:[]}};
+    const before=db.prepare("SELECT total_changes() AS total").get().total;
+    const started=performance.now();
+    write(db,"loja",current,new Date().toISOString(),revision++);
+    durations.push(Number((performance.now()-started).toFixed(2)));
+    const changes=db.prepare("SELECT total_changes() AS total").get().total-before;
+    assert.ok(changes<20,`No tamanho ${size}, abertura de caixa reescreveu ${changes} linhas`);
+   }
+   assert.equal(count(db,"pdv_products"),size);
+   assert.equal(count(db,"pdv_sales"),5000);
+   assert.equal(count(db,"pdv_inventory_movements"),3000);
+   assert.equal(JSON.parse(row(db).snapshotJson).cashSession.initialAmount,102);
+   assert.equal(db.prepare("PRAGMA quick_check").get().quick_check,"ok");
+   const timings=[...durations].sort((a,b)=>a-b);
+   console.log("PDV_P0P1_STRESS "+JSON.stringify({
+    products:size,sales:5000,movements:3000,initialWriteMs:+initialMs.toFixed(2),
+    cashOpenMs:durations,p50Ms:timings[1],p95Ms:timings[2],db:"SQLite node:sqlite in-memory",
+    dataSource:"synthetic",uiMeasured:false
+   }));
+  } finally { db.close(); }
+ }
+});
+
+test("P0: novas vendas preservam ordem do historico, itens e exclusoes canonicas", () => {
+ const db=createDb();
+ try {
+  const original=state(3,20);
+  write(db,"loja",original,new Date().toISOString(),0);
+  const lastSale={number:"NOVA",finalizedAt:"2026-11-12",items:[
+   {productCode:"00101",productName:"Café",quantity:1,totalPrice:10}],netTotal:10};
+  const next={...original,completedSales:[lastSale,...original.completedSales]};
+  write(db,"loja",next,new Date().toISOString(),1);
+  const stored=db.prepare("SELECT snapshot_json FROM pdv_store WHERE store_key=?").get("loja").snapshot_json;
+  assert.equal(JSON.parse(stored).completedSales[0].number,"NOVA");
+  assert.equal(count(db,"pdv_sales"),4);
+  assert.equal(count(db,"pdv_sale_items"),4);
+  const removed={...next,completedSales:[lastSale,...original.completedSales.slice(0,2)]};
+  write(db,"loja",removed,new Date().toISOString(),2);
+  assert.equal(count(db,"pdv_sales"),3);
+  assert.equal(count(db,"pdv_sale_items"),3);
+  assert.equal(db.prepare("PRAGMA quick_check").get().quick_check,"ok");
+ } finally { db.close(); }
+});

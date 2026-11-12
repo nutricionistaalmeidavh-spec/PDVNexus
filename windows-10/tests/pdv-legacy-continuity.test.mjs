@@ -12,13 +12,13 @@ const configs = [
   require('../../windows-7/apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs')
 ];
 
-test('nova compilação 2.0.4 atualiza a instalação original, sem criar uma edição paralela',()=>{
-  assert.equal(release.version,'2.0.4');
+test('nova compilação 2.0.5 atualiza a instalação original, sem criar uma edição paralela',()=>{
+  assert.equal(release.version,'2.0.5');
   for(const conf of configs){
     assert.equal(conf.appId,'com.nexuscore.pdv');
     assert.equal(conf.productName,'PDV Nexus');
     assert.equal(conf.nsis.shortcutName,'PDV Nexus');
-    assert.equal(conf.extraMetadata.version,'2.0.4');
+    assert.equal(conf.extraMetadata.version,'2.0.5');
     assert.equal(conf.extraMetadata.pdvUpdateManifestUrl,release.manifestUrl);
     assert.doesNotMatch(conf.artifactName,/Nova-Edicao/);
   }

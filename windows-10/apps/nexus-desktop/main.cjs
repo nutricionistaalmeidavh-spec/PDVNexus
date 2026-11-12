@@ -407,27 +407,70 @@ function writePdvStateToTables(db, storeKey, state, updatedAt, expectedRevision)
         throw conflict;
       }
     }
-    for (const table of ["pdv_products", "pdv_customers", "pdv_sales", "pdv_sale_items", "pdv_cancelled_sales", "pdv_inventory_movements", "pdv_settings"]) db.prepare(`DELETE FROM ${table} WHERE store_key = ?`).run(storeKey);
-    const insertProduct = db.prepare("INSERT INTO pdv_products (store_key, product_code, payload_json) VALUES (?, ?, ?)");
-    const insertCustomer = db.prepare("INSERT INTO pdv_customers (store_key, customer_id, payload_json) VALUES (?, ?, ?)");
-    const insertSale = db.prepare("INSERT INTO pdv_sales (store_key, sale_number, finalized_at, payload_json) VALUES (?, ?, ?, ?)");
+    // Delta writes: preserve stable rowids and avoid rewriting historical sales on every cash change.
+    // All changes remain in the same SQLite transaction and under the revision/CAS gate.
+    const syncRows = (table, idColumn, records, idOf, extraColumns = [], extraOf = () => [], onChange = () => {}, onRemove = () => {}) => {
+      const existing = new Map(db.prepare(`SELECT ${idColumn} AS entityId, payload_json AS payloadJson FROM ${table} WHERE store_key = ?`)
+        .all(storeKey).map((row) => [String(row.entityId), String(row.payloadJson)]));
+      const columns = ["store_key", idColumn, ...extraColumns, "payload_json"];
+      const changedColumns = [...extraColumns, "payload_json"];
+      const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})
+        ON CONFLICT(store_key, ${idColumn}) DO UPDATE SET ${changedColumns.map((column) => `${column} = excluded.${column}`).join(", ")}`;
+      const upsert = db.prepare(sql);
+      const remove = db.prepare(`DELETE FROM ${table} WHERE store_key = ? AND ${idColumn} = ?`);
+      const seen = new Set();
+      for (const record of records) {
+        const rawId = idOf(record);
+        if (rawId === undefined || rawId === null || rawId === "") continue;
+        const id = String(rawId);
+        if (seen.has(id)) throw new Error(`Identificador duplicado em ${table}: ${id}`);
+        seen.add(id);
+        const payload = JSON.stringify(record);
+        if (existing.get(id) !== payload) {
+          upsert.run(storeKey, id, ...extraOf(record), payload);
+          onChange(record, id);
+        }
+        existing.delete(id);
+      }
+      for (const id of existing.keys()) {
+        remove.run(storeKey, id);
+        onRemove(id);
+      }
+    };
+    syncRows("pdv_products", "product_code", products, (product) => product?.productCode);
+    syncRows("pdv_customers", "customer_id", customers, (customer) => customer?.id);
+    const removeSaleItems = db.prepare("DELETE FROM pdv_sale_items WHERE store_key = ? AND sale_number = ?");
     const insertSaleItem = db.prepare("INSERT INTO pdv_sale_items (store_key, sale_number, item_index, product_code, product_name, quantity, total_price) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insertCancelled = db.prepare("INSERT INTO pdv_cancelled_sales (store_key, sale_number, finalized_at, payload_json) VALUES (?, ?, ?, ?)");
-    const insertMovement = db.prepare("INSERT INTO pdv_inventory_movements (store_key, movement_id, created_at, payload_json) VALUES (?, ?, ?, ?)");
-    const insertSetting = db.prepare("INSERT INTO pdv_settings (store_key, setting_name, payload_json) VALUES (?, ?, ?)");
-    for (const product of products) if (product?.productCode) insertProduct.run(storeKey, String(product.productCode), JSON.stringify(product));
-    for (const customer of customers) if (customer?.id) insertCustomer.run(storeKey, String(customer.id), JSON.stringify(customer));
-    for (const sale of sales) {
-      if (!sale?.number) continue;
-      insertSale.run(storeKey, String(sale.number), String(sale.finalizedAt ?? ""), JSON.stringify(sale));
-      for (const [index, item] of (Array.isArray(sale.items) ? sale.items : []).entries()) insertSaleItem.run(storeKey, String(sale.number), index, String(item.productCode ?? ""), String(item.productName ?? ""), Number(item.quantity) || 0, Number(item.totalPrice) || 0);
+    syncRows("pdv_sales", "sale_number", sales, (sale) => sale?.number,
+      ["finalized_at"], (sale) => [String(sale.finalizedAt ?? "")],
+      (sale, id) => {
+        removeSaleItems.run(storeKey, id);
+        for (const [index, item] of (Array.isArray(sale.items) ? sale.items : []).entries()) {
+          insertSaleItem.run(storeKey, id, index, String(item.productCode ?? ""), String(item.productName ?? ""), Number(item.quantity) || 0, Number(item.totalPrice) || 0);
+        }
+      },
+      (id) => removeSaleItems.run(storeKey, id)
+    );
+    syncRows("pdv_cancelled_sales", "sale_number", cancelledSales, (sale) => sale?.number,
+      ["finalized_at"], (sale) => [String(sale.finalizedAt ?? "")]);
+    syncRows("pdv_inventory_movements", "movement_id", inventoryMovements, (movement) => movement?.id,
+      ["created_at"], (movement) => [String(movement.createdAt ?? "")]);
+    const settings = [
+      ["cashSession", JSON.stringify(state.cashSession ?? null)],
+      ["paymentOptions", JSON.stringify(state.paymentOptions ?? [])],
+      ["deviceConfig", JSON.stringify(state.deviceConfig ?? {})],
+      ["extensions", JSON.stringify({ ...extensions, cancelledSales: [], inventoryMovements: [] })]
+    ];
+    const previousSettings = new Map(db.prepare("SELECT setting_name AS name, payload_json AS payloadJson FROM pdv_settings WHERE store_key = ?")
+      .all(storeKey).map((row) => [String(row.name), String(row.payloadJson)]));
+    const upsertSetting = db.prepare(`INSERT INTO pdv_settings (store_key, setting_name, payload_json) VALUES (?, ?, ?)
+      ON CONFLICT(store_key, setting_name) DO UPDATE SET payload_json = excluded.payload_json`);
+    for (const [name, payload] of settings) {
+      if (previousSettings.get(name) !== payload) upsertSetting.run(storeKey, name, payload);
+      previousSettings.delete(name);
     }
-    for (const sale of cancelledSales) if (sale?.number) insertCancelled.run(storeKey, String(sale.number), String(sale.finalizedAt ?? ""), JSON.stringify(sale));
-    for (const movement of inventoryMovements) if (movement?.id) insertMovement.run(storeKey, String(movement.id), String(movement.createdAt ?? ""), JSON.stringify(movement));
-    insertSetting.run(storeKey, "cashSession", JSON.stringify(state.cashSession ?? null));
-    insertSetting.run(storeKey, "paymentOptions", JSON.stringify(state.paymentOptions ?? []));
-    insertSetting.run(storeKey, "deviceConfig", JSON.stringify(state.deviceConfig ?? {}));
-    insertSetting.run(storeKey, "extensions", JSON.stringify({ ...extensions, cancelledSales: [], inventoryMovements: [] }));
+    const removeSetting = db.prepare("DELETE FROM pdv_settings WHERE store_key = ? AND setting_name = ?");
+    for (const name of previousSettings.keys()) removeSetting.run(storeKey, name);
     db.prepare("INSERT OR REPLACE INTO pdv_meta (name, value) VALUES (?, ?)").run(`direct-schema:${storeKey}`, "1");
     // The snapshot compatibility view and normalized tables commit atomically.
     db.prepare("INSERT INTO pdv_store (store_key, snapshot_json, updated_at, revision) VALUES (?, ?, ?, 1) ON CONFLICT(store_key) DO UPDATE SET snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at, revision = pdv_store.revision + 1")
@@ -446,17 +489,25 @@ function readPdvStateFromTables(db, storeKey) {
   const readRows = (table, orderBy) => db.prepare(`SELECT payload_json AS payloadJson FROM ${table} WHERE store_key = ? ORDER BY ${orderBy}`).all(storeKey).map((row) => parsePdvJson(row.payloadJson, null)).filter(Boolean);
   const settings = new Map(db.prepare("SELECT setting_name AS name, payload_json AS payloadJson FROM pdv_settings WHERE store_key = ?").all(storeKey).map((row) => [row.name, parsePdvJson(row.payloadJson, null)]));
   const extensions = settings.get("extensions") && typeof settings.get("extensions") === "object" ? settings.get("extensions") : {};
+  const mirrorRow = db.prepare("SELECT snapshot_json AS snapshotJson FROM pdv_store WHERE store_key = ?").get(storeKey);
+  const mirror = parsePdvJson(mirrorRow?.snapshotJson, {});
+  const restoreOrder = (rows, desired, idOf) => {
+    if (!Array.isArray(desired)) return rows;
+    const positions = new Map(desired.map((record, index) => [String(idOf(record)), index]));
+    return rows.sort((a, b) => (positions.get(String(idOf(a))) ?? Number.MAX_SAFE_INTEGER) -
+      (positions.get(String(idOf(b))) ?? Number.MAX_SAFE_INTEGER));
+  };
   return {
     catalogProducts: readRows("pdv_products", "product_code"),
     registeredCustomers: readRows("pdv_customers", "customer_id"),
-    completedSales: readRows("pdv_sales", "rowid"),
+    completedSales: restoreOrder(readRows("pdv_sales", "rowid"), mirror?.completedSales, (sale) => sale?.number),
     cashSession: settings.get("cashSession") ?? null,
     paymentOptions: settings.get("paymentOptions") ?? [],
     deviceConfig: settings.get("deviceConfig") ?? {},
     extensions: {
       ...extensions,
-      cancelledSales: readRows("pdv_cancelled_sales", "rowid"),
-      inventoryMovements: readRows("pdv_inventory_movements", "rowid")
+      cancelledSales: restoreOrder(readRows("pdv_cancelled_sales", "rowid"), mirror?.extensions?.cancelledSales, (sale) => sale?.number),
+      inventoryMovements: restoreOrder(readRows("pdv_inventory_movements", "rowid"), mirror?.extensions?.inventoryMovements, (movement) => movement?.id)
     }
   };
 }
