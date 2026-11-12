@@ -116,3 +116,26 @@ test("upgrade JSON recupera backup .bak válido sem sobrescrever arquivo origina
   assert.equal(fs.readFileSync(jsonPath, "utf8"), "{invalid");
   assert.equal(JSON.parse(fs.readFileSync(result.backupPath,"utf8")).pdvSnapshots.default.snapshotJson, "{}");
 });
+
+
+test("release 2.0.5 Windows 7/8 mantém base JSON legada e backup íntegro", t => {
+ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-205-"));
+ t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+ const jsonPath = path.join(tempDir, "pdv-nexus-data.json");
+ const backupDir = path.join(tempDir, "backups");
+ const original = JSON.stringify({
+  pdvSnapshots: { default: { revision: 13, snapshotJson: JSON.stringify({
+   catalogProducts: [{ productCode: "SKU0001", stock: 35 }],
+   registeredCustomers: [{ id: "CLI0001", name: "Cliente fictício" }],
+   completedSales: [{ number: "VENDA0001", netTotal: 42.9 }],
+   cashSession: { initialAmount: 150, openedAt: "12/11/2026" },
+   extensions: { inventoryMovements: [{ id: "MOV0001" }] }
+  }) } }, appSnapshots: {}
+ });
+ fs.writeFileSync(jsonPath, original, "utf8");
+ const result = preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.5" });
+ assert.equal(result.status, "backed-up");
+ assert.equal(fs.readFileSync(jsonPath, "utf8"), original);
+ assert.equal(fs.readFileSync(result.backupPath, "utf8"), original);
+ assert.equal(preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.5" }).status, "already-backed-up");
+});
