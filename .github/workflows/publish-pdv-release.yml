@@ -233,7 +233,7 @@ jobs:
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "PDV Nexus 2.0.4: atualização direta da instalação 2.0.2, com a mesma identidade com suporte a vendas, estoque, fornecedores, CSV e busca instantânea. Publicado após testes Windows 7/8/10 e QA." \
+            --notes "PDV Nexus ${VERSION}: correção de travamentos no caixa e catálogo; persistência SQLite incremental, busca indexada e atualizador com consentimento antes de download assíncrono. Atualiza as instalações 2.0.2/2.0.4 sem apagar dados, após testes Windows 7/8/10 e QA." \
             --draft
 
       - name: Restore release assets into an existing draft
