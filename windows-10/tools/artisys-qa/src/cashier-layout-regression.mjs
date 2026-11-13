@@ -49,6 +49,8 @@ try {
       };
     });
     const label = `${viewport.width}x${viewport.height}`;
+    console.log(`LAYOUT ${label}: ${JSON.stringify(measurements)}`);
+    await page.screenshot({ path: resolve(root, `qa-cashier-${label}.png`), fullPage: false });
     assert.ok(measurements, `${label}: search toolbar and controls are present`);
     const { wrapper, toolbar, items } = measurements;
     assert.ok(wrapper.width > 260, `${label}: product lookup spans the cashier column`);
@@ -62,7 +64,6 @@ try {
       assert.ok(item.top >= wrapper.top - 2 && item.bottom <= wrapper.bottom + 2, `${label}: control ${index} not cut vertically`);
       assert.ok(item.right <= measurements.viewportWidth + 2, `${label}: control ${index} not outside viewport`);
     }
-    await page.screenshot({ path: resolve(root, `qa-cashier-${label}.png`), fullPage: false });
     console.log(`PASS ${label}: search width ${wrapper.width.toFixed(0)}, toolbar width ${toolbar.width.toFixed(0)}`);
   }
 } finally {
