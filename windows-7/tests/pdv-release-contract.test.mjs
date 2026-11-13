@@ -7,8 +7,8 @@ const releaseConfig = JSON.parse(fs.readFileSync(new URL("../../pdv-release.json
 const publishWorkflow = fs.readFileSync(new URL("../../.github/workflows/publish-pdv-release.yml", import.meta.url), "utf8");
 const desktopBuilder = fs.readFileSync(new URL("../apps/nexus-desktop/electron-builder.cjs", import.meta.url), "utf8");
 
-test("release do PDV para clientes 2.0.2 avança para 2.0.5", () => {
-  assert.equal(releaseConfig.version, "2.0.5");
+test("release do PDV para clientes 2.0.2 avança para 2.0.6", () => {
+  assert.equal(releaseConfig.version, "2.0.6");
   assert.match(releaseConfig.version, /^\d+\.\d+\.\d+$/);
 });
 
