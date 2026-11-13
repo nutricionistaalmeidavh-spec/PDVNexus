@@ -48,6 +48,12 @@ A publicação do 2.0.4 exige CI verde nas três arquiteturas e QA, criação da
 
 QA: `cd windows-10 && npm ci && npm run test:pdv-upgrade && npm run test:pdv-payments && npm run typecheck`; repetir em `windows-7` e verificar os três instaladores por hashes SHA-256.
 
+## Hotfix PDV Nexus 2.0.6 — 13/11/2026
+
+Corrige o corte da barra de pesquisa de produtos no caixa Windows 10: o wrapper do autocompletar deixa de receber indevidamente a grade dos seis comandos e a linha passa a ter altura adaptável. Em janelas estreitas, os comandos quebram linha sem serem escondidos; permanecem scanner, sugestões e botões operacionais. Não modifica regras de venda, tabelas SQLite, JSON, credenciais nem canais de atualização.
+
+Atualização in-place de 2.0.2, 2.0.4 e 2.0.5 para 2.0.6 deve preservar vendas, produtos, caixa e backups. Release apenas após os builds Windows 10/7/8, QA e sincronização da distribuição estarem aprovados.
+
 ## Hotfix PDV Nexus 2.0.5 — 12/11/2026
 
 Esta release corrige possíveis travamentos de interface em abertura de caixa, cadastro e pesquisa de produtos. A gravação SQLite incremental atualiza apenas entidades alteradas, preservando a transação, o controle CAS/revision, o histórico e o backup de migração. A pesquisa mantém índice normalizado do catálogo e o autocompletar exibe até 8 sugestões. O atualizador solicita consentimento antes de baixar, transmite o instalador por stream e calcula o SHA-256 de modo assíncrono.
