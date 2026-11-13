@@ -139,5 +139,6 @@ test("P0 cashier product search spans the panel and grows when actions wrap", ()
   assert.match(css, /\[data-cashier-search="true"\][\s\S]*?display:\s*block\s*!important/);
   assert.match(css, /\[data-cashier-toolbar="true"\][\s\S]*?width:\s*100%\s*!important/);
   assert.match(css, /grid-template-rows:\s*52px\s+minmax\(62px,\s*max-content\)/);
-  assert.match(css, /@media\s*\(max-width:\s*1240px\)[\s\S]*?\[data-cashier-toolbar="true"\][\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /@media\s*\(max-width:\s*1240px\)[\s\S]*?\[data-cashier-search="true"\]\s*>\s*\[data-cashier-toolbar="true"\][\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\[data-cashier-search="true"\]\s*>\s*\[data-cashier-toolbar="true"\][\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
 });
