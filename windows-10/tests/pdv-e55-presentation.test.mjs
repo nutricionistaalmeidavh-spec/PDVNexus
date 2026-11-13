@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const mainPath = resolve(root, "apps/pdv-demo/src/main.tsx");
 const decorPath = resolve(root, "apps/pdv-demo/src/CustomerPresentationDecor.tsx");
+const appPath = resolve(root, "apps/pdv-demo/src/PdvDemoApp.tsx");
 const cssPath = resolve(root, "apps/pdv-demo/src/pdv-e55.css");
 const cashierCssPath = resolve(root, "apps/pdv-demo/src/pdv-cashier-v3.css");
 const observationFixCssPath = resolve(root, "apps/pdv-demo/src/pdv-observation-layout-fix.css");
@@ -126,4 +127,17 @@ test("cashier upper work area receives a second typography increase without chan
   assert.match(css, /\.cashier-reference-metric\s*\{[\s\S]*?font-size:\s*12px\s*!important/);
   assert.match(css, /\.cashier-reference-metric strong\s*\{[\s\S]*?font-size:\s*16px\s*!important/);
   assert.match(css, /\.cashier-reference-action\s*\{[\s\S]*?font-size:\s*12px\s*!important/);
+});
+
+test("P0 cashier product search spans the panel and grows when actions wrap", () => {
+  const app = read(appPath);
+  const css = read(legibilityCssPath);
+
+  // The suggestion popover wraps the toolbar; layout rules must target each level separately.
+  assert.match(app, /data-cashier-search="true"/);
+  assert.match(app, /data-cashier-toolbar="true"/);
+  assert.match(css, /\[data-cashier-search="true"\][\s\S]*?display:\s*block\s*!important/);
+  assert.match(css, /\[data-cashier-toolbar="true"\][\s\S]*?width:\s*100%\s*!important/);
+  assert.match(css, /grid-template-rows:\s*52px\s+minmax\(62px,\s*max-content\)/);
+  assert.match(css, /@media\s*\(max-width:\s*1240px\)[\s\S]*?\[data-cashier-toolbar="true"\][\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
 });
