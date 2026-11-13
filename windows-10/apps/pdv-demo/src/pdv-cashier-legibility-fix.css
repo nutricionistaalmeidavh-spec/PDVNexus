@@ -354,7 +354,7 @@
 }
 
 @media (max-width: 1240px) {
-  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-toolbar="true"] {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-search="true"] > [data-cashier-toolbar="true"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     grid-auto-rows: minmax(36px, auto) !important;
   }
@@ -372,7 +372,7 @@
 }
 
 @media (max-width: 560px) {
-  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-toolbar="true"] {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-search="true"] > [data-cashier-toolbar="true"] {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
