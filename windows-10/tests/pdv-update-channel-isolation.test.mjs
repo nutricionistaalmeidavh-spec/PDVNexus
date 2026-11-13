@@ -11,8 +11,8 @@ const w10 = require("../apps/nexus-desktop/electron-builder-pdv.cjs");
 const w7 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win7.cjs");
 const w8 = require("../../windows-7/apps/nexus-desktop/electron-builder-pdv-win8-x86.cjs");
 
-test("upgrade 2.0.5 preserva appId, diretório e canal dos clientes 2.0.2", () => {
-  assert.equal(release.version, "2.0.5");
+test("upgrade 2.0.6 preserva appId, diretório e canal dos clientes 2.0.2", () => {
+  assert.equal(release.version, "2.0.6");
   assert.match(release.manifestUrl, /\/releases\/latest\/download\/latest\.json$/);
   for (const config of [w10,w7,w8]) {
     assert.equal(config.appId, "com.nexuscore.pdv");

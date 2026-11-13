@@ -83,6 +83,9 @@ jobs:
       - name: Build PDV renderer
         run: npm run build:pdv-demo
 
+      - name: Validate cashier search is not clipped at 1024, 1366 and 1920 widths
+        run: node tools/artisys-qa/src/cashier-layout-regression.mjs
+
       - name: Capture PDV UI with ArtiSys QA
         run: node tools/artisys-qa/src/cli.mjs run --config qa/artisys-qa.config.json --flow ui-review --output qa-artifacts
 
@@ -108,7 +111,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PDV-Nexus-ArtiSys-QA
-          path: windows-10/qa-artifacts
+          path: |
+            windows-10/qa-artifacts
+            windows-10/qa-cashier-*.png
           if-no-files-found: warn
           retention-days: 3
 

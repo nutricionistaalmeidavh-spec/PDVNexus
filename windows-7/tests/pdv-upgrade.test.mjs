@@ -118,8 +118,8 @@ test("upgrade JSON recupera backup .bak válido sem sobrescrever arquivo origina
 });
 
 
-test("release 2.0.5 Windows 7/8 mantém base JSON legada e backup íntegro", t => {
- const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-205-"));
+test("release 2.0.6 Windows 7/8 mantém base JSON legada e backup íntegro", t => {
+ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdv-json-206-"));
  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
  const jsonPath = path.join(tempDir, "pdv-nexus-data.json");
  const backupDir = path.join(tempDir, "backups");
@@ -133,9 +133,9 @@ test("release 2.0.5 Windows 7/8 mantém base JSON legada e backup íntegro", t =
   }) } }, appSnapshots: {}
  });
  fs.writeFileSync(jsonPath, original, "utf8");
- const result = preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.5" });
+ const result = preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.6" });
  assert.equal(result.status, "backed-up");
  assert.equal(fs.readFileSync(jsonPath, "utf8"), original);
  assert.equal(fs.readFileSync(result.backupPath, "utf8"), original);
- assert.equal(preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.5" }).status, "already-backed-up");
+ assert.equal(preparePdvJsonVersionBackup({ jsonPath, backupDir, currentVersion: "2.0.6" }).status, "already-backed-up");
 });

@@ -311,3 +311,68 @@
     font-size: 12px !important;
   }
 }
+
+/*
+ * P0 product lookup clipping (13/11/2026).
+ * Auto-suggestions wrap the original toolbar inside a positioned parent.
+ * The legacy ordinal selector mistakenly turned that parent into a six-column
+ * grid, leaving the actual toolbar inside only its FIRST cell. Allow the
+ * wrapper to fill the left cashier column and grid its actual controls.
+ * The row also needs intrinsic height when six actions wrap at small widths.
+ */
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section > div:first-child > [data-cashier-search="true"] {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-search="true"] > [data-cashier-toolbar="true"] {
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  grid-template-columns: minmax(150px, 1fr) 82px 116px 126px 106px 68px !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-toolbar="true"] > input,
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-toolbar="true"] > button {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+  grid-template-rows: 52px minmax(62px, max-content) 56px 210px 40px 52px 52px 30px 38px 134px !important;
+}
+
+@media (max-width: 1240px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-search="true"] > [data-cashier-toolbar="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(36px, auto) !important;
+  }
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-toolbar="true"] > button {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 900px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] main > section > section {
+    grid-template-rows: none !important;
+    grid-auto-rows: auto !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .pdv-density-root [data-shell="pdv-nexus"][data-view="caixa"] [data-cashier-search="true"] > [data-cashier-toolbar="true"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
