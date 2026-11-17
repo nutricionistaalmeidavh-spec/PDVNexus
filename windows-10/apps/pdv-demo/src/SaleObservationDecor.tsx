@@ -111,10 +111,15 @@ export function SaleObservationDecor() {
   useEffect(() => {
     const uninstallPersistence = installDesktopSaleObservationPersistence();
     const uninstallPrinting = installDesktopSaleObservationPrinting();
+    // The sale draft is saved on change, and completed sales are reconciled
+    // after a real canonical commit. No whole-store scan every 1.5 seconds.
+    const onCommit = () => { void reconcileSaleObservationsToStore(); };
     void reconcileSaleObservationsToStore();
-    const timer = window.setInterval(() => void reconcileSaleObservationsToStore(), 1500);
+    window.addEventListener("nexus-pdv:canonical-commit", onCommit);
+    window.addEventListener("nexus-pdv:canonical-external-write", onCommit);
     return () => {
-      window.clearInterval(timer);
+      window.removeEventListener("nexus-pdv:canonical-commit", onCommit);
+      window.removeEventListener("nexus-pdv:canonical-external-write", onCommit);
       uninstallPrinting();
       uninstallPersistence();
     };
