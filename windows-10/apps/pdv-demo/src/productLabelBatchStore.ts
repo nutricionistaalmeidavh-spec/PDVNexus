@@ -49,8 +49,13 @@ export async function loadProductLabelBatchContext(): Promise<ProductLabelBatchC
 
 export async function reconcileProductBatchFefoFromCurrentSnapshot() {
   const snapshotJson = await loadMainPdvSnapshot();
-  const snapshot = parseJson(snapshotJson, {});
-  const store = await loadProductLabelBatchStore();
+  const snapshot = parseJson(snapshotJson, {}) as { extensions?: { productLabelBatchStore?: unknown } };
+  // One canonical read supplies both sales and batch metadata; only legacy
+  // installations without embedded batches need the separate migration fallback.
+  const embeddedStore = snapshot?.extensions?.productLabelBatchStore;
+  const store = embeddedStore
+    ? normalizeProductBatchStore(embeddedStore)
+    : await loadProductLabelBatchStore();
   const ledger = loadProductBatchPhysicalScanLedger();
   const result = reconcileProductBatchFefoSnapshot(snapshot, store, new Date().toISOString(), ledger);
   if (result.changed) await saveProductLabelBatchStore(result.store);
