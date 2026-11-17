@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import vm from "node:vm";
 import { DatabaseSync } from "node:sqlite";
 
@@ -10,9 +12,17 @@ const end = main.indexOf("\nfunction readPdvStateFromTables(", start);
 assert.ok(start >= 0 && end > start, "canonical write function must be present");
 const source = main.slice(start, end);
 const write = vm.runInNewContext(source + "\nwritePdvStateToTables;", { Error, JSON, Number, String, Array });
+const readStart = main.indexOf("function readPdvStateFromTables(");
+const readEnd = main.indexOf("\nfunction sendJson(", readStart);
+assert.ok(readStart >= 0 && readEnd > readStart, "canonical read function must be present");
+const read = vm.runInNewContext(
+  "function parsePdvJson(value, fallback) { try { return JSON.parse(value); } catch { return fallback; } }\n" +
+  main.slice(readStart, readEnd) + "\nreadPdvStateFromTables;",
+  { JSON, Number, String, Array, Map }
+);
 
-function createDb() {
- const db = new DatabaseSync(":memory:");
+function createDb(filename = ":memory:") {
+ const db = new DatabaseSync(filename);
  db.exec(`
   CREATE TABLE pdv_store (store_key TEXT PRIMARY KEY, snapshot_json TEXT NOT NULL, updated_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0);
   CREATE TABLE pdv_meta (name TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -185,6 +195,20 @@ test("P1 stress SQLite: 1000, 10000 e 50000 produtos com historico extenso e abe
     const changes=db.prepare("SELECT total_changes() AS total").get().total-before;
     assert.ok(changes<20,`No tamanho ${size}, abertura de caixa reescreveu ${changes} linhas`);
    }
+   const cpuBefore=process.cpuUsage();
+   const heapBefore=process.memoryUsage().heapUsed;
+   const readDurations=[];
+   for (let pass=0;pass<3;pass++) {
+     const started=performance.now();
+     const hydrated=read(db,"loja");
+     readDurations.push(+(performance.now()-started).toFixed(2));
+     assert.equal(hydrated.catalogProducts.length,size);
+     assert.equal(hydrated.completedSales.length,5000);
+     assert.equal(hydrated.extensions.inventoryMovements.length,3000);
+     assert.equal(hydrated.cashSession.initialAmount,102);
+   }
+   const cpu=process.cpuUsage(cpuBefore);
+   const heapDeltaMb=(process.memoryUsage().heapUsed-heapBefore)/(1024*1024);
    assert.equal(count(db,"pdv_products"),size);
    assert.equal(count(db,"pdv_sales"),5000);
    assert.equal(count(db,"pdv_inventory_movements"),3000);
@@ -193,7 +217,10 @@ test("P1 stress SQLite: 1000, 10000 e 50000 produtos com historico extenso e abe
    const timings=[...durations].sort((a,b)=>a-b);
    console.log("PDV_P0P1_STRESS "+JSON.stringify({
     products:size,sales:5000,movements:3000,initialWriteMs:+initialMs.toFixed(2),
-    cashOpenMs:durations,p50Ms:timings[1],p95Ms:timings[2],db:"SQLite node:sqlite in-memory",
+    cashOpenMs:durations,p50Ms:timings[1],p95Ms:timings[2],
+    fullCanonicalReadMs:readDurations,
+    cpuUserMs:+(cpu.user/1000).toFixed(2),cpuSystemMs:+(cpu.system/1000).toFixed(2),
+    heapDeltaMb:+heapDeltaMb.toFixed(2),db:"SQLite node:sqlite in-memory",
     dataSource:"synthetic",uiMeasured:false
    }));
   } finally { db.close(); }
@@ -219,4 +246,41 @@ test("P0: novas vendas preservam ordem do historico, itens e exclusoes canonicas
   assert.equal(count(db,"pdv_sale_items"),3);
   assert.equal(db.prepare("PRAGMA quick_check").get().quick_check,"ok");
  } finally { db.close(); }
+});
+
+test("P1: SQLite disk snapshot, sales and recovery backup remain intact after update and conflict", () => {
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),"pdv-nexus-p1-"));
+ const dbPath=path.join(directory,"pdv-nexus.sqlite");
+ const backupPath=path.join(directory,"pdv-nexus-backup.sqlite");
+ const db=createDb(dbPath);
+ let backupDb;
+ try {
+  const baseline=state(1200,180);
+  baseline.catalogProducts=Array.from({length:1000},(_,index)=>({
+    productCode:"SKU-"+index,productName:"Produto "+index,stock:index+1,unitPrice:10
+  }));
+  write(db,"loja",baseline,new Date().toISOString(),0);
+  const original=row(db).snapshotJson;
+  db.exec("VACUUM INTO '"+backupPath.replaceAll("\\","/").replaceAll("'","''")+"'");
+  backupDb=new DatabaseSync(backupPath);
+  assert.equal(row(backupDb).snapshotJson,original);
+  const updated=structuredClone(baseline);
+  updated.cashSession={openedAt:"2026-11-17T17:00:00",initialAmount:120,withdrawals:[]};
+  write(db,"loja",updated,new Date().toISOString(),1);
+  assert.throws(()=>write(db,"loja",baseline,new Date().toISOString(),1),/REVISION_CONFLICT/);
+  assert.equal(row(db).revision,2);
+  assert.equal(count(db,"pdv_products"),1000);
+  assert.equal(count(db,"pdv_sales"),1200);
+  assert.equal(count(db,"pdv_inventory_movements"),301);
+  assert.equal(JSON.parse(row(db).snapshotJson).cashSession.initialAmount,120);
+  assert.equal(row(backupDb).revision,1);
+  assert.equal(count(backupDb,"pdv_sales"),1200);
+  assert.equal(JSON.parse(row(backupDb).snapshotJson).cashSession,null);
+  assert.equal(db.prepare("PRAGMA quick_check").get().quick_check,"ok");
+  assert.equal(backupDb.prepare("PRAGMA quick_check").get().quick_check,"ok");
+ } finally {
+  backupDb?.close();
+  db.close();
+  fs.rmSync(directory,{recursive:true,force:true});
+ }
 });
