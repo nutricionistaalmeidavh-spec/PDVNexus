@@ -399,6 +399,7 @@ export function PdvDemoApp() {
       );
       lastPersistedSnapshotRef.current = initialSnapshot;
       lastPersistedRevisionRef.current = initialSave.revision;
+      window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-commit", { detail: { revision: initialSave.revision } }));
       if (!cancelled) setPersistenceState("ready");
     })().catch((error) => {
       setDesktopStoreStatus(error instanceof Error ? error.message : "Falha ao abrir SQLite desktop.");
@@ -481,6 +482,7 @@ export function PdvDemoApp() {
     if (persistenceSaveActiveRef.current) return;
 
     persistenceSaveActiveRef.current = true;
+    let persistedAny = false;
     void (async () => {
       try {
         while (pendingPersistenceSnapshotRef.current && pendingPersistenceSnapshotRef.current !== lastPersistedSnapshotRef.current) {
@@ -496,6 +498,7 @@ export function PdvDemoApp() {
             );
             lastPersistedRevisionRef.current = persisted.revision;
             lastPersistedSnapshotRef.current = nextSnapshot;
+            persistedAny = true;
           } catch (error) {
             const message = error instanceof Error ? error.message : "Falha ao salvar SQLite desktop.";
             const isConflict = message.includes("REVISION_CONFLICT");
@@ -524,6 +527,9 @@ export function PdvDemoApp() {
         persistenceSaveActiveRef.current = false;
         if (pendingPersistenceSnapshotRef.current === lastPersistedSnapshotRef.current) {
           pendingPersistenceSnapshotRef.current = "";
+        }
+        if (persistedAny) {
+          window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-commit", { detail: { revision: lastPersistedRevisionRef.current } }));
         }
       }
     })();
