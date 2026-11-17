@@ -78,10 +78,12 @@ async function writeSnapshot(snapshot: SnapshotLike, original: SnapshotLike) {
     if (!latest?.snapshotJson || JSON.stringify(parseSnapshot(latest.snapshotJson)) !== JSON.stringify(original)) {
       throw new Error("REVISION_CONFLICT: dados atualizados durante importação. Recarregue o PDV antes de tentar novamente.");
     }
-    await bridge.save(PDV_STORE_KEY, raw, latest.revision);
+    const persisted = await bridge.save(PDV_STORE_KEY, raw, latest.revision);
+    window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-external-write", { detail: { revision: persisted.revision } }));
     return;
   }
   window.localStorage.setItem(PDV_STORE_KEY, raw);
+  window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-external-write"));
 }
 
 function mergeProducts(snapshot: SnapshotLike, products: PdvImportedProduct[]) {
@@ -146,19 +148,37 @@ export function PdvOpsDecor() {
 
   useEffect(() => {
     let active = true;
+    let refreshing = false;
+    let queued = false;
+    let lastRaw: string | null | undefined;
     const refresh = async () => {
+      if (refreshing) { queued = true; return; }
+      refreshing = true;
       try {
-        const raw = await readSnapshot();
-        if (active) setSnapshot(parseSnapshot(raw));
-      } catch {
-        if (active) setMessage("Não foi possível ler o snapshot operacional.");
+        do {
+          queued = false;
+          try {
+            const raw = await readSnapshot();
+            if (active && raw !== lastRaw) {
+              lastRaw = raw;
+              setSnapshot(parseSnapshot(raw));
+            }
+          } catch {
+            if (active) setMessage("Não foi possível ler o snapshot operacional.");
+          }
+        } while (active && queued);
+      } finally {
+        refreshing = false;
       }
     };
+    const onCommit = () => { void refresh(); };
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 2500);
+    window.addEventListener("nexus-pdv:canonical-commit", onCommit);
+    window.addEventListener("nexus-pdv:canonical-external-write", onCommit);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      window.removeEventListener("nexus-pdv:canonical-commit", onCommit);
+      window.removeEventListener("nexus-pdv:canonical-external-write", onCommit);
     };
   }, []);
 
