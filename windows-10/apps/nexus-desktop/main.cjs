@@ -96,15 +96,18 @@ function getPdvSqliteLogPath() {
   return path.join(app.getPath("userData"), PDV_SQLITE_LOG_FILE);
 }
 
+// Serialize diagnostic writes outside the synchronous Electron/SQLite critical path.
+let pdvSqliteLogQueue = Promise.resolve();
 function appendPdvSqliteLog(phase, detail = "") {
-  try {
-    const logPath = getPdvSqliteLogPath();
-    fs.mkdirSync(path.dirname(logPath), { recursive: true });
-    const safeDetail = String(detail || "").replace(/[\r\n]+/g, " ").slice(0, 800);
-    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${phase}${safeDetail ? ` | ${safeDetail}` : ""}\n`, "utf8");
-  } catch {
-    // diagnostics must never prevent the PDV from opening
-  }
+  const logPath = getPdvSqliteLogPath();
+  const safeDetail = String(detail || "").replace(/[\r\n]+/g, " ").slice(0, 800);
+  const line = `[${new Date().toISOString()}] ${phase}${safeDetail ? ` | ${safeDetail}` : ""}\n`;
+  pdvSqliteLogQueue = pdvSqliteLogQueue.then(async () => {
+    await fs.promises.mkdir(path.dirname(logPath), { recursive: true });
+    await fs.promises.appendFile(logPath, line, "utf8");
+  }).catch(() => {
+    // Diagnostics must never prevent the PDV from opening or saving a sale.
+  });
 }
 
 function normalizePdvSqliteError(error, operation) {
