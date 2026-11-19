@@ -233,7 +233,7 @@ jobs:
             --repo "$REPO" \
             --target "$SHA" \
             --title "PDV Nexus ${VERSION}" \
-            --notes "PDV Nexus ${VERSION}: correção de travamentos no caixa e catálogo; persistência SQLite incremental, busca indexada e atualizador com consentimento antes de download assíncrono. Atualiza as instalações 2.0.2/2.0.4 sem apagar dados, após testes Windows 7/8/10 e QA." \
+            --notes "PDV Nexus ${VERSION}: otimização preventiva de desempenho com FEFO, observações de venda e painel operacional orientados por eventos em vez de leituras periódicas, menos acessos duplicados ao banco e logs SQLite assíncronos. Métricas de CPU, memória e latência adicionadas. Preserva dados, vendas, caixa, backups, identidade do aplicativo e atualização das versões 2.0.2/2.0.4/2.0.5/2.0.6, após testes Windows 7/8/10 e QA." \
             --draft
 
       - name: Restore release assets into an existing draft
