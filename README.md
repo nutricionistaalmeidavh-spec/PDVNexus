@@ -48,6 +48,12 @@ A publicação do 2.0.4 exige CI verde nas três arquiteturas e QA, criação da
 
 QA: `cd windows-10 && npm ci && npm run test:pdv-upgrade && npm run test:pdv-payments && npm run typecheck`; repetir em `windows-7` e verificar os três instaladores por hashes SHA-256.
 
+## PDV Nexus 2.0.7 — 18/11/2026
+
+Correção preventiva de desempenho a partir de relatos de travamentos após atualização. As verificações recorrentes de lotes FEFO (1,2 s), observações (1,5 s) e painel operacional (2,5 s) passam a reagir a gravações canônicas e eventos externos, reduzindo leituras completas repetitivas. FEFO reutiliza metadados já presentes no snapshot; o logger SQLite do Windows 10 deixa de gravar de modo síncrono na thread principal.
+
+Instrumentação local de latência, CPU e memória e testes de integridade/bancos sintéticos para 1 mil, 10 mil e 50 mil produtos, sem dependências pagas. Preservam-se caixa, vendas, histórico, CAS/revision, backups, appId, diretório e canal original para quem atualiza das versões 2.0.2, 2.0.4, 2.0.5 e 2.0.6. Nenhum dado de cliente foi coletado para esses testes; a causa exata do travamento da Luana continua não confirmada.
+
 ## Hotfix PDV Nexus 2.0.6 — 13/11/2026
 
 Corrige o corte da barra de pesquisa de produtos no caixa Windows 10: o wrapper do autocompletar deixa de receber indevidamente a grade dos seis comandos e a linha passa a ter altura adaptável. Em janelas estreitas, os comandos quebram linha sem serem escondidos; permanecem scanner, sugestões e botões operacionais. Não modifica regras de venda, tabelas SQLite, JSON, credenciais nem canais de atualização.

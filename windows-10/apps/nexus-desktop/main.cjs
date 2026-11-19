@@ -96,15 +96,24 @@ function getPdvSqliteLogPath() {
   return path.join(app.getPath("userData"), PDV_SQLITE_LOG_FILE);
 }
 
+// Serialize diagnostic writes outside the synchronous Electron/SQLite critical path.
+let pdvSqliteLogQueue = Promise.resolve();
 function appendPdvSqliteLog(phase, detail = "") {
-  try {
-    const logPath = getPdvSqliteLogPath();
-    fs.mkdirSync(path.dirname(logPath), { recursive: true });
-    const safeDetail = String(detail || "").replace(/[\r\n]+/g, " ").slice(0, 800);
-    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${phase}${safeDetail ? ` | ${safeDetail}` : ""}\n`, "utf8");
-  } catch {
-    // diagnostics must never prevent the PDV from opening
-  }
+  const logPath = getPdvSqliteLogPath();
+  const safeDetail = String(detail || "").replace(/[\r\n]+/g, " ").slice(0, 800);
+  const line = `[${new Date().toISOString()}] ${phase}${safeDetail ? ` | ${safeDetail}` : ""}\n`;
+  pdvSqliteLogQueue = pdvSqliteLogQueue.then(async () => {
+    await fs.promises.mkdir(path.dirname(logPath), { recursive: true });
+    await fs.promises.appendFile(logPath, line, "utf8");
+  }).catch(() => {
+    // Diagnostics must never prevent the PDV from opening or saving a sale.
+  });
+}
+
+function describePdvOperationResources(startCpu, startHeap) {
+  const cpu = process.cpuUsage(startCpu);
+  const heapUsed = process.memoryUsage().heapUsed;
+  return `cpuUserMs=${(cpu.user / 1000).toFixed(2)}; cpuSystemMs=${(cpu.system / 1000).toFixed(2)}; heapDeltaMb=${((heapUsed - startHeap) / (1024 * 1024)).toFixed(2)}; heapUsedMb=${(heapUsed / (1024 * 1024)).toFixed(2)}`;
 }
 
 function normalizePdvSqliteError(error, operation) {
@@ -314,6 +323,8 @@ function saveAppStoreSnapshot(storeKey, snapshotJson) {
 
 function loadPdvStoreSnapshot(storeKey) {
   const startedAt = Date.now();
+  const startCpu = process.cpuUsage();
+  const startHeap = process.memoryUsage().heapUsed;
   const key = String(storeKey ?? "default");
   appendPdvSqliteLog("load.start", `store=${key}`);
   try {
@@ -325,12 +336,12 @@ function loadPdvStoreSnapshot(storeKey) {
     const state = readPdvStateFromTables(db, key);
     appendPdvSqliteLog("load.read.done", `store=${key}; found=${Boolean(state)}`);
     if (!state) {
-      appendPdvSqliteLog("load.done", `store=${key}; empty=true; ms=${Date.now() - startedAt}`);
+      appendPdvSqliteLog("load.done", `store=${key}; empty=true; ms=${Date.now() - startedAt}; ${describePdvOperationResources(startCpu, startHeap)}`);
       return null;
     }
     const persisted = db.prepare("SELECT updated_at AS updatedAt, revision FROM pdv_store WHERE store_key = ?").get(key);
     const result = { snapshotJson: JSON.stringify(state), updatedAt: persisted?.updatedAt ?? getPdvUpdatedAt(db, key), revision: Number(persisted?.revision ?? 0) };
-    appendPdvSqliteLog("load.done", `store=${key}; ms=${Date.now() - startedAt}`);
+    appendPdvSqliteLog("load.done", `store=${key}; ms=${Date.now() - startedAt}; ${describePdvOperationResources(startCpu, startHeap)}`);
     return result;
   } catch (error) {
     appendPdvSqliteLog("load.error", `store=${key}; ms=${Date.now() - startedAt}; ${error?.message || error}`);
@@ -343,6 +354,8 @@ function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
     throw new Error("REVISION_REQUIRED: leitura canônica obrigatória antes de gravar.");
   }
   const startedAt = Date.now();
+  const startCpu = process.cpuUsage();
+  const startHeap = process.memoryUsage().heapUsed;
   const key = String(storeKey ?? "default");
   appendPdvSqliteLog("save.start", `store=${key}`);
   const db = getPdvDatabase();
@@ -361,7 +374,7 @@ function savePdvStoreSnapshot(storeKey, snapshotJson, expectedRevision) {
   }
   try {
     writePdvStateToTables(db, key, state, updatedAt, expectedRevision);
-    appendPdvSqliteLog("save.done", `store=${key}; ms=${Date.now() - startedAt}`);
+    appendPdvSqliteLog("save.done", `store=${key}; ms=${Date.now() - startedAt}; ${describePdvOperationResources(startCpu, startHeap)}`);
     const row = db.prepare("SELECT revision FROM pdv_store WHERE store_key = ?").get(key);
     return { updatedAt, revision: Number(row?.revision ?? 0) };
   } catch (error) {
