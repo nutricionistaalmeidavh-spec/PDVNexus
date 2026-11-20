@@ -1,5 +1,6 @@
-const OBSERVATIONS_STORAGE_KEY = "nexus-core:pdv-sale-observations:v1";
-const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
+import { getActivePdvStoreKey, getScopedBranchStorageKey } from "./storeNetwork";
+const OBSERVATIONS_STORAGE_KEY = getScopedBranchStorageKey("nexus-core:pdv-sale-observations:v1");
+const PDV_STORE_KEY = getActivePdvStoreKey();
 const MAX_OBSERVATION_LENGTH = 500;
 export const MAX_RECEIPT_OBSERVATION_LENGTH = 120;
 export const MAX_RECEIPT_OBSERVATION_LINES = 4;

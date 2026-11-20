@@ -1,3 +1,4 @@
+import { getActivePdvStoreKey, getScopedBranchStorageKey } from "./storeNetwork";
 import { getDesktopPdvStoreBridge } from "@nexus-core/desktop-runtime";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -12,7 +13,7 @@ import {
 } from "../../../packages/modules/pdv-ops/src/index";
 import { getPdvOpsRuntime } from "./saleObservationDesktop";
 
-const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
+const PDV_STORE_KEY = getActivePdvStoreKey();
 type ImportKind = "products" | "customers";
 
 type ProductLike = {
