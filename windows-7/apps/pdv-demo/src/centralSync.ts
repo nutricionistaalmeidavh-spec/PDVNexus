@@ -112,7 +112,7 @@ export function applyRemoteEvents<T extends CentralSnapshot>(
     if(event.kind==="sale.completed"||event.kind==="sale.cancelled") {
       if(String(payload.number??"")!==event.entityId)throw new Error("Venda remota com identificação inconsistente.");
       if(payload.terminalId && payload.terminalId!==event.terminalId)throw new Error("Venda remota com terminal incompatível.");
-      const tagged={...payload,terminalId:event.terminalId};
+      const tagged:Record<string,unknown>={...payload,terminalId:event.terminalId};
       const active=sales.find(row=>row.number===tagged.number);
       const previouslyCancelled=cancelled.find(row=>row.number===tagged.number);
       if(event.kind==="sale.completed") {
