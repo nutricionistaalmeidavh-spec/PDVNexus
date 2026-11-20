@@ -37,3 +37,27 @@ for (const edition of ["windows-10","windows-7"]) {
     assert.throws(()=>m.applyRemoteEvents(snapshot,[{...sales,branchId:"outra"}],"matriz","CAIXA-A"),/filial/i);
   });
 }
+
+for(const edition of ["windows-10","windows-7"]){
+  test(edition+": cancelamento remoto substitui venda sem ressuscitar operação",async()=>{
+    const m=await mod(edition);
+    const snapshot={
+      catalogProducts:[{productCode:"A",productName:"Item",stock:4}],
+      completedSales:[{number:"22",terminalId:"CX-REMOTO",netTotal:20,status:"completed",items:[]}],
+      extensions:{inventoryMovements:[],cancelledSales:[],centralSync:{enabled:true,endpointUrl:"https://example.invalid",ackedIds:[],receivedIds:[],cursor:"0"}}
+    };
+    const cancel={sequence:"2",eventId:"cancel:CX-REMOTO:22",branchId:"matriz",terminalId:"CX-REMOTO",entityId:"22",kind:"sale.cancelled",payload:{number:"22",terminalId:"CX-REMOTO",netTotal:20,status:"cancelled",items:[]}};
+    const result=m.applyRemoteEvents(snapshot,[cancel],"matriz","CX-LOCAL");
+    assert.equal(result.completedSales.length,0);
+    assert.equal(result.extensions.cancelledSales.length,1);
+    assert.equal(m.collectPendingEvents(result,"matriz","CX-LOCAL",[]).length,0);
+  });
+  test(edition+": venda recebida sem terminal no payload não é reenviada como local",async()=>{
+    const m=await mod(edition);
+    const snapshot={catalogProducts:[],completedSales:[],extensions:{inventoryMovements:[],centralSync:{ackedIds:[],receivedIds:[],cursor:"0"}}};
+    const event={sequence:"1",eventId:"sale:CX-B:100",branchId:"matriz",terminalId:"CX-B",entityId:"100",kind:"sale.completed",payload:{number:"100",netTotal:50,items:[]}};
+    const imported=m.applyRemoteEvents(snapshot,[event],"matriz","CX-A");
+    assert.equal(imported.completedSales[0].terminalId,"CX-B");
+    assert.equal(m.collectPendingEvents(imported,"matriz","CX-A",[]).length,0);
+  });
+}
