@@ -1,5 +1,5 @@
 import { SalesReports } from "./SalesReports";
-import { getActivePdvStoreKey, readStoreNetwork, saveStoreNetwork, registerStoreBranch, renameStoreBranch, deactivateStoreBranch, grantStoreBranchOperator, currentStoreBranch, canAccessStoreBranch, selectActiveStoreBranch } from "./storeNetwork";
+import { LEGACY_PDV_STORE_KEY, ACTIVE_STORE_BRANCH_KEY, getActivePdvStoreKey, readStoreNetwork, saveStoreNetwork, registerStoreBranch, renameStoreBranch, deactivateStoreBranch, grantStoreBranchOperator, currentStoreBranch, canAccessStoreBranch, selectActiveStoreBranch } from "./storeNetwork";
 import { parsePdvOpeningAmount, buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "./cashierSafety";
 import { changeSaleReportExclusion, type ReportExclusion, type ReportExclusionEvent, type ReportSaleIdentity } from "./reportTraining";
 import { SaleItemPaymentEditor } from "./SaleItemPaymentEditor";
@@ -227,6 +227,9 @@ export function PdvDemoApp() {
   const [loginPasswordDraft, setLoginPasswordDraft] = useState("");
   const [operatorChoiceId, setOperatorChoiceId] = useState(savedExtensions.currentOperatorId);
   const [authorizedManagerId, setAuthorizedManagerId] = useState<string|null>(null);
+  const [storeBranchAuthorized, setStoreBranchAuthorized] = useState(PDV_STORE_KEY === LEGACY_PDV_STORE_KEY);
+  const [storeBranchLoginId, setStoreBranchLoginId] = useState("");
+  const [storeBranchLoginPassword, setStoreBranchLoginPassword] = useState("");
   const [terminalDraft, setTerminalDraft] = useState({ terminalId: savedExtensions.terminalConfig.terminalId, terminalName: savedExtensions.terminalConfig.terminalName, mode: savedExtensions.terminalConfig.mode, serverUrl: savedExtensions.terminalConfig.serverUrl ?? "" });
   const [syncServerDraft, setSyncServerDraft] = useState({ port: "4174", token: "", remoteUrl: savedExtensions.terminalConfig.serverUrl ?? "" });
   const [syncServerStatus, setSyncServerStatus] = useState<DesktopPdvSyncServerStatus>({ running: false });
@@ -615,6 +618,7 @@ export function PdvDemoApp() {
   const addWithdrawal = () => { if (!cashSession || cashSession.closedAt) return setLastEvent("Abra o caixa antes de registrar uma sangria."); const amount = Number(withdrawalDraft) || 0; if (amount <= 0) return setLastEvent("Informe um valor de sangria valido."); setCashSession((current) => current ? { ...current, withdrawals: [...current.withdrawals, { amount, note: withdrawalNote || "Sangria", createdAt: new Date().toLocaleString("pt-BR") }] } : current); setLastEvent(`Sangria de ${formatCurrency(amount)} registrada.`); };
   const exportPdvBackup = () => { const snapshot = buildPdvSnapshotJson(); const blob = new Blob([snapshot], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `pdv-backup-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); setLastEvent("Backup do PDV exportado em JSON."); };
   const applyImportedStore = (imported: ReturnType<typeof parsePdvSnapshot>) => {
+    if (activeStoreBranch.id !== "matriz") setStoreBranchAuthorized(false);
     preservedPdvExtensionsRef.current = imported.extensions && typeof imported.extensions === "object"
       ? { ...imported.extensions } : {};
     setCatalogProducts(imported.catalogProducts); setRegisteredCustomers(imported.registeredCustomers); setCompletedSales(imported.completedSales); setCashSession(imported.cashSession); setPaymentOptions(imported.paymentOptions);
@@ -805,6 +809,17 @@ export function PdvDemoApp() {
   const cancelSelectedSale = () => { const targetSale = completedSales.find((item) => item.number === cancelSaleNumber); if (!targetSale) return setLastEvent("Selecione uma venda finalizada para cancelar."); const targetCustomer = registeredCustomers.find((customer) => customer.id === targetSale.customerId) ?? fallbackCustomer; try { const authorization = authorizePdvAction({ action: "cancel-sale", operator: activeOperator, users, managerPassword: managerPasswordDraft, reason: cancelReasonDraft, createdAt: new Date().toLocaleString("pt-BR") }); const result = cancelPdvSale({ sale: targetSale, products: catalogProducts, customer: targetCustomer, reason: cancelReasonDraft, cancelledAt: new Date().toLocaleString("pt-BR"), operator: activeOperator, authorization }); setCatalogProducts(result.products); setRegisteredCustomers((current) => current.map((customer) => customer.id === result.customer.id ? result.customer : customer)); setCompletedSales((current) => current.filter((item) => item.number !== targetSale.number)); setCancelledSales((current) => [result.cancelledSale as CompletedSale, ...current]); setInventoryMovements((current) => [...result.stockMovements, ...current]); setAuditLogs((current) => [result.auditLog, ...current]); setPendingSensitiveAction(null); setLastEvent(`Venda ${targetSale.number} cancelada por ${activeOperator.name} com autorizacao de ${authorization.authorizedBy?.name ?? "gerente"}.`); setManagerPasswordDraft(""); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao cancelar venda."); } };
 
 
+  const unlockStoreBranch = () => {
+    try {
+      const result = authenticatePdvOperator(users, storeBranchLoginId, storeBranchLoginPassword);
+      if (!canAccessStoreBranch(activeStoreBranch, result.user)) throw new Error("Operador sem permissão para esta filial.");
+      setCurrentOperatorId(result.user.id);
+      setAuthorizedManagerId(result.sessionManagerId);
+      setStoreBranchAuthorized(true);
+      setStoreBranchLoginPassword("");
+      setLastEvent(`Acesso validado para ${activeStoreBranch.name}.`);
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Não foi possível autenticar nesta filial."); }
+  };
   const createNetworkBranch = async () => {
     try {
       if (!canManageFinance) throw new Error("Somente gerente autenticado pode cadastrar filiais.");
@@ -1023,6 +1038,20 @@ export function PdvDemoApp() {
 
   if (persistenceState === "booting") return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Segoe UI, sans-serif" }}>Abrindo dados do SQLite...</main>;
   if (persistenceState === "error") return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "Segoe UI, sans-serif" }}><section><h1>Não foi possível abrir o SQLite do PDV</h1><p>{desktopStoreStatus}</p><button onClick={() => window.location.reload()}>Tentar novamente</button></section></main>;
+  if (activeStoreBranch.id !== "matriz" && !storeBranchAuthorized) return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "Segoe UI, sans-serif" }}>
+    <section style={{ maxWidth: 420, width: "90%", display: "grid", gap: 12 }} data-pdv-branch-access>
+      <h1>Acessar {activeStoreBranch.name}</h1>
+      <p>Esta unidade possui cadastro e estoque independentes. Identifique-se antes de utilizar os dados da filial.</p>
+      <select aria-label="Operador da filial" value={storeBranchLoginId} onChange={(event) => setStoreBranchLoginId(event.target.value)} style={styles.input}>
+        <option value="">Selecione seu usuário</option>
+        {users.filter((user) => user.active && canAccessStoreBranch(activeStoreBranch, user)).map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+      </select>
+      <input aria-label="Senha ou PIN da filial" type="password" autoComplete="current-password" value={storeBranchLoginPassword} onChange={(event) => setStoreBranchLoginPassword(event.target.value)} placeholder="Senha / PIN do usuário" style={styles.input} />
+      <button type="button" style={styles.primaryButton} onClick={unlockStoreBranch} disabled={!storeBranchLoginId}>Entrar na filial</button>
+      <button type="button" style={styles.secondaryButton} onClick={() => { window.localStorage.setItem(ACTIVE_STORE_BRANCH_KEY, "matriz"); window.location.reload(); }}>Voltar para matriz</button>
+      <p role="status">{lastEvent}</p>
+    </section>
+  </main>;
 
   return (
     <AppShell title="Nexus Core - Professional Backoffice PDV" nav={nav} sidebarPosition="right" sidebarTitle="Gestão" hideTitle={route === "/caixa"}>
