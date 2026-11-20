@@ -76,3 +76,15 @@ test("P1: leitores auxiliares usam a chave ativa em ambas as edições", () => {
     assert.match(s, /getActivePdvStoreKey/);
   }
 });
+
+test("P1: login obrigatório e backup de outra unidade bloqueado", () => {
+  for (const edition of ["windows-10", "windows-7"]) {
+    const source = fs.readFileSync(new URL("../../" + edition + "/apps/pdv-demo/src/PdvDemoApp.tsx", import.meta.url), "utf8");
+    assert.match(source, /data-pdv-branch-access/);
+    assert.match(source, /authenticatePdvOperator\(users, storeBranchLoginId, storeBranchLoginPassword\)/);
+    assert.match(source, /canAccessStoreBranch\(activeStoreBranch, result\.user\)/);
+    assert.match(source, /targetBranchId !== activeStoreBranch\.id/);
+    assert.match(source, /branchId: created\.id/);
+    assert.match(source, /pre-multiloja/);
+  }
+});
