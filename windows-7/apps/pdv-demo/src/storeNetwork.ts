@@ -47,6 +47,8 @@ export function parseStoreNetwork(raw: string | null): StoreNetwork {
       branch.allowedOperatorIds.some((id) => typeof id !== "string")) ||
     new Set(value.branches.map((branch) => branch.id)).size !== value.branches.length ||
     new Set(value.branches.map((branch) => branch.storeKey)).size !== value.branches.length ||
+    value.branches.some((branch) => branch.id !== MAIN_BRANCH_ID &&
+      (!/^loja-[a-z0-9-]+$/.test(branch.id) || branch.storeKey !== `${LEGACY_PDV_STORE_KEY}:filial:${branch.id}`)) ||
     !value.branches.some((branch) => branch.id === MAIN_BRANCH_ID && branch.storeKey === LEGACY_PDV_STORE_KEY && branch.active)) {
     throw new Error("Registro de filiais inválido ou corrompido. Os dados existentes não foram alterados.");
   }
@@ -103,6 +105,11 @@ export function deactivateStoreBranch(registry: StoreNetwork, branchId: string):
   if (branchId === MAIN_BRANCH_ID) throw new Error("A matriz não pode ser desativada.");
   if (!registry.branches.some((branch) => branch.id === branchId)) throw new Error("Filial não encontrada.");
   return { ...registry, branches: registry.branches.map((branch) => branch.id === branchId ? { ...branch, active: false } : branch) };
+}
+
+export function reactivateStoreBranch(registry: StoreNetwork, branchId: string): StoreNetwork {
+  if (!registry.branches.some((branch) => branch.id === branchId)) throw new Error("Filial não encontrada.");
+  return { ...registry, branches: registry.branches.map((branch) => branch.id === branchId ? { ...branch, active: true } : branch) };
 }
 
 export function grantStoreBranchOperator(registry: StoreNetwork, branchId: string, operatorId: string, allowed: boolean): StoreNetwork {
