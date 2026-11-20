@@ -1,3 +1,4 @@
+import { getActivePdvStoreKey, getScopedBranchStorageKey } from "./storeNetwork";
 import {
   getDesktopPdvStoreBridge,
   getDesktopPrintingBridge,
@@ -16,7 +17,7 @@ import {
   reconcileSaleObservationsToBrowserStore
 } from "./saleObservation";
 
-const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
+const PDV_STORE_KEY = getActivePdvStoreKey();
 const eventBus = createPdvEventBus();
 let previousSnapshotJson: string | null = null;
 
