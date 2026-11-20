@@ -627,6 +627,11 @@ export function PdvDemoApp() {
     if (!file) return;
     try {
       const imported = parsePdvSnapshot(await file.text());
+      const backupBranchId = imported.extensions && typeof imported.extensions === "object"
+        ? (imported.extensions as Record<string, unknown>).branchId : undefined;
+      // Backups antigos sem branchId pertencem exclusivamente à matriz.
+      const targetBranchId = typeof backupBranchId === "string" ? backupBranchId : "matriz";
+      if (targetBranchId !== activeStoreBranch.id) throw new Error("Backup pertence a outra filial. Restauração bloqueada para impedir mistura de dados.");
       setPendingRestore({ filename: file.name, snapshot: imported });
       setLastEvent("Arquivo validado. Revise a restauração e confirme antes de alterar os dados.");
     } catch (error) { setLastEvent(error instanceof Error ? error.message : "Backup inválido."); }
@@ -818,7 +823,9 @@ export function PdvDemoApp() {
           ...defaultExtensions,
           users: users.map((user) => ({ ...user })),
           currentOperatorId: activeOperator.id,
-          storeSettings: { ...defaultStoreSettings, storeName: created.name }
+          storeSettings: { ...defaultStoreSettings, storeName: created.name },
+          branchId: created.id,
+          companyId: next.company.id
         }
       });
       await desktopStoreBridge.save(created.storeKey, JSON.stringify(emptyBranchSnapshot), 0);
