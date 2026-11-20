@@ -29,6 +29,8 @@ for (const edition of ["windows-10","windows-7"]) {
     const stock={sequence:"2",eventId:"stock:caixa-b:m1",branchId:"matriz",terminalId:"caixa-b",entityId:"m1",kind:"stock.movement",payload:{id:"m1",productCode:"A",quantityDelta:-2,type:"exit"}};
     const once=m.applyRemoteEvents(snapshot,[sales,stock],"matriz","CAIXA-A");
     assert.equal(once.catalogProducts[0].stock,3);
+    assert.equal(once.extensions.inventoryMovements[0].stockBefore,5);
+    assert.equal(once.extensions.inventoryMovements[0].stockAfter,3);
     assert.equal(once.completedSales.length,1);
     const twice=m.applyRemoteEvents(once,[sales,stock],"matriz","CAIXA-A");
     assert.deepEqual(twice.catalogProducts,once.catalogProducts);

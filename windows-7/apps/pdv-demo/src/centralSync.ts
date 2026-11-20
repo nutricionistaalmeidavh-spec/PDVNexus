@@ -136,8 +136,11 @@ export function applyRemoteEvents<T extends CentralSnapshot>(
       if(!product)throw new Error("Produto não cadastrado nesta filial; conciliação de estoque necessária.");
       const stock=normalizeAmount(product.stock);
       if(stock+delta<0)throw new Error("Estoque insuficiente para aplicar movimento remoto; saldo preservado.");
-      products=products.map(row=>row.productCode===productCode?{...row,stock:Math.round((stock+delta)*1000)/1000}:row);
-      movements=[{...payload,sourceTerminalId:event.terminalId},...movements];
+      const nextStock=Math.round((stock+delta)*1000)/1000;
+      products=products.map(row=>row.productCode===productCode?{...row,stock:nextStock}:row);
+      // O histórico remoto deve registrar os saldos REAIS da unidade que aplica,
+      // e não os saldos de origem da outra máquina.
+      movements=[{...payload,sourceTerminalId:event.terminalId,stockBefore:stock,stockAfter:nextStock},...movements];
     } else throw new Error("Tipo de evento remoto desconhecido.");
   }
   const next=updateCentralSyncState(snapshot,{receivedIds:[...received],cursor:String(cursor)});
