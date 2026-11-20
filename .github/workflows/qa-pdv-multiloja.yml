@@ -1,0 +1,54 @@
+name: QA PDV Multiloja PostgreSQL
+on:
+  push:
+    branches: ["feature/multiloja-p0-p1-20261120"]
+    paths:
+      - "services/pdv-sync-server/**"
+      - "windows-10/apps/pdv-demo/src/centralSync.ts"
+      - "windows-7/apps/pdv-demo/src/centralSync.ts"
+      - "windows-10/tests/pdv-central-sync.test.mjs"
+      - ".github/workflows/qa-pdv-multiloja.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/pdv-sync-server/**"
+      - "windows-10/apps/pdv-demo/src/centralSync.ts"
+      - "windows-7/apps/pdv-demo/src/centralSync.ts"
+      - "windows-10/tests/pdv-central-sync.test.mjs"
+      - ".github/workflows/qa-pdv-multiloja.yml"
+permissions:
+  contents: read
+jobs:
+  protocol-and-database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pdvnexus_test
+          POSTGRES_USER: pdvnexus
+          POSTGRES_PASSWORD: testing_only_not_production
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pdvnexus -d pdvnexus_test"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://pdvnexus:testing_only_not_production@127.0.0.1:5432/pdvnexus_test
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install open-source PostgreSQL driver
+        working-directory: services/pdv-sync-server
+        run: npm install --no-audit --no-fund
+      - name: PostgreSQL integration and protocol tests
+        working-directory: services/pdv-sync-server
+        run: npm test
+      - name: Desktop offline sync regression (both editions)
+        working-directory: windows-10
+        run: |
+          npm ci
+          node --test tests/pdv-central-sync.test.mjs
