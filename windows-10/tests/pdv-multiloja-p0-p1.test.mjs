@@ -57,6 +57,13 @@ for (const edition of ["windows-10", "windows-7"]) {
     const disabled = net.deactivateStoreBranch(next, next.branches[1].id);
     net.saveStoreNetwork(storage, disabled);
     assert.throws(() => net.selectActiveStoreBranch(storage, disabled, next.branches[1].id, { id: "GER-001", role: "manager" }), /inativa/i);
+    const restored = net.reactivateStoreBranch(disabled, next.branches[1].id);
+    assert.equal(restored.branches[1].storeKey, disabled.branches[1].storeKey);
+    assert.equal(restored.branches[1].active, true);
+    assert.throws(() => net.saveStoreNetwork(storage, {
+      ...next,
+      branches: next.branches.map((branch) => branch.id === "matriz" ? branch : { ...branch, storeKey: net.LEGACY_PDV_STORE_KEY })
+    }), /inválido/i);
     assert.equal(net.getActivePdvStoreKey(storage), net.LEGACY_PDV_STORE_KEY);
   });
 }
