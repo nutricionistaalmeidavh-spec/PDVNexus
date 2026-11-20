@@ -20,7 +20,7 @@ function memoryStorage() {
 
 for (const edition of ["windows-10", "windows-7"]) {
   test(edition + ": matriz antiga mantém a chave, migração não destrutiva", async () => {
-    const net = await loadModule("../" + (edition === "windows-10" ? "" : "../../windows-7/") + "apps/pdv-demo/src/storeNetwork.ts");
+    const net = await loadModule((edition === "windows-10" ? "../apps/pdv-demo/src/storeNetwork.ts" : "../../windows-7/apps/pdv-demo/src/storeNetwork.ts"));
     const storage = memoryStorage();
     const registry = net.readStoreNetwork(storage);
     assert.equal(registry.branches.length, 1);
@@ -30,7 +30,7 @@ for (const edition of ["windows-10", "windows-7"]) {
   });
 
   test(edition + ": filiais com snapshots e auxiliares separados", async () => {
-    const net = await loadModule("../" + (edition === "windows-10" ? "" : "../../windows-7/") + "apps/pdv-demo/src/storeNetwork.ts");
+    const net = await loadModule((edition === "windows-10" ? "../apps/pdv-demo/src/storeNetwork.ts" : "../../windows-7/apps/pdv-demo/src/storeNetwork.ts"));
     const storage = memoryStorage();
     const main = net.readStoreNetwork(storage);
     const next = net.registerStoreBranch(main, { name: "Filial Centro", operatorId: "GER-001" });
@@ -47,7 +47,7 @@ for (const edition of ["windows-10", "windows-7"]) {
   });
 
   test(edition + ": registro inválido não é apagado e filial inativa não abre", async () => {
-    const net = await loadModule("../" + (edition === "windows-10" ? "" : "../../windows-7/") + "apps/pdv-demo/src/storeNetwork.ts");
+    const net = await loadModule((edition === "windows-10" ? "../apps/pdv-demo/src/storeNetwork.ts" : "../../windows-7/apps/pdv-demo/src/storeNetwork.ts"));
     const storage = memoryStorage();
     storage.setItem(net.STORE_NETWORK_KEY, "{");
     assert.throws(() => net.readStoreNetwork(storage), /inválido|corrompido/i);
