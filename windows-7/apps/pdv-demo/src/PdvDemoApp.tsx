@@ -1,4 +1,5 @@
 import { SalesReports } from "./SalesReports";
+import { getActivePdvStoreKey, readStoreNetwork, saveStoreNetwork, registerStoreBranch, renameStoreBranch, deactivateStoreBranch, grantStoreBranchOperator, currentStoreBranch, canAccessStoreBranch, selectActiveStoreBranch } from "./storeNetwork";
 import { parsePdvOpeningAmount, buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "./cashierSafety";
 import { changeSaleReportExclusion, type ReportExclusion, type ReportExclusionEvent, type ReportSaleIdentity } from "./reportTraining";
 import { SaleItemPaymentEditor } from "./SaleItemPaymentEditor";
@@ -127,7 +128,7 @@ const nav = [
   { key: "configuracoes", label: "Configurações", path: "/configuracoes", icon: "CF" }
 ];
 
-const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
+const PDV_STORE_KEY = getActivePdvStoreKey();
 const defaultPaymentOptions: PaymentOption[] = [{ name: "A VISTA", feePercent: 0, showsInCashflow: true }, { name: "PIX", feePercent: 0, showsInCashflow: true }, { name: "CREDITO", feePercent: 3, showsInCashflow: true }, { name: "DEBITO", feePercent: 2.5, showsInCashflow: true }, { name: "A PRAZO", feePercent: 0, showsInCashflow: false }, { name: "CHEQUE", feePercent: 0, showsInCashflow: true }, { name: "OUTROS", feePercent: 0, showsInCashflow: true }];
 const paymentQuickMethods = ["A VISTA", "PIX", "DEBITO", "CREDITO", "A PRAZO"];
 const defaultRoute = "/caixa";
@@ -187,6 +188,8 @@ export function PdvDemoApp() {
   const pendingPersistenceSnapshotRef = useRef("");
   const lastPersistedSnapshotRef = useRef("");
   const lastPersistedRevisionRef = useRef(0);
+  const lastPulledServerRevisionRef = useRef<number | null>(null);
+  const lastPulledServerSnapshotRef = useRef<string | null>(null);
   // Preserve canonical extensions managed by other modules (lots, labels, etc.).
   const preservedPdvExtensionsRef = useRef<Record<string, unknown>>({});
   const savedConfig = initialStore.deviceConfig;
@@ -206,6 +209,11 @@ export function PdvDemoApp() {
   const [auditLogs, setAuditLogs] = useState<PdvAuditLog[]>(savedExtensions.auditLogs);
   const [cancelledSales, setCancelledSales] = useState<CompletedSale[]>(savedExtensions.cancelledSales);
   const [terminalConfig, setTerminalConfig] = useState<PdvTerminalConfig>(savedExtensions.terminalConfig);
+  const [storeNetwork, setStoreNetwork] = useState(readStoreNetwork);
+  const [networkCompanyName, setNetworkCompanyName] = useState(() => readStoreNetwork().company.name);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [operatorForBranch, setOperatorForBranch] = useState("");
+  const [renameBranchDrafts, setRenameBranchDrafts] = useState<Record<string, string>>({});
   const [tefConfig, setTefConfig] = useState<TefConfig>(savedExtensions.tefConfig);
   const [tefTransactions, setTefTransactions] = useState<PdvTefTransaction[]>(savedExtensions.tefTransactions);
   const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(savedExtensions.autoBackupConfig);
@@ -304,6 +312,7 @@ export function PdvDemoApp() {
   const activeCustomer = registeredCustomers.find((customer) => customer.id === (sale?.customerId ?? selectedCustomerId)) ?? registeredCustomers[0] ?? fallbackCustomer;
   const activeOperator = users.find((user) => user.id === currentOperatorId) ?? users[0] ?? defaultUsers[0];
   const canManageFinance=canReadPdvFinance(activeOperator,authorizedManagerId);
+  const activeStoreBranch = currentStoreBranch(storeNetwork);
   const needsManagerSetup=!users.some(user=>user.active&&(user.role==="manager"||user.role==="admin")&&Boolean(user.managerPassword||user.password));
   const extraCountMethods = paymentOptions.filter((opt) => opt.active !== false && opt.showsInCashflow !== false && opt.kind !== "store-credit" && !["A VISTA","PIX","CREDITO","DEBITO"].includes(opt.name.toUpperCase())).map((opt) => opt.name);
   const canReviewCash = Boolean(cashReviewApproverId && users.some((u) => u.id === cashReviewApproverId && u.active && (u.role === "manager" || u.role === "admin")));
@@ -790,6 +799,88 @@ export function PdvDemoApp() {
 
   const cancelSelectedSale = () => { const targetSale = completedSales.find((item) => item.number === cancelSaleNumber); if (!targetSale) return setLastEvent("Selecione uma venda finalizada para cancelar."); const targetCustomer = registeredCustomers.find((customer) => customer.id === targetSale.customerId) ?? fallbackCustomer; try { const authorization = authorizePdvAction({ action: "cancel-sale", operator: activeOperator, users, managerPassword: managerPasswordDraft, reason: cancelReasonDraft, createdAt: new Date().toLocaleString("pt-BR") }); const result = cancelPdvSale({ sale: targetSale, products: catalogProducts, customer: targetCustomer, reason: cancelReasonDraft, cancelledAt: new Date().toLocaleString("pt-BR"), operator: activeOperator, authorization }); setCatalogProducts(result.products); setRegisteredCustomers((current) => current.map((customer) => customer.id === result.customer.id ? result.customer : customer)); setCompletedSales((current) => current.filter((item) => item.number !== targetSale.number)); setCancelledSales((current) => [result.cancelledSale as CompletedSale, ...current]); setInventoryMovements((current) => [...result.stockMovements, ...current]); setAuditLogs((current) => [result.auditLog, ...current]); setPendingSensitiveAction(null); setLastEvent(`Venda ${targetSale.number} cancelada por ${activeOperator.name} com autorizacao de ${authorization.authorizedBy?.name ?? "gerente"}.`); setManagerPasswordDraft(""); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao cancelar venda."); } };
 
+
+  const createNetworkBranch = async () => {
+    try {
+      if (!canManageFinance) throw new Error("Somente gerente autenticado pode cadastrar filiais.");
+      if (!desktopStoreBridge || !desktopPdvBackupBridge) throw new Error("Cadastro de filiais requer o aplicativo desktop com backup ativo.");
+      const next = registerStoreBranch(storeNetwork, { name: newBranchName, operatorId: activeOperator.id });
+      const created = next.branches[next.branches.length - 1];
+      // P0: backup antes de qualquer criação; nada é removido do store_key da matriz.
+      await desktopPdvBackupBridge.write({ snapshotJson: buildPdvSnapshotJson(), reason: "pre-multiloja", retention: Math.max(7, autoBackupConfig.retention) });
+      const emptyBranchSnapshot = createDefaultPdvLocalStore({
+        ...defaultPdvStore,
+        catalogProducts: [],
+        registeredCustomers: [{ ...fallbackCustomer, creditUsed: 0 }],
+        completedSales: [],
+        cashSession: null,
+        extensions: {
+          ...defaultExtensions,
+          users: users.map((user) => ({ ...user })),
+          currentOperatorId: activeOperator.id,
+          storeSettings: { ...defaultStoreSettings, storeName: created.name }
+        }
+      });
+      await desktopStoreBridge.save(created.storeKey, JSON.stringify(emptyBranchSnapshot), 0);
+      saveStoreNetwork(window.localStorage, next);
+      setStoreNetwork(next);
+      setNewBranchName("");
+      setLastEvent(`Filial ${created.name} criada com base independente. A matriz foi preservada.`);
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Não foi possível cadastrar a filial."); }
+  };
+  const renameNetworkBranch = (id: string) => {
+    try {
+      if (!canManageFinance) throw new Error("Somente gerente autenticado pode editar filiais.");
+      const next = renameStoreBranch(storeNetwork, id, renameBranchDrafts[id] ?? "");
+      saveStoreNetwork(window.localStorage, next);
+      setStoreNetwork(next);
+      if (id === activeStoreBranch.id) setStoreSettings((current) => ({ ...current, storeName: next.branches.find((item) => item.id === id)?.name ?? current.storeName }));
+      setRenameBranchDrafts((current) => ({ ...current, [id]: "" }));
+      setLastEvent("Nome da filial atualizado.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao editar filial."); }
+  };
+  const disableNetworkBranch = (id: string) => {
+    try {
+      if (!canManageFinance) throw new Error("Somente gerente autenticado pode desativar filiais.");
+      if (id === activeStoreBranch.id) throw new Error("Troque de filial antes de desativá-la.");
+      const next = deactivateStoreBranch(storeNetwork, id);
+      saveStoreNetwork(window.localStorage, next);
+      setStoreNetwork(next);
+      setLastEvent("Filial desativada sem apagar cadastros, vendas ou backups.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao desativar filial."); }
+  };
+  const saveNetworkCompany = () => {
+    try {
+      if (!canManageFinance) throw new Error("Somente gerente autenticado pode editar a empresa.");
+      const name = networkCompanyName.trim();
+      if (!name || name.length > 80) throw new Error("Informe o nome da empresa (até 80 caracteres).");
+      const next = { ...storeNetwork, company: { ...storeNetwork.company, name } };
+      saveStoreNetwork(window.localStorage, next);
+      setStoreNetwork(next);
+      setLastEvent("Empresa atualizada.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao editar empresa."); }
+  };
+  const saveBranchOperator = (branchId: string, allowed: boolean) => {
+    try {
+      if (!canManageFinance) throw new Error("Somente gerente autenticado pode alterar permissões.");
+      if (!users.some((user) => user.id === operatorForBranch && user.active)) throw new Error("Selecione um operador ativo.");
+      if (!allowed && operatorForBranch === activeOperator.id && branchId === activeStoreBranch.id) throw new Error("O gerente não pode revogar o próprio acesso à unidade ativa.");
+      const next = grantStoreBranchOperator(storeNetwork, branchId, operatorForBranch, allowed);
+      saveStoreNetwork(window.localStorage, next);
+      setStoreNetwork(next);
+      setLastEvent(allowed ? "Acesso à filial autorizado." : "Acesso à filial revogado.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao alterar permissão."); }
+  };
+  const switchNetworkBranch = (branchId: string) => {
+    try {
+      if (sale || (cashSession && !cashSession.closedAt)) throw new Error("Finalize a venda e feche o caixa antes de trocar de filial.");
+      if (syncServerStatus.running) throw new Error("Encerre o servidor multi-caixa antes de trocar de filial.");
+      if (persistenceState !== "ready" || persistenceSaveActiveRef.current || pendingPersistenceSnapshotRef.current) throw new Error("Aguarde a confirmação das gravações locais antes de trocar de filial.");
+      selectActiveStoreBranch(window.localStorage, storeNetwork, branchId, activeOperator);
+      window.location.reload();
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao trocar de filial."); }
+  };
+
   const saveTerminalConfig = () => { try { const next = configurePdvTerminal(terminalDraft); setTerminalConfig(next); setLastEvent(`${next.terminalName} configurado em modo ${next.mode}.`); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao configurar multi-caixa."); } };
   const runAutoBackup = async (reason: string) => { if (!autoBackupConfig.enabled && reason !== "manual") return; const snapshotJson = buildPdvSnapshotJson(); setAutoBackups((current) => createPdvAutoBackup({ backups: current, snapshotJson, reason, createdAt: new Date().toISOString(), retention: autoBackupConfig.retention })); if (desktopPdvBackupBridge) { const result = await desktopPdvBackupBridge.write({ snapshotJson, reason, retention: autoBackupConfig.retention }); setDesktopBackupFiles(result.files); } };
   const refreshDesktopBackups = async () => { if (!desktopPdvBackupBridge) return setLastEvent("Backups em arquivo ficam disponiveis no app desktop Electron."); const result = await desktopPdvBackupBridge.list(); setDesktopBackupFiles(result.files); setLastEvent(`Pasta de backup: ${result.directory}`); };
@@ -823,8 +914,57 @@ export function PdvDemoApp() {
   const verifySqliteStorage = async () => { if (!desktopStoreBridge) return setLastEvent("SQLite so fica disponivel dentro do app desktop Electron."); const status = await desktopStoreBridge.status(); if (!status.available) throw new Error("SQLite indisponível neste computador."); setDesktopStoreStatus(`SQLite ativo neste computador (${status.machineName}). Banco: ${status.path}`); setLastEvent("Conexão com o SQLite confirmada."); };
   const startPdvSyncServer = async () => { try { if (!desktopPdvSyncBridge) return setLastEvent("Servidor multi-caixa disponivel apenas no app desktop Electron."); if (terminalConfig.mode !== "server") return setLastEvent("Defina este computador como Servidor antes de iniciar o multi-caixa."); const status = await desktopPdvSyncBridge.start({ port: Number(syncServerDraft.port) || 4174, token: syncServerDraft.token, storeKey: PDV_STORE_KEY }); setSyncServerStatus(status); setSyncServerDraft((current) => ({ ...current, remoteUrl: status.url ?? current.remoteUrl })); setLastEvent(`Servidor multi-caixa ativo em ${status.url}. Use o IP deste computador nos outros caixas.`); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao iniciar servidor multi-caixa."); } };
   const stopPdvSyncServer = async () => { try { if (!desktopPdvSyncBridge) return setLastEvent("Servidor multi-caixa disponivel apenas no app desktop Electron."); if (terminalConfig.mode !== "server") return setLastEvent("Somente o computador Servidor pode encerrar o multi-caixa."); const status = await desktopPdvSyncBridge.stop(); setSyncServerStatus(status); setLastEvent("Servidor multi-caixa parado."); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao parar servidor multi-caixa."); } };
-  const pushSnapshotToPdvServer = async () => { try { if (terminalConfig.mode !== "client") return setLastEvent("O envio para a base é exclusivo dos caixas Cliente."); const url = normalizeSyncUrl(syncServerDraft.remoteUrl); if (!url) return setLastEvent("Informe a URL do servidor multi-caixa."); const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, { method: "PUT", headers: { "Content-Type": "application/json", ...(syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : {}) }, body: JSON.stringify({ snapshotJson: buildPdvSnapshotJson() }) }); if (!response.ok) throw new Error(`Servidor recusou envio: ${response.status}.`); setLastEvent("Snapshot enviado para o servidor multi-caixa."); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao enviar snapshot para servidor."); } };
-  const pullSnapshotFromPdvServer = async () => { try { if (terminalConfig.mode !== "client") return setLastEvent("O recebimento da base é exclusivo dos caixas Cliente."); const url = normalizeSyncUrl(syncServerDraft.remoteUrl); if (!url) return setLastEvent("Informe a URL do servidor multi-caixa."); const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, { headers: syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : undefined }); if (!response.ok) throw new Error(`Servidor recusou leitura: ${response.status}.`); const row = await response.json() as { snapshotJson?: string } | null; if (!row?.snapshotJson) return setLastEvent("Servidor multi-caixa ainda nao tem snapshot salvo."); applyImportedStore(parsePdvSnapshot(row.snapshotJson)); setLastEvent("Snapshot recebido do servidor multi-caixa."); } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao receber snapshot do servidor."); } };
+  const pushSnapshotToPdvServer = async () => {
+    try {
+      if (terminalConfig.mode !== "client") throw new Error("Envio permitido somente no caixa cliente.");
+      if (lastPulledServerRevisionRef.current === null) throw new Error("Receba a revisão da base antes de enviar alterações. Nenhum dado foi sobrescrito.");
+      if (persistenceSaveActiveRef.current || pendingPersistenceSnapshotRef.current) throw new Error("Aguarde a gravação local antes de enviar.");
+      const url = normalizeSyncUrl(syncServerDraft.remoteUrl);
+      if (!url) throw new Error("Informe a URL do servidor multi-caixa.");
+      const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...(syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : {}) },
+        body: JSON.stringify({ snapshotJson: buildPdvSnapshotJson(), expectedRevision: lastPulledServerRevisionRef.current })
+      });
+      if (response.status === 409) throw new Error("Conflito de revisão: outro caixa alterou a base. Envio bloqueado; preserve seus dados e concilie as operações.");
+      if (!response.ok) throw new Error(`Servidor recusou envio: ${response.status}.`);
+      const saved = await response.json() as { revision?: number };
+      if (!Number.isSafeInteger(saved.revision)) throw new Error("Servidor não confirmou a revisão gravada.");
+      lastPulledServerRevisionRef.current = saved.revision!;
+      lastPulledServerSnapshotRef.current = buildPdvSnapshotJson();
+      setLastEvent("Snapshot enviado ao servidor com controle de revisão. Operações concorrentes continuam exigindo conciliação.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao enviar snapshot para servidor."); }
+  };
+  const pullSnapshotFromPdvServer = async () => {
+    try {
+      if (terminalConfig.mode !== "client") throw new Error("Recebimento permitido somente no caixa cliente.");
+      if (persistenceSaveActiveRef.current || pendingPersistenceSnapshotRef.current) throw new Error("Aguarde a gravação local antes de receber.");
+      const url = normalizeSyncUrl(syncServerDraft.remoteUrl);
+      if (!url) throw new Error("Informe a URL do servidor multi-caixa.");
+      const response = await fetch(`${url}/pdv-store?storeKey=${encodeURIComponent(PDV_STORE_KEY)}`, {
+        headers: syncServerDraft.token ? { "x-nexus-token": syncServerDraft.token } : undefined
+      });
+      if (!response.ok) throw new Error(`Servidor recusou leitura: ${response.status}.`);
+      const row = await response.json() as { snapshotJson?: string; revision?: number } | null;
+      if (!row?.snapshotJson || !Number.isSafeInteger(row.revision)) throw new Error("Servidor sem snapshot/revisão confiável.");
+      const previous = lastPulledServerSnapshotRef.current;
+      const localIsUntouched = completedSales.length === 0 && cancelledSales.length === 0 &&
+        inventoryMovements.length === 0 && cashClosings.length === 0 && !cashSession &&
+        ((JSON.stringify(catalogProducts) === JSON.stringify(seedProducts) && JSON.stringify(registeredCustomers) === JSON.stringify(seedCustomers)) ||
+         (catalogProducts.length === 0 && registeredCustomers.length <= 1));
+      if (!localIsUntouched && previous === null) throw new Error("Recebimento bloqueado: esta unidade já possui dados. Exporte backup e concilie antes de substituir um snapshot.");
+      if (previous !== null && (JSON.stringify(catalogProducts) !== JSON.stringify((JSON.parse(previous) as PdvStoreDefaults).catalogProducts) ||
+        JSON.stringify(completedSales) !== JSON.stringify((JSON.parse(previous) as PdvStoreDefaults).completedSales))) {
+        throw new Error("Recebimento bloqueado: existem alterações locais posteriores à última sincronização.");
+      }
+      // P0: nunca substituir registros comerciais locais sem validação de segurança.
+      await desktopPdvBackupBridge?.write({ snapshotJson: buildPdvSnapshotJson(), reason: "pre-sync-pull", retention: Math.max(7, autoBackupConfig.retention) });
+      applyImportedStore(parsePdvSnapshot(row.snapshotJson));
+      lastPulledServerRevisionRef.current = row.revision!;
+      lastPulledServerSnapshotRef.current = row.snapshotJson;
+      setLastEvent("Dados recebidos com revisão verificada. A gravação canônica local será concluída antes de novas operações.");
+    } catch (error) { setLastEvent(error instanceof Error ? error.message : "Falha ao receber snapshot do servidor."); }
+  };
   const exportHistoryCsv = () => { const csv = exportPdvReportCsv({ rows: salesHistory.map((item) => ({ date: item.finalizedAt, number: item.number, customerName: registeredCustomers.find((customer) => customer.id === item.customerId)?.name ?? item.customerId ?? "Cliente", status: item.status ?? "completed", paymentMethods: item.payments.map((payment) => payment.method).join(", "), total: item.netTotal })) }); const blob = new Blob([csv], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `pdv-vendas-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url); setLastEvent("Historico de vendas exportado em CSV."); };
   const saveCustomer = () => {
     const name = customerDraft.name.trim();
@@ -969,6 +1109,44 @@ export function PdvDemoApp() {
       {route === "/vendas" ? <section style={styles.pageGrid}><SectionCard title="Cancelamento e estorno" subtitle="Devolve estoque, reverte crédito a prazo e registra auditoria"><div style={styles.stack}><div style={styles.formRow}><select value={cancelSaleNumber} onChange={(event) => setCancelSaleNumber(event.target.value)} style={styles.input}><option value="">Selecione a venda</option>{completedSales.map((item) => <option key={item.number} value={item.number}>{item.number} - {formatCurrency(item.netTotal)}</option>)}</select><button onClick={() => setPendingSensitiveAction("cancel")} style={styles.primaryButton} disabled={!cancelSaleNumber}>Revisar estorno</button></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Venda</th><th style={styles.th}>Data</th><th style={styles.th}>Motivo</th><th style={styles.th}>Operador</th></tr></thead><tbody>{cancelledSales.slice(0, 6).map((item) => <tr key={`${item.number}-${item.cancelledAt}`}><td style={styles.td}>{item.number}</td><td style={styles.td}>{item.cancelledAt}</td><td style={styles.td}>{item.cancelReason}</td><td style={styles.td}>{users.find((user) => user.id === item.cancelledById)?.name ?? item.cancelledById}</td></tr>)}{cancelledSales.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhuma venda cancelada.</td></tr>}</tbody></table></div></div></SectionCard></section> : null}
 
       {route === "/fechamento" ? <section style={styles.pageGrid}><SectionCard title="Conferência de caixa" subtitle={canReviewCash && cashClosings[0] ? `Último fechamento: ${formatIntegrationStatus(cashClosings[0].status)}` : "Contagem cega: informe os valores antes de conferir"}><div style={styles.stack}><button onClick={() => { setCashCountStep("count");setPendingSensitiveAction("close"); }} style={styles.primaryButton} disabled={!cashSession || Boolean(cashSession.closedAt)}>Iniciar contagem cega</button><label style={styles.label}>PIN para consultar fechamentos anteriores<input type="password" autoComplete="off" value={cashClosePinDraft} onChange={(event) => setCashClosePinDraft(event.target.value)} style={styles.input} placeholder="PIN gerencial" /></label><div style={styles.toolbar}><button type="button" onClick={approveCashReview} style={styles.secondaryButton}>Consultar conferências com PIN</button><button type="button" onClick={() => setCashReviewApproverId(null)} style={styles.secondaryButton}>Ocultar valores</button></div><div style={styles.infoBox}>Os valores esperados permanecem ocultos durante a contagem. Somente PIN de gerente/administrador autoriza fechamento e consulta.</div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Fechamento</th><th style={styles.th}>Status</th><th style={styles.th}>Dinheiro esperado</th><th style={styles.th}>Divergência</th></tr></thead><tbody>{cashClosings.slice(0, 5).map((closing) => <tr key={closing.closedAt}><td style={styles.td}>{closing.closedAt}</td><td style={styles.td}>{canReviewCash ? formatIntegrationStatus(closing.status) : "Restrito"}</td><td style={styles.td}>{canReviewCash ? formatCurrency(closing.expectedCashTotal) : "Restrito"}</td><td style={styles.td}>{canReviewCash ? formatCurrency(closing.divergenceByMethod["A VISTA"] ?? 0) : "Restrito"}</td></tr>)}{cashClosings.length ? null : <tr><td style={styles.emptyRow} colSpan={4}>Nenhum fechamento conferido ainda.</td></tr>}</tbody></table></div></div></SectionCard></section> : null}
+
+      {route === "/administracao" ? <section style={styles.pageGrid} data-pdv-store-network>
+        <SectionCard title="Empresa e filiais" subtitle={`Unidade ativa: ${activeStoreBranch.name} · ${storeNetwork.branches.length} unidade(s)`}>
+          <div style={styles.stack}>
+            <div style={styles.infoBox}>A matriz continua utilizando o banco legado original. Novas filiais têm dados e estoques isolados; a gestão remota centralizada será entregue nas etapas P2/P3.</div>
+            <div style={styles.formRow}>
+              <input aria-label="Nome da empresa" style={styles.input} value={networkCompanyName} onChange={(event) => setNetworkCompanyName(event.target.value)} disabled={!canManageFinance} />
+              {canManageFinance ? <button style={styles.secondaryButton} onClick={saveNetworkCompany}>Salvar empresa</button> : null}
+            </div>
+            {storeNetwork.branches.map((branch) => <div key={branch.id} style={{ ...styles.stack, border: "1px solid #dbe2ea", borderRadius: 10, padding: 10 }}>
+              <div style={styles.formRow}>
+                <strong>{branch.name} {branch.id === activeStoreBranch.id ? "(ativa neste computador)" : ""}</strong>
+                <span>{branch.active ? "Habilitada" : "Desativada"}</span>
+                {branch.id !== activeStoreBranch.id && branch.active && canAccessStoreBranch(branch, activeOperator)
+                  ? <button style={styles.secondaryButton} onClick={() => switchNetworkBranch(branch.id)}>Acessar filial</button> : null}
+              </div>
+              {canManageFinance ? <div style={styles.formRow}>
+                <input aria-label={`Renomear ${branch.name}`} style={styles.input} placeholder="Novo nome da filial" value={renameBranchDrafts[branch.id] ?? ""} onChange={(event) => setRenameBranchDrafts((current) => ({ ...current, [branch.id]: event.target.value }))} />
+                <button style={styles.secondaryButton} onClick={() => renameNetworkBranch(branch.id)}>Renomear</button>
+                {branch.active && branch.id !== "matriz" ? <button style={styles.secondaryButton} onClick={() => disableNetworkBranch(branch.id)}>Desativar</button> : null}
+              </div> : null}
+              {canManageFinance ? <div style={styles.formRow}>
+                <select aria-label={`Permissão ${branch.name}`} style={styles.input} value={operatorForBranch} onChange={(event) => setOperatorForBranch(event.target.value)}>
+                  <option value="">Selecione um operador</option>
+                  {users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} · {user.id}</option>)}
+                </select>
+                <button style={styles.secondaryButton} onClick={() => saveBranchOperator(branch.id, true)}>Permitir acesso</button>
+                {branch.id !== "matriz" ? <button style={styles.secondaryButton} onClick={() => saveBranchOperator(branch.id, false)}>Revogar acesso</button> : null}
+              </div> : null}
+            </div>)}
+            {canManageFinance ? <div style={styles.formRow}>
+              <input aria-label="Nome da nova filial" placeholder="Nome da nova filial" value={newBranchName} onChange={(event) => setNewBranchName(event.target.value)} style={styles.input} />
+              <button style={styles.primaryButton} onClick={() => void createNetworkBranch()}>Cadastrar filial</button>
+            </div> : <div style={styles.infoBox}>Entre com o PIN de gerente para administrar filiais e permissões.</div>}
+          </div>
+        </SectionCard>
+      </section> : null}
+
       {route === "/configuracoes" ? <section style={styles.pageGrid}><SectionCard title="Comprovante e impressão" subtitle="Bobina 58/80 mm ou cupom não fiscal na metade superior da A4"><div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={receiptPrinterConfig.paperFormat} onChange={(event) => updateReceiptPaperFormat(event.target.value as ReceiptPaperFormat)} style={styles.input}><option value="58mm">58mm (bobina)</option><option value="80mm">80mm (bobina)</option><option value="a4-half">A4 meia folha</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => setPendingSensitiveAction("printer")} style={styles.secondaryButton} disabled={!lastReceiptText}>Revisar impressão</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth, storeSettings) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div></SectionCard></section> : null}
 
       {route === "/vendas" ? <section style={styles.pageGrid}><SectionCard wide title="Relatórios e dashboard" subtitle="Últimos 30 dias"><div style={styles.stack}><div style={styles.infoBox}>{storageStatusLabel}</div><div style={styles.totalsGrid}><div style={styles.totalTile}><span>Vendas</span><strong>{dashboardReport.salesCount}</strong></div><div style={styles.totalTile}><span>Total vendido</span><strong>{formatCurrency(dashboardReport.salesTotal)}</strong></div><div style={styles.totalTile}><span>Ticket médio</span><strong>{formatCurrency(dashboardReport.averageTicket)}</strong></div><div style={styles.totalTile}><span>Divergência de caixa</span><strong>{formatCurrency(dashboardReport.cashflow.divergenceTotal)}</strong></div></div><div style={styles.reportTables}><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Forma</th><th style={styles.th}>Total</th></tr></thead><tbody>{Object.entries(dashboardReport.paymentsByMethod).map(([method, amount]) => <tr key={method}><td style={styles.td}>{method}</td><td style={styles.td}>{formatCurrency(amount)}</td></tr>)}{Object.keys(dashboardReport.paymentsByMethod).length ? null : <tr><td style={styles.emptyRow} colSpan={2}>Sem pagamentos no período.</td></tr>}</tbody></table></div><div style={styles.tableScroll}><table style={styles.table}><thead><tr><th style={styles.th}>Produto</th><th style={styles.th}>Qtd.</th><th style={styles.th}>Total</th></tr></thead><tbody>{dashboardReport.topProducts.map((product) => <tr key={product.productCode}><td style={styles.td}>{product.productName}</td><td style={styles.td}>{product.quantity}</td><td style={styles.td}>{formatCurrency(product.total)}</td></tr>)}{dashboardReport.topProducts.length ? null : <tr><td style={styles.emptyRow} colSpan={3}>Sem produtos vendidos no período.</td></tr>}</tbody></table></div></div></div></SectionCard></section> : null}
