@@ -1,4 +1,5 @@
 import { SalesReports } from "./SalesReports";
+import { CentralSyncController, CentralSyncPanel } from "./CentralSyncPanel";
 import { LEGACY_PDV_STORE_KEY, ACTIVE_STORE_BRANCH_KEY, getActivePdvStoreKey, getScopedBranchStorageKey, readStoreNetwork, saveStoreNetwork, registerStoreBranch, renameStoreBranch, deactivateStoreBranch, reactivateStoreBranch, grantStoreBranchOperator, currentStoreBranch, canAccessStoreBranch, selectActiveStoreBranch } from "./storeNetwork";
 import { parsePdvOpeningAmount, buildPdvCashCount, shouldHandlePdvHotkey, authorizePdvCashManager } from "./cashierSafety";
 import { changeSaleReportExclusion, type ReportExclusion, type ReportExclusionEvent, type ReportSaleIdentity } from "./reportTraining";
@@ -1064,6 +1065,7 @@ export function PdvDemoApp() {
 
   return (
     <AppShell title="Nexus Core - Professional Backoffice PDV" nav={nav} sidebarPosition="right" sidebarTitle="Gestão" hideTitle={route === "/caixa"}>
+      <CentralSyncController terminalId={terminalConfig.terminalId} canRun={() => persistenceState === "ready" && !sale && !persistenceSaveActiveRef.current && !pendingPersistenceSnapshotRef.current && (activeStoreBranch.id === "matriz" || storeBranchAuthorized)} />
       {route === "/caixa" ? <section style={styles.cashierSurface}>
         <div style={styles.cashierMainPanel}>
           <div style={styles.cashierBanner}><div><p style={styles.cashierEyebrow}>{cashStatus} / {terminalConfig.terminalName}</p><h2 style={styles.cashierTitle}>Caixa de venda</h2><p role="status" aria-live="polite" style={styles.cashierSubtitle}>{lastEvent}</p></div><div style={styles.cashierStatusGrid}><div style={styles.cashierStatusTile}><span>Venda</span><strong>{sale?.number ?? "------"}</strong></div><div style={styles.cashierStatusTile}><span>Operador</span><strong>{activeOperator.name}</strong></div><div style={styles.cashierStatusTile}><span>Itens</span><strong>{itemCount.toFixed(3)}</strong></div></div></div>
@@ -1158,7 +1160,7 @@ export function PdvDemoApp() {
       {route === "/administracao" ? <section style={styles.pageGrid} data-pdv-store-network>
         <SectionCard title="Empresa e filiais" subtitle={`Unidade ativa: ${activeStoreBranch.name} · ${storeNetwork.branches.length} unidade(s)`}>
           <div style={styles.stack}>
-            <div style={styles.infoBox}>A matriz continua utilizando o banco legado original. Novas filiais têm dados e estoques isolados; a gestão remota centralizada será entregue nas etapas P2/P3.</div>
+            <div style={styles.infoBox}>A matriz continua utilizando o banco legado original. Novas filiais têm dados e estoques isolados; o servidor central P2/P3 é opcional e configurado por terminal; relatórios consolidados completos permanecem para P5.</div>
             <div style={styles.formRow}>
               <input aria-label="Nome da empresa" style={styles.input} value={networkCompanyName} onChange={(event) => setNetworkCompanyName(event.target.value)} disabled={!canManageFinance} />
               {canManageFinance ? <button style={styles.secondaryButton} onClick={saveNetworkCompany}>Salvar empresa</button> : null}
@@ -1191,6 +1193,7 @@ export function PdvDemoApp() {
             </div> : <div style={styles.infoBox}>Entre com o PIN de gerente para administrar filiais e permissões.</div>}
           </div>
         </SectionCard>
+        <CentralSyncPanel terminalId={terminalConfig.terminalId} canConfigure={canManageFinance} canSynchronize={persistenceState === "ready" && !sale && !persistenceSaveActiveRef.current && !pendingPersistenceSnapshotRef.current && (activeStoreBranch.id === "matriz" || storeBranchAuthorized)} />
       </section> : null}
 
       {route === "/configuracoes" ? <section style={styles.pageGrid}><SectionCard title="Comprovante e impressão" subtitle="Bobina 58/80 mm ou cupom não fiscal na metade superior da A4"><div style={styles.stack}><div style={styles.formRow}><input value={receiptPrinterConfig.printerName} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, printerName: event.target.value }))} placeholder="Nome/perfil da impressora" style={styles.input} /><select value={receiptPrinterConfig.paperFormat} onChange={(event) => updateReceiptPaperFormat(event.target.value as ReceiptPaperFormat)} style={styles.input}><option value="58mm">58mm (bobina)</option><option value="80mm">80mm (bobina)</option><option value="a4-half">A4 meia folha</option></select></div><label style={styles.label}><span><input type="checkbox" checked={receiptPrinterConfig.autoPrint} onChange={(event) => setReceiptPrinterConfig((current) => ({ ...current, autoPrint: event.target.checked }))} /> Imprimir automaticamente ao finalizar</span></label><div style={styles.toolbar}><button onClick={() => setPendingSensitiveAction("printer")} style={styles.secondaryButton} disabled={!lastReceiptText}>Revisar impressão</button><button onClick={() => setLastReceiptText(completedSales[0] ? renderReceiptForSale(completedSales[0], registeredCustomers.find((customer) => customer.id === completedSales[0].customerId)?.name ?? "Cliente", receiptPrinterConfig.paperWidth, storeSettings) : "")} style={styles.secondaryButton} disabled={!completedSales.length}>Gerar Ultimo</button></div><pre style={styles.pre}>{lastReceiptText || "Nenhum comprovante gerado ainda."}</pre></div></SectionCard></section> : null}
