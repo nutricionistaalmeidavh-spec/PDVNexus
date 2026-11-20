@@ -1,3 +1,4 @@
+import { getActivePdvStoreKey, getScopedBranchStorageKey } from "./storeNetwork";
 import {
   isBatchExpired,
   type ProductBatch,
@@ -6,7 +7,7 @@ import {
 } from "./productLabels";
 
 export const PRODUCT_BATCH_TRACKING_PREFIX = "NXL1:";
-export const PRODUCT_BATCH_PHYSICAL_SCAN_STORE_KEY = "nexus-core:pdv-batch-physical-scans:v1";
+export const PRODUCT_BATCH_PHYSICAL_SCAN_STORE_KEY = getScopedBranchStorageKey("nexus-core:pdv-batch-physical-scans:v1");
 
 export type BatchPhysicalScanRecord = {
   id: string;
