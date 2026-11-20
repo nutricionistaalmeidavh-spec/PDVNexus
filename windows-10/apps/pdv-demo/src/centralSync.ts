@@ -111,13 +111,19 @@ export function applyRemoteEvents<T extends CentralSnapshot>(
     const payload=safeRecord(event.payload);
     if(event.kind==="sale.completed"||event.kind==="sale.cancelled") {
       if(String(payload.number??"")!==event.entityId)throw new Error("Venda remota com identificação inconsistente.");
-      const existing=sales.find(row=>row.number===payload.number)??cancelled.find(row=>row.number===payload.number);
-      if(existing&&!same(existing,payload))throw new Error("Conflito de número de venda entre caixas. Conciliação obrigatória.");
+      if(payload.terminalId && payload.terminalId!==event.terminalId)throw new Error("Venda remota com terminal incompatível.");
+      const tagged={...payload,terminalId:event.terminalId};
+      const active=sales.find(row=>row.number===tagged.number);
+      const previouslyCancelled=cancelled.find(row=>row.number===tagged.number);
       if(event.kind==="sale.completed") {
-        if(!existing)sales=[payload,...sales];
+        if(previouslyCancelled)throw new Error("Conflito: venda já cancelada na filial.");
+        if(active && !same(active,tagged))throw new Error("Conflito de número de venda entre caixas. Conciliação obrigatória.");
+        if(!active)sales=[tagged,...sales];
       } else {
-        if(!existing)cancelled=[payload,...cancelled];
-        else if(sales.some(row=>row.number===payload.number)){sales=sales.filter(row=>row.number!==payload.number);cancelled=[payload,...cancelled];}
+        if(previouslyCancelled && !same(previouslyCancelled,tagged))throw new Error("Conflito de cancelamento duplicado.");
+        if(active && active.terminalId!==event.terminalId)throw new Error("Cancelamento de venda pertencente a outro terminal.");
+        if(!previouslyCancelled)cancelled=[tagged,...cancelled];
+        if(active)sales=sales.filter(row=>row.number!==tagged.number);
       }
     } else if(event.kind==="stock.movement") {
       if(String(payload.id??"")!==event.entityId)throw new Error("Movimento remoto com identificação inconsistente.");
