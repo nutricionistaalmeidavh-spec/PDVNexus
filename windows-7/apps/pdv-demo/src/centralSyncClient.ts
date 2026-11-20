@@ -41,7 +41,7 @@ export async function configureCentralSync(input:{endpointUrl:string;token:strin
   if(input.token.trim())await createUserSecretStore().set(credentialKey(branch.id,input.terminalId),token);
   if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("nexus-pdv:canonical-external-write"));
 }
-async function runSync(input:{terminalId:string}):Promise<CentralSyncResult>{
+async function runSync(input:{terminalId:string;canPersist?:()=>boolean}):Promise<CentralSyncResult>{
   const bridge=getDesktopPdvStoreBridge();
   if(!bridge)throw new Error("Banco canônico desktop indisponível.");
   const network=readStoreNetwork();
@@ -61,6 +61,7 @@ async function runSync(input:{terminalId:string}):Promise<CentralSyncResult>{
   const backupBridge=getDesktopPdvBackupBridge();
   let sent=0,received=0;
   const persist=async(next:CentralSnapshot)=>{
+    if(input.canPersist && !input.canPersist())throw new Error("Operação de caixa iniciada durante sincronização; gravação remota adiada.");
     const written=await bridge.save(storeKey,JSON.stringify(next),row!.revision);
     row={...row!,revision:written.revision,snapshotJson:JSON.stringify(next)};
     snapshot=next;
@@ -95,7 +96,7 @@ async function runSync(input:{terminalId:string}):Promise<CentralSyncResult>{
   const end=normalizeCentralSyncState(snapshot);
   return {state:"ok",sent,received,pending:collectPendingEvents(snapshot,branch.id,input.terminalId,end.ackedIds).length,cursor:end.cursor};
 }
-export function syncCentralNow(input:{terminalId:string}):Promise<CentralSyncResult>{
+export function syncCentralNow(input:{terminalId:string;canPersist?:()=>boolean}):Promise<CentralSyncResult>{
   if(running)return running;
   const op=runSync(input);
   running=op;

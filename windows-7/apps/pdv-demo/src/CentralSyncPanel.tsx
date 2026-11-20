@@ -20,7 +20,7 @@ export function CentralSyncController({terminalId,canRun}:{terminalId:string;can
         if(!bridge)return;
         const row=await bridge.load(getActivePdvStoreKey());
         if(!row?.snapshotJson||!normalizeCentralSyncState(JSON.parse(row.snapshotJson) as CentralSnapshot).enabled)return;
-        const result=await syncCentralNow({terminalId});
+        const result=await syncCentralNow({terminalId,canPersist:()=>gate.current()});
         if(!disposed&&result.state==="ok")announce("Última sincronização: "+result.sent+" enviados, "+result.received+" recebidos; cursor "+result.cursor+".");
       }catch(error){
         if(!disposed)announce("Sincronização pendente: "+(error instanceof Error?error.message:"falha de comunicação")+". As vendas locais foram preservadas.");
@@ -40,6 +40,8 @@ export function CentralSyncPanel({terminalId,canConfigure,canSynchronize}:{termi
   const [enabled,setEnabled]=useState(false);
   const [status,setStatus]=useState("Servidor central opcional: nenhum serviço pago é necessário.");
   const [busy,setBusy]=useState(false);
+  const manualGate=useRef(canSynchronize);
+  manualGate.current=canSynchronize;
   useEffect(()=>{
     let alive=true;
     const refresh=async()=>{
@@ -72,7 +74,7 @@ export function CentralSyncPanel({terminalId,canConfigure,canSynchronize}:{termi
     if(busy||!canSynchronize)return;
     setBusy(true);
     try{
-      const result=await syncCentralNow({terminalId});
+      const result=await syncCentralNow({terminalId,canPersist:()=>manualGate.current});
       setStatus("Sincronização confirmada: "+result.sent+" enviados e "+result.received+" recebidos. Pendentes: "+result.pending+".");
     }catch(error){setStatus(error instanceof Error?error.message:"Sincronização falhou. Operações locais preservadas.");}
     finally{setBusy(false);}
