@@ -36,6 +36,7 @@ export async function configureCentralSync(input:{endpointUrl:string;token:strin
     await checkMeta(endpoint,token,network.company.id,branch.id,input.terminalId);
   }
   const snapshot=JSON.parse(current.snapshotJson) as CentralSnapshot;
+  if(input.enabled && (snapshot.extensions?.terminalConfig as {mode?:string}|undefined)?.mode !== "single") throw new Error("Desative o multi-caixa legado antes de configurar o servidor PostgreSQL.");
   const next=updateCentralSyncState(snapshot,{enabled:input.enabled,endpointUrl:endpoint});
   await bridge.save(key,JSON.stringify(next),current.revision);
   if(input.token.trim())await createUserSecretStore().set(credentialKey(branch.id,input.terminalId),token);
@@ -50,6 +51,7 @@ async function runSync(input:{terminalId:string;canPersist?:()=>boolean}):Promis
   let row=await bridge.load(storeKey);
   if(!row?.snapshotJson)throw new Error("Snapshot local indisponível.");
   let snapshot=JSON.parse(row.snapshotJson) as CentralSnapshot;
+  if((snapshot.extensions?.terminalConfig as {mode?:string}|undefined)?.mode !== "single") throw new Error("Modo multi-caixa legado ativo; sincronização central bloqueada.");
   const state=normalizeCentralSyncState(snapshot);
   if(!state.enabled)return {sent:0,received:0,pending:0,cursor:state.cursor,state:"disabled"};
   const endpoint=validateSyncEndpointUrl(state.endpointUrl);

@@ -4,8 +4,8 @@
 - **P0:** proteção de gravação multi-caixa com `expectedRevision` obrigatório, mensagens para HTTP 409, backup pré-recebimento e bloqueio de importação/recebimento em lojas com dados locais não reconciliados.
 - **P1:** empresa e filiais locais, seleção de unidade, cadastro/renomeação/desativação, operadores autorizados por filial e armazenamento comercial independente por `store_key`.
 - Edições Windows 10+ (SQLite) e Windows 7/8 (JSON legado) utilizam a **mesma chave antiga da matriz**, `nexus-core:pdv-store:v1`, para não afetar instalações existentes. Filiais novas usam chaves novas.
-- A matrícula de empresa e filiais é local ao computador (`localStorage`); ainda não é uma federação de lojas. Não transportar o cadastro de filiais para outro terminal por cópia de snapshots.
-- **Não inclui** PostgreSQL, integração multiloja remota, transferências entre filiais, consolidação de relatórios ou sincronização automática offline. Essas entregas pertencem a P2–P5.
+- O registro de empresa e filiais permanece local ao computador (`localStorage`) no P1. O serviço central P2 utiliza provisionamento explícito com tokens por filial/terminal, não sincroniza esse cadastro automaticamente. Não copiar snapshots para transportar o registro de filiais.
+- **P2/P3 na mesma PR:** serviço PostgreSQL opcional em `services/pdv-sync-server`, API de eventos incrementais, tokens por filial/terminal, UI de conexão e sincronização automática somente quando seguro. Transferências entre filiais e relatórios consolidados completos continuam para P4/P5.
 - **Não habilitar release ou migração automatizada** até homologar as três arquiteturas e o fluxo completo de dados em máquinas reais.
 
 ## Fluxo administrativo
@@ -27,3 +27,9 @@
 - `cd windows-10 && npm ci && npm run typecheck && npm run test:pdv-payments && npm run test:pdv-upgrade && npm run build:pdv-demo`
 - `cd windows-7 && npm ci && npm run typecheck && npm run test:pdv-payments && npm run test:pdv-upgrade && npm run build:pdv-demo` (conforme scripts disponíveis).
 - Integração manual QA: criar uma filial com nome distinto, vender em matriz, trocar para filial, verificar ausência de vendas/estoques da matriz; bloquear troca com caixa aberto; backup cruzado; testar 409 e HTTP 428; atualizar de instalação antiga sem reconfiguração.
+
+## P2/P3 — novos gates
+- Executar `.github/workflows/qa-pdv-multiloja.yml` com PostgreSQL 17 real e testes de eventos do Windows 7/10.
+- Conexão central ativada somente pelo usuário e em modo Caixa único; nunca usar simultaneamente o antigo protocolo de snapshots multi-caixa.
+- P4 e P5 ainda pendentes: transferências com dupla confirmação, estoque remoto consolidado, dashboard da rede.
+- P6 pendente: homologação em hardware real, roteiros completos offline/reconexão, instaladores e release controlada.

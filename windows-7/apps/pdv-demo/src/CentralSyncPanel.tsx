@@ -80,7 +80,7 @@ export function CentralSyncPanel({terminalId,canConfigure,canSynchronize}:{termi
     finally{setBusy(false);}
   };
   return <section data-pdv-central-sync style={{display:"grid",gap:10,border:"1px solid #dbe2ea",borderRadius:12,padding:16}}>
-    <div><strong>Servidor central (PostgreSQL) — opcional</strong><p style={{fontSize:12,color:"#64748b"}}>Banco local continua operacional offline. Conecte somente via HTTPS ou localhost e use a credencial criada no provisionamento do servidor.</p></div>
+    <div><strong>Servidor central (PostgreSQL) — opcional</strong><p style={{fontSize:12,color:"#64748b"}}>O banco local continua funcionando offline. Configure o terminal em modo Caixa único antes de habilitar o servidor central; não execute simultaneamente o multi-caixa legado.</p></div>
     <label style={{display:"grid",gap:4}}>URL da API central
       <input aria-label="URL da API central" value={endpoint} onChange={e=>setEndpoint(e.target.value)} disabled={!canConfigure||busy} placeholder="https://pdv.intranet.exemplo" style={{padding:9,border:"1px solid #dbe2ea",borderRadius:8}}/>
     </label>
