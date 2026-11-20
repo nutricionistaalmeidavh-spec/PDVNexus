@@ -1,3 +1,4 @@
+import { getActivePdvStoreKey, getScopedBranchStorageKey } from "./storeNetwork";
 import { getDesktopPdvStoreBridge } from "@nexus-core/desktop-runtime";
 import { applyBatchStockEntryToSnapshot, type BatchStockEntryDraft } from "./batchInventory";
 import {
@@ -16,8 +17,8 @@ import {
 } from "./productLabels";
 import { reconcileProductBatchFefoSnapshot } from "./productBatchFefo";
 
-const PDV_STORE_KEY = "nexus-core:pdv-store:v1";
-export const PRODUCT_LABEL_BATCH_STORE_KEY = "nexus-core:pdv-label-batches:v1";
+const PDV_STORE_KEY = getActivePdvStoreKey();
+export const PRODUCT_LABEL_BATCH_STORE_KEY = getScopedBranchStorageKey("nexus-core:pdv-label-batches:v1");
 
 export type ProductLabelBatchCatalogProduct = LabelCatalogProduct & {
   barcodeType: "internal" | "gtin" | "manual";
