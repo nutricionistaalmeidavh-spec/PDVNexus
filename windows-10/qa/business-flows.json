@@ -2,6 +2,136 @@
   "schemaVersion": 1,
   "flows": [
     {
+      "id": "onboarding-cash-opening-150",
+      "category": "onboarding",
+      "critical": true,
+      "steps": [
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/caixa\"]",
+          "name": "pdv-ready",
+          "timeoutMs": 20000
+        },
+        {
+          "action": "desktopStoreSet",
+          "key": "nexus-core:pdv-store:v1",
+          "value": {},
+          "name": "reset-pdv"
+        },
+        {
+          "action": "reload",
+          "name": "reload-reset"
+        },
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/caixa\"]",
+          "name": "pdv-reset-ready",
+          "timeoutMs": 20000
+        },
+        {
+          "action": "waitFor",
+          "selector": "input[aria-label=\"Troco inicial (R$)\"]",
+          "name": "campo-troco-inicial-no-guia",
+          "timeoutMs": 16000
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Troco inicial (R$)\"]",
+          "value": "150,00",
+          "name": "informar-troco-inicial"
+        },
+        {
+          "action": "click",
+          "text": "2. Abrir o caixa",
+          "exact": true,
+          "name": "abrir-caixa-pelo-guia"
+        },
+        {
+          "action": "waitForTimeout",
+          "timeoutMs": 400,
+          "name": "persistir-caixa"
+        },
+        {
+          "action": "expectDesktopStoreJson",
+          "key": "nexus-core:pdv-store:v1",
+          "path": "cashSession.initialAmount",
+          "expected": 150,
+          "name": "troco-canonico-150"
+        }
+      ]
+    },
+    {
+      "id": "picker-missing-product-to-register",
+      "category": "onboarding",
+      "critical": true,
+      "steps": [
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/caixa\"]",
+          "name": "pdv-ready",
+          "timeoutMs": 20000
+        },
+        {
+          "action": "desktopStoreSet",
+          "key": "nexus-core:pdv-store:v1",
+          "value": {},
+          "name": "reset-pdv"
+        },
+        {
+          "action": "reload",
+          "name": "reload-reset"
+        },
+        {
+          "action": "waitFor",
+          "selector": "a[href=\"#/caixa\"]",
+          "name": "pdv-reset-ready",
+          "timeoutMs": 20000
+        },
+        {
+          "action": "click",
+          "text": "Escolher produto",
+          "exact": true,
+          "name": "abrir-pesquisa-de-venda"
+        },
+        {
+          "action": "waitFor",
+          "selector": "input[aria-label=\"Buscar produto por nome, marca, código ou categoria\"]",
+          "name": "pesquisa-aberta"
+        },
+        {
+          "action": "fill",
+          "selector": "input[aria-label=\"Buscar produto por nome, marca, código ou categoria\"]",
+          "value": "QA-MERCADORIA-NAO-CADASTRADA",
+          "name": "buscar-produto-inexistente"
+        },
+        {
+          "action": "expectVisible",
+          "role": "button",
+          "roleName": "Cadastrar novo produto",
+          "exact": true,
+          "name": "cadastro-oferecido"
+        },
+        {
+          "action": "click",
+          "role": "button",
+          "roleName": "Cadastrar novo produto",
+          "exact": true,
+          "name": "acessar-cadastro"
+        },
+        {
+          "action": "expectURL",
+          "includes": "#/produtos",
+          "name": "rota-cadastro"
+        },
+        {
+          "action": "waitFor",
+          "selector": "input[placeholder=\"Código *\"]",
+          "name": "formulario-cadastro-visivel",
+          "timeoutMs": 12000
+        }
+      ]
+    },
+    {
       "id": "cash-open",
       "category": "caixa",
       "critical": true,
