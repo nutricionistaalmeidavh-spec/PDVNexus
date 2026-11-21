@@ -1,0 +1,99 @@
+name: Gravar 6 tutoriais reais PDV Nexus Nova (QA)
+
+on:
+  push:
+    branches:
+      - "qa/pdv-tutoriais-reais-*"
+    paths:
+      - ".github/workflows/pdv-tutoriais-reais.yml"
+      - "windows-10/qa/artisys-qa.tutorials.config.json"
+      - "windows-10/qa/flows/tutorial-*.json"
+      - "windows-10/tests/pdv-tutorial-recordings.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdv-tutoriais-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gravar-tutoriais:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows-10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            windows-10/package-lock.json
+            windows-10/tools/artisys-qa/package-lock.json
+      - name: Instalar dependências locais
+        run: |
+          npm ci
+          npm ci --prefix tools/artisys-qa
+      - name: Provar jornadas interativas
+        run: node --test tests/pdv-tutorial-recordings.test.mjs
+      - name: Validar manifesto de tutoriais
+        run: node tools/artisys-qa/src/cli.mjs validate --config qa/artisys-qa.tutorials.config.json
+      - name: Compilar a interface atual do PDV
+        run: npm run build:pdv-demo
+      - name: Instalar FFmpeg open source
+        run: choco install ffmpeg -y --no-progress
+      - name: Gravar vídeos da operação real da interface
+        run: |
+          $videos = @(
+            "produto-primeira-venda",
+            "abrir-fechar-caixa",
+            "cliente-cadastro",
+            "consulta-ajuste-estoque",
+            "historico-vendas",
+            "relatorios-negocio"
+          )
+          New-Item -ItemType Directory -Force "qa-tutoriais-renderizados" | Out-Null
+          $errors = @()
+          foreach ($video in $videos) {
+            Write-Host "::group::Gravacao $video"
+            node tools/artisys-qa/src/cli.mjs demo --config qa/artisys-qa.tutorials.config.json --demo $video --output "qa-tutoriais/$video"
+            if ($LASTEXITCODE -ne 0) {
+              $errors += $video
+              Write-Host "::error::Falha na jornada real $video"
+            } else {
+              $mp4 = Get-ChildItem "qa-tutoriais/$video" -Recurse -Filter demo-video.mp4 | Select-Object -First 1
+              $summary = Get-ChildItem "qa-tutoriais/$video" -Recurse -Filter demo-summary.json | Select-Object -First 1
+              if (!$mp4 -or !$summary) {
+                $errors += $video
+              } else {
+                $data = Get-Content $summary.FullName -Raw | ConvertFrom-Json
+                if ($data.status -ne "passed") {
+                  $errors += $video
+                } else {
+                  Copy-Item $mp4.FullName "qa-tutoriais-renderizados/$video.mp4" -Force
+                  Copy-Item $summary.FullName "qa-tutoriais-renderizados/$video.summary.json" -Force
+                }
+              }
+            }
+            Write-Host "::endgroup::"
+          }
+          if ($errors.Count -gt 0) {
+            throw "Tutoriais nao aprovados: $($errors -join ', ')"
+          }
+          $actual = @(Get-ChildItem qa-tutoriais-renderizados -Filter *.mp4)
+          if ($actual.Count -ne 6) { throw "Esperados 6 videos reais; encontrados $($actual.Count)" }
+      - name: Anexar gravações e comprovantes
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PDV-Nexus-Tutoriais-Reais-QA
+          path: |
+            windows-10/qa-tutoriais-renderizados/
+            windows-10/qa-tutoriais/
+          if-no-files-found: warn
+          retention-days: 7

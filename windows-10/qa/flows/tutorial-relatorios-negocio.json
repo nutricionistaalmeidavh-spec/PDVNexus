@@ -1,0 +1,129 @@
+{
+  "id": "pdv-tutorial-real-relatorios-negocio",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-reset-ready-tutorial",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "open-caixa-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "clickIfVisible",
+      "text": "Abrir caixa",
+      "exact": true,
+      "name": "abrir-caixa-se-necessario-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F2",
+      "name": "nova-venda-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "value": "7895555441971",
+      "name": "scan-teclado-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "Enter",
+      "name": "confirmar-teclado-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F6",
+      "name": "pagamento-vista-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "press",
+      "selector": "input[placeholder*=\"Bipe\"]",
+      "key": "F8",
+      "name": "finalizar-venda-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "expectVisible",
+      "selector": "[role=\"dialog\"][aria-label=\"Comprovante da venda\"]",
+      "name": "comprovante-tutorial",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Fechar",
+      "exact": true,
+      "name": "fechar-comprovante-tutorial",
+      "holdMs": 700
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 450,
+      "name": "persistir-venda-tutorial"
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/vendas\"]",
+      "name": "abrir-relatorios",
+      "holdMs": 700
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/vendas",
+      "name": "rota-relatorios",
+      "holdMs": 500
+    },
+    {
+      "action": "expectVisible",
+      "text": "Relatórios e dashboard",
+      "exact": true,
+      "name": "painel-relatorios",
+      "holdMs": 500
+    },
+    {
+      "action": "expectVisible",
+      "text": "Ticket médio",
+      "exact": true,
+      "name": "ticket-medio",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Por produto",
+      "exact": true,
+      "name": "relatorio-por-produto",
+      "holdMs": 700
+    },
+    {
+      "action": "expectVisible",
+      "selector": ".nexus-reports__filters",
+      "name": "filtros-de-relatorio",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "text": "Itens vendidos",
+      "exact": true,
+      "name": "relatorio-itens-vendidos",
+      "holdMs": 700
+    }
+  ]
+}

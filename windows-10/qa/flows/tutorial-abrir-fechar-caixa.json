@@ -1,0 +1,146 @@
+{
+  "id": "pdv-tutorial-real-abrir-fechar-caixa",
+  "steps": [
+    {
+      "action": "waitFor",
+      "selector": "a[href=\"#/caixa\"]",
+      "name": "pdv-ready",
+      "timeoutMs": 20000
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/configuracoes\"]",
+      "name": "configurar-gerente-inicial",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Senha/PIN do operador\"]",
+      "value": "QA-test-manager-only-2026",
+      "name": "pin-de-teste-local",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Configurar gerente inicial",
+      "exact": true,
+      "name": "salvar-gerente-teste",
+      "holdMs": 700
+    },
+    {
+      "action": "expectVisible",
+      "text": "Gerente inicial configurado.",
+      "exact": false,
+      "name": "gerente-teste-configurado",
+      "holdMs": 500
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"#/fechamento\"]",
+      "name": "open-financeiro",
+      "holdMs": 700
+    },
+    {
+      "action": "expectURL",
+      "includes": "#/fechamento",
+      "name": "financeiro-route",
+      "holdMs": 500
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Caixa inicial\"]",
+      "value": "100",
+      "name": "caixa-inicial",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Abrir Caixa",
+      "exact": true,
+      "name": "abrir-caixa",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Iniciar contagem cega",
+      "exact": true,
+      "name": "abrir-dialogo-contagem",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Dinheiro contado\"]",
+      "value": "100",
+      "name": "dinheiro-contado",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"PIX conferido\"]",
+      "value": "0",
+      "name": "pix-contado",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Crédito conferido\"]",
+      "value": "0",
+      "name": "credito-contado",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Débito conferido\"]",
+      "value": "0",
+      "name": "debito-contado",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Conferir CHEQUE\"]",
+      "value": "0",
+      "name": "cheques-conferidos",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"Conferir OUTROS\"]",
+      "value": "0",
+      "name": "outros-conferidos",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Revisar contagem",
+      "exact": true,
+      "name": "revisar-contagem-cega",
+      "holdMs": 700
+    },
+    {
+      "action": "fill",
+      "selector": "input[placeholder=\"PIN do gerente (obrigatório)\"]",
+      "value": "QA-test-manager-only-2026",
+      "name": "autorizacao-gerente",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "text": "Autorizar e fechar caixa",
+      "exact": true,
+      "name": "autorizar-fechar-caixa",
+      "holdMs": 700
+    },
+    {
+      "action": "waitForTimeout",
+      "timeoutMs": 300,
+      "name": "persistir-fechamento"
+    },
+    {
+      "action": "expectVisible",
+      "text": "Status: FECHADO",
+      "exact": true,
+      "name": "fechamento-conferido",
+      "holdMs": 500
+    }
+  ]
+}
